@@ -5,8 +5,8 @@ import 'package:riocaja_smart/models/receipt.dart';
 
 class ApiService {
   // Asegúrate de que esta URL sea correcta - usa tu dirección IP y puerto correcto
-  final String baseUrl = 'http://192.168.100.216:8080/api/v1';
-  
+  final String baseUrl = 'http://10.41.1.251:8080/api/v1';
+ 
   // Obtener todos los comprobantes
   Future<List<Receipt>> getAllReceipts() async {
     try {

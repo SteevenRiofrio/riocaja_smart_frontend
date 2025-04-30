@@ -32,8 +32,8 @@ dependencies:
     sdk: flutter
   camera: ^0.10.5+8           # Para acceso a la cámara
   firebase_core: ^2.24.2      # Base de Firebase
-  google_mlkit_text_recognition: ^0.10.0  # Versión moderna para OCR
-  google_mlkit_commons: ^0.5.0 # Para el reconocimiento de texto
+  google_mlkit_text_recognition: ^0.11.0  # En lugar de 0.10.0
+  google_mlkit_commons: ^0.6.0  # En lugar de 0.5.0
   # Alternativa moderna: google_mlkit_text_recognition
   http: ^1.1.0                # Para llamadas API
   provider: ^6.1.1            # Para gestión de estado
