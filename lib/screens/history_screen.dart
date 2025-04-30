@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:riocaja_smart/models/receipt.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
+import 'package:riocaja_smart/services/api_service.dart'; // Asegúrate de importar tu ApiService
 
 class HistoryScreen extends StatefulWidget {
   @override
@@ -24,11 +25,26 @@ Future<void> _loadReceipts() async {
   
   try {
     print('HistoryScreen: Intentando cargar comprobantes desde el provider...');
+    
+    // Obtener información sobre la URL del API service
+    final apiService = ApiService(); // Necesitarás importar esta clase
+    print('HistoryScreen: URL del API: ${apiService.baseUrl}/receipts/');
+    
     await Provider.of<ReceiptsProvider>(context, listen: false).loadReceipts();
     final receipts = Provider.of<ReceiptsProvider>(context, listen: false).receipts;
     print('HistoryScreen: Se cargaron ${receipts.length} comprobantes');
+    
+    if (receipts.isEmpty) {
+      print('HistoryScreen: La lista de comprobantes está vacía');
+    } else {
+      // Mostrar el primer comprobante como ejemplo
+      print('HistoryScreen: Muestra del primer comprobante: ${receipts[0].nroTransaccion}');
+    }
   } catch (e) {
     print('HistoryScreen: Error al cargar comprobantes: $e');
+    // Mostrar más detalles sobre el error
+    print('HistoryScreen: Tipo de error: ${e.runtimeType}');
+    print('HistoryScreen: Detalles completos: $e');
   }
   
   setState(() => _isLoading = false);

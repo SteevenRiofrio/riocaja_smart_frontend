@@ -1,35 +1,50 @@
 // lib/services/api_service.dart
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:riocaja_smart/models/receipt.dart';
 
 class ApiService {
   // Asegúrate de que esta URL sea correcta - usa tu dirección IP y puerto correcto
-  final String baseUrl = 'http://10.41.1.251:8080/api/v1';
- 
+   final String baseUrl = 'http://10.41.1.251:8000/api/v1'; // Asegúrate de que sea puerto 8000
+
   // Obtener todos los comprobantes
   Future<List<Receipt>> getAllReceipts() async {
-    try {
-      print('Obteniendo comprobantes de: $baseUrl/receipts/');
-      final response = await http.get(Uri.parse('$baseUrl/receipts/'));
+  try {
+    final url = '$baseUrl/receipts/';
+    print('Obteniendo comprobantes de: $url');
+    
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+    ).timeout(Duration(seconds: 10)); // Añade un timeout
+    
+    print('Código de respuesta: ${response.statusCode}');
+    print('Cuerpo de respuesta: ${response.body.substring(0, min(200, response.body.length))}...');
+    
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+      final List<dynamic> receiptsJson = responseData['data'];
       
-      print('Respuesta: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        final Map<String, dynamic> responseData = jsonDecode(response.body);
-        final List<dynamic> receiptsJson = responseData['data'];
-        
-        print('Comprobantes obtenidos: ${receiptsJson.length}');
-        return receiptsJson.map((json) => Receipt.fromJson(json)).toList();
-      } else {
-        print('Error HTTP: ${response.statusCode}');
-        throw Exception('Error al obtener comprobantes');
-      }
-    } catch (e) {
-      print('Error en getAllReceipts: $e');
-      throw Exception('Error de conexión: $e');
+      print('Comprobantes obtenidos: ${receiptsJson.length}');
+      return receiptsJson.map((json) => Receipt.fromJson(json)).toList();
+    } else {
+      print('Error HTTP: ${response.statusCode}');
+      print('Detalles: ${response.body}');
+      throw Exception('Error al obtener comprobantes: ${response.statusCode}');
     }
+  } catch (e) {
+    print('Error en getAllReceipts: $e');
+    // Si el error es por un timeout, indícalo claramente
+    if (e is TimeoutException) {
+      print('La conexión al servidor agotó el tiempo de espera');
+    }
+    throw Exception('Error de conexión: $e');
   }
+}
   
   // Guardar un nuevo comprobante
   Future<bool> saveReceipt(Receipt receipt) async {
