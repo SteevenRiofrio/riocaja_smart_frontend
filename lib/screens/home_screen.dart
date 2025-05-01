@@ -5,6 +5,7 @@ import 'package:riocaja_smart/screens/report_screen.dart';
 import 'package:riocaja_smart/widgets/dashboard_summary.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
+import 'package:riocaja_smart/screens/debug_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
