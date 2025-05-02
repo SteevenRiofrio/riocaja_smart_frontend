@@ -1,4 +1,4 @@
-// lib/services/api_service.dart - Completo y corregido
+// lib/services/api_service.dart - Actualizado con la nueva IP
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
@@ -6,8 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:riocaja_smart/models/receipt.dart';
 
 class ApiService {
-  // URL actualizada al backend desplegado en Render
-  String baseUrl = 'https://35.202.219.87/api/v1';
+  // URL con dirección IP directa sin puerto
+  String baseUrl = 'http://35.202.219.87:8080/api/v1';
   
   // Método para permitir cambiar la URL dinámicamente (útil para pruebas/desarrollo)
   void updateBaseUrl(String newUrl) {
@@ -25,7 +25,7 @@ class ApiService {
       print('Enviando petición GET a: $url');
       print('Headers: ${{'Content-Type': 'application/json', 'Accept': 'application/json'}}');
       
-      // Aumentar el timeout para servicios en la nube como Render que pueden tener cold starts
+      // Aumentar el timeout para servicios en la nube que pueden tener cold starts
       final response = await http.get(
         Uri.parse(url),
         headers: {
@@ -74,7 +74,7 @@ class ApiService {
         print('Detalles: ${e.message}');
       } else if (e.toString().contains('TimeoutException')) {
         print('La conexión al servidor agotó el tiempo de espera (60 segundos)');
-        print('Nota: Los servicios en Render pueden tener "cold starts" que tardan más en responder la primera vez');
+        print('Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez');
       } else if (e is FormatException) {
         print('Error de formato: La respuesta no tiene el formato JSON esperado');
       }
@@ -130,7 +130,7 @@ class ApiService {
         print('Detalles: ${e.message}');
       } else if (e.toString().contains('TimeoutException')) {
         print('La conexión al servidor agotó el tiempo de espera (60 segundos)');
-        print('Nota: Los servicios en Render pueden tener "cold starts" que tardan más en responder la primera vez');
+        print('Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez');
       } else if (e is FormatException) {
         print('Error de formato: La respuesta no tiene el formato JSON esperado');
       }

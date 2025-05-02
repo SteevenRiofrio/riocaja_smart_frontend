@@ -1,4 +1,4 @@
-// lib/screens/debug_screen.dart - Completamente corregido
+// lib/screens/debug_screen.dart - Actualizado con la nueva IP
 import 'dart:convert';
 import 'dart:io';
 import 'dart:async';  // Importación explícita de dart:async para TimeoutException
@@ -16,11 +16,10 @@ class _DebugScreenState extends State<DebugScreen> {
   String _logs = '';
   bool _isTesting = false;
   TextEditingController _urlController = TextEditingController();
+  
+  // Lista simplificada con únicamente la IP del servidor Debian
   List<String> _predefinedUrls = [
-    'https://riocaja-smart-backend.onrender.com/api/v1', // Render (producción)
-    'http://10.41.1.251:8000/api/v1',                    // IP local original
-    'http://10.0.2.2:8000/api/v1',                       // Emulador Android
-    'http://localhost:8000/api/v1'                       // Local iOS/desarrollo
+    'http://35.202.219.87/api/v1',                    // IP del servidor Debian (producción)
   ];
 
   @override
@@ -70,6 +69,14 @@ class _DebugScreenState extends State<DebugScreen> {
         // Si falla, comprobar si es un error de certificado SSL (común en desarrollo)
         if (e.toString().contains('certificate') || e.toString().contains('SSL')) {
           _log('⚠️ Posible problema con certificados SSL. En desarrollo, considera usar HTTP en lugar de HTTPS.');
+          _log('⚠️ Si estás intentando usar HTTPS con una IP, necesitarás configurar certificados SSL válidos.');
+        }
+        
+        // Si es un error de socket o conexión rechazada
+        if (e is SocketException) {
+          _log('⚠️ Error de conexión: No se pudo conectar al servidor.');
+          _log('⚠️ Verifica que el servidor esté en ejecución y sea accesible desde tu red.');
+          _log('⚠️ Si estás usando una IP externa, asegúrate de que los puertos estén abiertos y configurados correctamente.');
         }
         
         // Continuar con el resto de las pruebas aún si esta falla
@@ -104,7 +111,7 @@ class _DebugScreenState extends State<DebugScreen> {
         final response = await http.get(
           Uri.parse(receiptsEndpoint),
           headers: {'Content-Type': 'application/json'}
-        ).timeout(Duration(seconds: 60)); // Tiempo extendido para Render (cold starts)
+        ).timeout(Duration(seconds: 60)); // Tiempo extendido para servidores con arranque en frío
         
         _log('✅ Respuesta del endpoint de comprobantes: ${response.statusCode}');
         
@@ -131,20 +138,23 @@ class _DebugScreenState extends State<DebugScreen> {
         // Proporcionar sugerencias basadas en el tipo de error
         if (e is SocketException) {
           _log('Parece un problema de conectividad de red o servidor no disponible.');
+          _log('Verifica que la ruta del endpoint sea correcta: $receiptsEndpoint');
         } else if (e.toString().contains('TimeoutException')) {
-          _log('Si estás usando Render, puede ser un "cold start" del servidor. Intenta de nuevo en unos momentos.');
+          _log('Si el servidor está en la nube, puede ser un "cold start". Intenta de nuevo en unos momentos.');
         } else if (e.toString().contains('HandshakeException')) {
           _log('Problema de SSL/TLS. Verifica que la URL sea correcta (http vs https).');
+          _log('Si estás intentando usar HTTPS con una IP, configura certificados SSL válidos o usa HTTP.');
         } 
       }
 
       _log('Diagnóstico finalizado');
       
-      // Recordatorio sobre Render
-      if (baseUrl.contains('render.com')) {
-        _log('⚠️ NOTA: Los servicios gratuitos en Render pueden tener "cold starts" de 30-60 segundos si el servicio no se ha usado recientemente.');
-        _log('Si la primera conexión falló, espera un minuto y vuelve a intentarlo.');
-      }
+      // Nota informativa sobre conexiones a servidores externos
+      _log('⚠️ NOTA: Cuando te conectas a un servidor externo por IP, asegúrate de:');
+      _log('1. Usar HTTP si no tienes un certificado SSL configurado.');
+      _log('2. Verificar que el puerto correcto esté abierto (80 para HTTP, 443 para HTTPS).');
+      _log('3. Configurar el firewall del servidor para permitir conexiones entrantes.');
+      
     } catch (e) {
       _log('❌ Error en el diagnóstico: $e');
     } finally {
@@ -172,7 +182,7 @@ class _DebugScreenState extends State<DebugScreen> {
               controller: _urlController,
               decoration: InputDecoration(
                 labelText: 'URL del API',
-                hintText: 'https://riocaja-smart-backend.onrender.com/api/v1',
+                hintText: 'http://35.202.219.87/api/v1',
                 border: OutlineInputBorder(),
                 suffixIcon: IconButton(
                   icon: Icon(Icons.more_vert),
