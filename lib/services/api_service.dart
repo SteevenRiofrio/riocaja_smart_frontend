@@ -7,7 +7,7 @@ import 'package:riocaja_smart/models/receipt.dart';
 
 class ApiService {
   // URL actualizada al backend desplegado en Render
-  String baseUrl = 'https://riocaja-smart-backend.onrender.com/api/v1';
+  String baseUrl = 'https://35.202.219.87/api/v1';
   
   // Método para permitir cambiar la URL dinámicamente (útil para pruebas/desarrollo)
   void updateBaseUrl(String newUrl) {
