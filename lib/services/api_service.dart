@@ -7,7 +7,7 @@ import 'package:riocaja_smart/models/receipt.dart';
 
 class ApiService {
   // URL con dirección IP directa sin puerto
-  String baseUrl = 'http://35.202.219.87:8080/api/v1';
+  String baseUrl = 'http://35.225.88.153:8080/api/v1';
   
   // Método para permitir cambiar la URL dinámicamente (útil para pruebas/desarrollo)
   void updateBaseUrl(String newUrl) {
