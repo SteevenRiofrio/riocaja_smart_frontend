@@ -37,18 +37,26 @@ class _PreviewScreenState extends State<PreviewScreen> {
       // Extraer texto de la imagen
       final extractedText = await ocrService.extractText(widget.imagePath);
 
+      // Detectar el tipo directamente en el texto
+      String tipoComprobante = 'Pago de Servicio'; // valor por defecto
+      
+      // Comprobar si contiene la palabra RETIRO
+      if (extractedText.toUpperCase().contains('RETIRO')) {
+        tipoComprobante = 'Retiro';
+      }
+
       // Analizar el texto para obtener datos estructurados
       final receiptData = await ocrService.analyzeReceipt(extractedText);
 
       setState(() {
         _extractedText = extractedText;
 
-        // Crear el objeto Receipt con los datos extraídos
+        // Crear el objeto Receipt con los datos extraídos y el tipo detectado
         _receipt = Receipt(
           banco: 'Banco del Barrio | Banco Guayaquil',
           fecha: receiptData['fecha'] ?? '',
           hora: receiptData['hora'] ?? '',
-          tipo: receiptData['tipo'] ?? 'Pago de Servicio',
+          tipo: tipoComprobante, // Usar el tipo detectado directamente
           nroTransaccion: receiptData['nro_transaccion'] ?? '',
           nroControl: receiptData['nro_control'] ?? '',
           local: receiptData['local'] ?? '',
@@ -216,6 +224,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
       );
     }
 
+    // Determinar color e icono según el tipo de comprobante
+    final bool isRetiro = _receipt!.tipo == 'Retiro';
+    final Color bannerColor = isRetiro ? Colors.orange.shade100 : Colors.blue.shade100;
+    final IconData bannerIcon = isRetiro ? Icons.money_off : Icons.payment;
+
     return Card(
       elevation: 2,
       child: Padding(
@@ -223,10 +236,33 @@ class _PreviewScreenState extends State<PreviewScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Banner principal con el tipo detectado
+            Container(
+              width: double.infinity,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              margin: EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: bannerColor,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(bannerIcon, size: 24),
+                  SizedBox(width: 12),
+                  Text(
+                    _receipt!.tipo, // Mostrar directamente el tipo detectado
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
             _buildInfoRow('Banco', _receipt!.banco),
             _buildInfoRow('Fecha', _receipt!.fecha),
             _buildInfoRow('Hora', _receipt!.hora),
-            _buildInfoRow('Tipo', _receipt!.tipo),
             _buildInfoRow(
               'Nro. Transacción',
               _receipt!.nroTransaccion.isEmpty

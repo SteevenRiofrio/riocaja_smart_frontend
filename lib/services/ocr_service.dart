@@ -19,12 +19,23 @@ class OcrService {
   // Analiza el texto para extraer datos del comprobante de pago de servicio
   Future<Map<String, dynamic>> analyzeReceipt(String text) async {
     try {
+    // Determinar el tipo de comprobante basado en el texto
+    String tipo = '';
+    
+    // Solo detectar entre dos tipos: Retiro o Pago de Servicio
+    if (text.toUpperCase().contains('RETIRO')) {
+      tipo = 'Retiro';
+    } else {
+      // Si no se detecta explícitamente como Retiro, asignar Pago de Servicio
+      tipo = 'Pago de Servicio';
+    }
+
       // Extraer campos según el orden y formato del comprobante original
       Map<String, dynamic> result = {
         'banco': 'Banco del Barrio | Banco Guayaquil',
         'fecha': _extractDate(text),
         'hora': _extractTime(text),
-        'tipo': 'Pago de Servicio',
+        'tipo': 'tipo',
         'nro_transaccion': _extractTransactionNumber(text),
         'nro_control': _extractControlNumber(text),
         'local': _extractLocalName(text),
@@ -39,7 +50,7 @@ class OcrService {
     } catch (e) {
       print('Error analyzing receipt: $e');
       return {
-        'tipo': 'Pago de Servicio',
+        'tipo': 'No Detectado',
         'fullText': text,
       };
     }

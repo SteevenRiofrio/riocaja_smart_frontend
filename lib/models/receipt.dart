@@ -17,7 +17,7 @@ class Receipt {
     required this.banco,
     required this.fecha,
     required this.hora,
-    required this.tipo,
+    required this.tipo, 
     required this.nroTransaccion,
     required this.nroControl,
     required this.local,
@@ -52,7 +52,7 @@ class Receipt {
       banco: json['banco'] ?? 'Banco del Barrio | Banco Guayaquil',
       fecha: json['fecha'] ?? '',
       hora: json['hora'] ?? '',
-      tipo: json['tipo'] ?? 'Pago de Servicio',
+      tipo: json['tipo'] ?? '',
       nroTransaccion:
           json['nro_transaccion'] ?? '', // Nombre del campo según el backend
       nroControl:

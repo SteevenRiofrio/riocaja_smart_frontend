@@ -174,37 +174,63 @@ class ApiService {
     }
   }
   
-  // Obtener reporte de cierre
-  Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
+ // Obtener reporte de cierre
+Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
+  try {
     // Formato de fecha esperado: dd/MM/yyyy
     String dateStr = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     
-    try {
-      print('Obteniendo reporte para fecha: $dateStr');
-      final response = await http.get(
-        Uri.parse('$baseUrl/receipts/report/$dateStr'),
-      ).timeout(Duration(seconds: 60));
-      
-      print('Respuesta: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
+    // Imprimir el formato de fecha para verificar
+    print('Formato de fecha enviado: $dateStr');
+    
+    // Revisar la ruta completa
+    final String url = '$baseUrl/receipts/report/$dateStr';
+    print('URL del reporte: $url');
+    
+    // Añadir logs detallados
+    print('Enviando solicitud GET a: $url');
+    print('Headers: ${{'Content-Type': 'application/json'}}');
+    
+    final response = await http.get(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+    ).timeout(Duration(seconds: 60));
+    
+    print('Código de respuesta: ${response.statusCode}');
+    print('Cuerpo de respuesta: ${response.body}');
+    
+    if (response.statusCode == 200) {
+      final jsonResponse = jsonDecode(response.body);
+      print('Datos del reporte recibidos: $jsonResponse');
+      return jsonResponse;
+    } else {
+      // Manejar específicamente el error 404
+      if (response.statusCode == 404) {
+        print('Error 404: No se encontró la ruta o no hay datos para la fecha $dateStr');
+        return {
+          'summary': {},
+          'total': 0.0,
+          'date': date.toString(),
+          'count': 0,
+          'error': 'No se encontraron datos para la fecha especificada'
+        };
       } else {
-        throw Exception('Error al obtener reporte: ${response.statusCode} - ${response.body}');
+        throw Exception('Error en la respuesta del servidor: ${response.statusCode} - ${response.body}');
       }
-    } catch (e) {
-      print('Error en getClosingReport: $e');
-      
-      if (e is SocketException) {
-        print('Error de socket: No se pudo conectar al servidor');
-      } else if (e.toString().contains('TimeoutException')) {
-        print('La conexión al servidor agotó el tiempo de espera (60 segundos)');
-      }
-      
-      throw Exception('Error de conexión: $e');
     }
+  } catch (e) {
+    print('Error en getClosingReport: $e');
+    
+    return {
+      'summary': {},
+      'total': 0.0,
+      'date': date.toString(),
+      'count': 0,
+      'error': 'Error de conexión: $e'
+    };
   }
-  
+}
+
   // Helper function for min (used in truncating logs)
   int min(int a, int b) {
     return (a < b) ? a : b;

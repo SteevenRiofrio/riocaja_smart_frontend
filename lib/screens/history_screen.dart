@@ -12,6 +12,7 @@ class HistoryScreen extends StatefulWidget {
 
 class _HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
+  String _selectedFilter = 'Todos'; // Filtro seleccionado
   
 @override
 void initState() {
@@ -50,18 +51,24 @@ Future<void> _loadReceipts() async {
   setState(() => _isLoading = false);
 }
   
-  @override
+   @override
   Widget build(BuildContext context) {
-    // Usar el Consumer para escuchar cambios en los datos
     return Consumer<ReceiptsProvider>(
       builder: (context, receiptsProvider, child) {
-        final _receipts = receiptsProvider.receipts;
+        final _allReceipts = receiptsProvider.receipts;
         final _isProviderLoading = receiptsProvider.isLoading;
+        
+        // Filtrar los comprobantes según el filtro seleccionado
+        final _receipts = _filterReceipts(_allReceipts);
         
         return Scaffold(
           appBar: AppBar(
             title: Text('Historial de Comprobantes'),
             actions: [
+              IconButton(
+                icon: Icon(Icons.filter_list),
+                onPressed: _showFilterOptions,
+              ),
               IconButton(
                 icon: Icon(Icons.refresh),
                 onPressed: _loadReceipts,
@@ -70,9 +77,97 @@ Future<void> _loadReceipts() async {
           ),
           body: _isLoading || _isProviderLoading
               ? Center(child: CircularProgressIndicator())
-              : _receipts.isEmpty
-                  ? _buildEmptyState()
-                  : _buildReceiptsList(_receipts),
+              : Column(
+                  children: [
+                    // Mostrar el filtro activo
+                    if (_selectedFilter != 'Todos')
+                      Container(
+                        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                        color: Colors.grey.shade200,
+                        child: Row(
+                          children: [
+                            Text('Filtro: $_selectedFilter', 
+                              style: TextStyle(fontWeight: FontWeight.bold)),
+                            Spacer(),
+                            TextButton(
+                              onPressed: () {
+                                setState(() {
+                                  _selectedFilter = 'Todos';
+                                });
+                              },
+                              child: Text('Limpiar'),
+                            )
+                          ],
+                        ),
+                      ),
+                    // Lista de comprobantes
+                    Expanded(
+                      child: _receipts.isEmpty
+                          ? _buildEmptyState()
+                          : _buildReceiptsList(_receipts),
+                    ),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+  
+  // Método para filtrar comprobantes
+  List<Receipt> _filterReceipts(List<Receipt> receipts) {
+    if (_selectedFilter == 'Todos') {
+      return receipts;
+    }
+    
+    return receipts.where((receipt) {
+      return receipt.tipo == _selectedFilter;
+    }).toList();
+  }
+  
+  // Mostrar opciones de filtro
+  void _showFilterOptions() {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: Text('Todos los comprobantes'),
+                leading: Icon(Icons.receipt_long),
+                selected: _selectedFilter == 'Todos',
+                onTap: () {
+                  setState(() {
+                    _selectedFilter = 'Todos';
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: Text('Pagos de Servicio'),
+                leading: Icon(Icons.payment, color: Colors.blue),
+                selected: _selectedFilter == 'Pago de Servicio',
+                onTap: () {
+                  setState(() {
+                    _selectedFilter = 'Pago de Servicio';
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                title: Text('Retiros'),
+                leading: Icon(Icons.money_off, color: Colors.orange),
+                selected: _selectedFilter == 'Retiro',
+                onTap: () {
+                  setState(() {
+                    _selectedFilter = 'Retiro';
+                  });
+                  Navigator.pop(context);
+                },
+              ),
+            ],
+          ),
         );
       },
     );
@@ -121,6 +216,18 @@ Future<void> _loadReceipts() async {
   }
 
   Widget _buildReceiptCard(Receipt receipt) {
+      // Determinar el icono y color según el tipo de comprobante
+  IconData typeIcon;
+  Color headerColor;
+  
+  if (receipt.tipo == 'Retiro') {
+    typeIcon = Icons.money_off; // Icono para retiros
+    headerColor = Colors.orange.shade100; // Color para retiros
+  } else {
+    // Para Pago de Servicio u otros tipos no reconocidos
+    typeIcon = Icons.payment; // Icono para pagos de servicio
+    headerColor = Colors.blue.shade100; // Color para pagos
+  }
     return Card(
       margin: EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -129,36 +236,36 @@ Future<void> _loadReceipts() async {
           children: [
             // Encabezado con tipo y fecha
             Container(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                borderRadius: BorderRadius.only(
-                  topLeft: Radius.circular(4),
-                  topRight: Radius.circular(4),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.payment),
-                  SizedBox(width: 8),
-                  Text(
-                    receipt.tipo,
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  Spacer(),
-                  Text(
-                    '${receipt.fecha} ${receipt.hora}',
-                    style: TextStyle(
-                      color: Colors.grey.shade700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
+            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: headerColor,
+              borderRadius: BorderRadius.only(
+                topLeft: Radius.circular(4),
+                topRight: Radius.circular(4),
               ),
             ),
+            child: Row(
+              children: [
+                Icon(typeIcon),
+                SizedBox(width: 8),
+                Text(
+                  receipt.tipo,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '${receipt.fecha} ${receipt.hora}',
+                  style: TextStyle(
+                    color: Colors.grey.shade700,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
             
             // Contenido principal
             Padding(
