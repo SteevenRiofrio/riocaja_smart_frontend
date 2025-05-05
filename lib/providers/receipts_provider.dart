@@ -1,7 +1,10 @@
 // lib/providers/receipts_provider.dart
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:riocaja_smart/models/receipt.dart';
 import 'package:riocaja_smart/services/api_service.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:provider/provider.dart';
 
 class ReceiptsProvider with ChangeNotifier {
   List<Receipt> _receipts = [];
@@ -11,13 +14,25 @@ class ReceiptsProvider with ChangeNotifier {
   List<Receipt> get receipts => _receipts;
   bool get isLoading => _isLoading;
   
+  // Método para configurar el contexto
+  void setContext(BuildContext context) {
+    // Pasar el contexto al ApiService para que pueda acceder al AuthProvider
+    _apiService.setContext(context);
+    
+    // Configurar el token actual
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.isAuthenticated) {
+      _apiService.setAuthToken(authProvider.user?.token);
+    }
+  }
+  
   // Cargar todos los comprobantes
   Future<void> loadReceipts() async {
     _isLoading = true;
     notifyListeners();
     
     try {
-       print("Intentando cargar comprobantes desde el backend...");
+      print("Intentando cargar comprobantes desde el backend...");
       _receipts = await _apiService.getAllReceipts();
     } catch (e) {
       print('Error loading receipts: $e');

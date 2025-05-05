@@ -1,18 +1,58 @@
-// lib/services/api_service.dart - Actualizado con la nueva IP
+// lib/services/api_service.dart
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:riocaja_smart/models/receipt.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter/material.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
 
 class ApiService {
-  // URL con dirección IP directa sin puerto
+  // URL con dirección IP directa
   String baseUrl = 'http://35.225.88.153:8080/api/v1';
-  
+
+  // Token de autenticación
+  String? _authToken;
+
+  // Contexto para acceder a los providers
+  BuildContext? _context;
+
+  // Método para establecer el contexto
+  void setContext(BuildContext context) {
+    _context = context;
+    // Obtener el token del AuthProvider si está disponible
+    if (_context != null) {
+      final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+      if (authProvider.isAuthenticated) {
+        _authToken = authProvider.user?.token;
+      }
+    }
+  }
+
   // Método para permitir cambiar la URL dinámicamente (útil para pruebas/desarrollo)
   void updateBaseUrl(String newUrl) {
     baseUrl = newUrl;
     print('URL de API actualizada a: $baseUrl');
+  }
+
+  // Método para establecer el token de autenticación directamente
+  void setAuthToken(String? token) {
+    _authToken = token;
+  }
+
+  // Crear los headers HTTP con o sin token de autenticación
+  Map<String, String> _getHeaders() {
+    Map<String, String> headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    if (_authToken != null) {
+      headers['Authorization'] = 'Bearer $_authToken';
+    }
+
+    return headers;
   }
 
   // Obtener todos los comprobantes
@@ -20,32 +60,42 @@ class ApiService {
     try {
       final url = '$baseUrl/receipts/';
       print('Obteniendo comprobantes de: $url');
-      
+
       // Mejorar el registro de la petición HTTP
       print('Enviando petición GET a: $url');
-      print('Headers: ${{'Content-Type': 'application/json', 'Accept': 'application/json'}}');
-      
+      print('Headers: ${_getHeaders()}');
+
       // Aumentar el timeout para servicios en la nube que pueden tener cold starts
-      final response = await http.get(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ).timeout(Duration(seconds: 60)); // 60 segundos para manejar cold starts
-      
+      final response = await http
+          .get(Uri.parse(url), headers: _getHeaders())
+          .timeout(
+            Duration(seconds: 60),
+          ); // 60 segundos para manejar cold starts
+
       print('Código de respuesta: ${response.statusCode}');
-      
+
+      // Verificar si el token ha expirado (código 401)
+      if (response.statusCode == 401 && _context != null) {
+        print('Token expirado. Se requiere iniciar sesión nuevamente.');
+        // Notificar al AuthProvider que el token ha expirado
+        Provider.of<AuthProvider>(_context!, listen: false).logout();
+        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
+      }
+
       if (response.body.isNotEmpty) {
         try {
-          print('Primeros 200 caracteres del cuerpo: ${response.body.substring(0, min(200, response.body.length))}...');
-          
+          print(
+            'Primeros 200 caracteres del cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
+          );
+
           if (response.statusCode == 200) {
             final Map<String, dynamic> responseData = jsonDecode(response.body);
             if (responseData.containsKey('data')) {
               final List<dynamic> receiptsJson = responseData['data'];
               print('Comprobantes obtenidos: ${receiptsJson.length}');
-              return receiptsJson.map((json) => Receipt.fromJson(json)).toList();
+              return receiptsJson
+                  .map((json) => Receipt.fromJson(json))
+                  .toList();
             } else {
               print('La respuesta no contiene la clave "data"');
               print('Respuesta completa: ${response.body}');
@@ -54,7 +104,9 @@ class ApiService {
           } else {
             print('Error HTTP: ${response.statusCode}');
             print('Detalles: ${response.body}');
-            throw Exception('Error al obtener comprobantes: ${response.statusCode} - ${response.body}');
+            throw Exception(
+              'Error al obtener comprobantes: ${response.statusCode} - ${response.body}',
+            );
           }
         } catch (e) {
           print('Error al procesar el cuerpo de la respuesta: $e');
@@ -67,45 +119,61 @@ class ApiService {
       }
     } catch (e) {
       print('Error en getAllReceipts: $e');
-      
+
       // Mejor diagnóstico de errores de red
       if (e is SocketException) {
         print('Error de socket: No se pudo conectar al servidor');
         print('Detalles: ${e.message}');
       } else if (e.toString().contains('TimeoutException')) {
-        print('La conexión al servidor agotó el tiempo de espera (60 segundos)');
-        print('Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez');
+        print(
+          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
+        );
+        print(
+          'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
+        );
       } else if (e is FormatException) {
-        print('Error de formato: La respuesta no tiene el formato JSON esperado');
+        print(
+          'Error de formato: La respuesta no tiene el formato JSON esperado',
+        );
       }
-      
+
       throw Exception('Error de conexión: $e');
     }
   }
+
   
+
   // Guardar un nuevo comprobante
   Future<bool> saveReceipt(Receipt receipt) async {
     try {
       final url = '$baseUrl/receipts/';
       print('Guardando comprobante en: $url');
-      
+
       // Convertir el objeto Receipt a JSON con el formato correcto
       final Map<String, dynamic> receiptJson = receipt.toJson();
       final String jsonBody = jsonEncode(receiptJson);
-      
+
       print('Datos a enviar: $jsonBody');
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonBody,
-      ).timeout(Duration(seconds: 60));
-      
+
+      final response = await http
+          .post(Uri.parse(url), headers: _getHeaders(), body: jsonBody)
+          .timeout(Duration(seconds: 60));
+
       print('Respuesta del servidor: ${response.statusCode}');
       if (response.body.isNotEmpty) {
-        print('Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...');
+        print(
+          'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
+        );
       }
-      
+
+      // Verificar si el token ha expirado (código 401)
+      if (response.statusCode == 401 && _context != null) {
+        print('Token expirado. Se requiere iniciar sesión nuevamente.');
+        // Notificar al AuthProvider que el token ha expirado
+        Provider.of<AuthProvider>(_context!, listen: false).logout();
+        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
+      }
+
       // Revisar códigos de estado adicionales
       if (response.statusCode == 200 || response.statusCode == 201) {
         return true;
@@ -120,21 +188,29 @@ class ApiService {
       } else {
         print('Error HTTP no esperado: ${response.statusCode}');
         print('Detalles: ${response.body}');
-        throw Exception('Error al guardar comprobante: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Error al guardar comprobante: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('Error en saveReceipt: $e');
-      
+
       if (e is SocketException) {
         print('Error de socket: No se pudo conectar al servidor');
         print('Detalles: ${e.message}');
       } else if (e.toString().contains('TimeoutException')) {
-        print('La conexión al servidor agotó el tiempo de espera (60 segundos)');
-        print('Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez');
+        print(
+          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
+        );
+        print(
+          'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
+        );
       } else if (e is FormatException) {
-        print('Error de formato: La respuesta no tiene el formato JSON esperado');
+        print(
+          'Error de formato: La respuesta no tiene el formato JSON esperado',
+        );
       }
-      
+
       throw Exception('Error de conexión: $e');
     }
   }
@@ -146,90 +222,121 @@ class ApiService {
     }
 
     try {
-      print('Eliminando comprobante con número de transacción: $transactionNumber');
-      final response = await http.delete(
-        Uri.parse('$baseUrl/receipts/$transactionNumber'),
-      ).timeout(Duration(seconds: 60));
+      print(
+        'Eliminando comprobante con número de transacción: $transactionNumber',
+      );
+      final response = await http
+          .delete(
+            Uri.parse('$baseUrl/receipts/$transactionNumber'),
+            headers: _getHeaders(),
+          )
+          .timeout(Duration(seconds: 60));
 
       print('Respuesta del servidor: ${response.statusCode}');
       if (response.body.isNotEmpty) {
-        print('Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...');
+        print(
+          'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
+        );
+      }
+
+      // Verificar si el token ha expirado (código 401)
+      if (response.statusCode == 401 && _context != null) {
+        print('Token expirado. Se requiere iniciar sesión nuevamente.');
+        // Notificar al AuthProvider que el token ha expirado
+        Provider.of<AuthProvider>(_context!, listen: false).logout();
+        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
       }
 
       if (response.statusCode == 200) {
         return true;
       } else {
-        throw Exception('Error al eliminar comprobante: ${response.statusCode} - ${response.body}');
+        throw Exception(
+          'Error al eliminar comprobante: ${response.statusCode} - ${response.body}',
+        );
       }
     } catch (e) {
       print('Error en deleteReceipt: $e');
-      
+
       if (e is SocketException) {
         print('Error de socket: No se pudo conectar al servidor');
       } else if (e.toString().contains('TimeoutException')) {
-        print('La conexión al servidor agotó el tiempo de espera (60 segundos)');
+        print(
+          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
+        );
       }
-      
+
       throw Exception('Error de conexión: $e');
     }
   }
-  
- // Obtener reporte de cierre
-Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
-  try {
-    // Formato de fecha esperado: dd/MM/yyyy
-    String dateStr = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    
-    // Imprimir el formato de fecha para verificar
-    print('Formato de fecha enviado: $dateStr');
-    
-    // Revisar la ruta completa
-    final String url = '$baseUrl/receipts/report/$dateStr';
-    print('URL del reporte: $url');
-    
-    // Añadir logs detallados
-    print('Enviando solicitud GET a: $url');
-    print('Headers: ${{'Content-Type': 'application/json'}}');
-    
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-    ).timeout(Duration(seconds: 60));
-    
-    print('Código de respuesta: ${response.statusCode}');
-    print('Cuerpo de respuesta: ${response.body}');
-    
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
-      print('Datos del reporte recibidos: $jsonResponse');
-      return jsonResponse;
-    } else {
-      // Manejar específicamente el error 404
-      if (response.statusCode == 404) {
-        print('Error 404: No se encontró la ruta o no hay datos para la fecha $dateStr');
-        return {
-          'summary': {},
-          'total': 0.0,
-          'date': date.toString(),
-          'count': 0,
-          'error': 'No se encontraron datos para la fecha especificada'
-        };
-      } else {
-        throw Exception('Error en la respuesta del servidor: ${response.statusCode} - ${response.body}');
+
+  // Obtener reporte de cierre
+  Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
+    try {
+      // Formato de fecha esperado: dd/MM/yyyy
+      String dateStr =
+          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+      // Imprimir el formato de fecha para verificar
+      print('Formato de fecha enviado: $dateStr');
+
+      // Revisar la ruta completa
+      final String url = '$baseUrl/receipts/report/$dateStr';
+      print('URL del reporte: $url');
+
+      // Añadir logs detallados
+      print('Enviando solicitud GET a: $url');
+      print('Headers: ${_getHeaders()}');
+
+      final response = await http
+          .get(Uri.parse(url), headers: _getHeaders())
+          .timeout(Duration(seconds: 60));
+
+      print('Código de respuesta: ${response.statusCode}');
+      print('Cuerpo de respuesta: ${response.body}');
+
+      // Verificar si el token ha expirado (código 401)
+      if (response.statusCode == 401 && _context != null) {
+        print('Token expirado. Se requiere iniciar sesión nuevamente.');
+        // Notificar al AuthProvider que el token ha expirado
+        Provider.of<AuthProvider>(_context!, listen: false).logout();
+        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
       }
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        print('Datos del reporte recibidos: $jsonResponse');
+        return jsonResponse;
+      } else {
+        // Manejar específicamente el error 404
+        if (response.statusCode == 404) {
+          print(
+            'Error 404: No se encontró la ruta o no hay datos para la fecha $dateStr',
+          );
+          return {
+            'summary': {},
+            'total': 0.0,
+            'date': date.toString(),
+            'count': 0,
+            'error': 'No se encontraron datos para la fecha especificada',
+          };
+        } else {
+          throw Exception(
+            'Error en la respuesta del servidor: ${response.statusCode} - ${response.body}',
+          );
+        }
+      }
+    } catch (e) {
+      print('Error en getClosingReport: $e');
+
+      return {
+        'summary': {},
+        'total': 0.0,
+        'date': date.toString(),
+        'count': 0,
+        'error': 'Error de conexión: $e',
+      };
     }
-  } catch (e) {
-    print('Error en getClosingReport: $e');
-    
-    return {
-      'summary': {},
-      'total': 0.0,
-      'date': date.toString(),
-      'count': 0,
-      'error': 'Error de conexión: $e'
-    };
   }
-}
 
   // Helper function for min (used in truncating logs)
   int min(int a, int b) {

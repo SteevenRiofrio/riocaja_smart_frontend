@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:riocaja_smart/models/receipt.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
-import 'package:riocaja_smart/services/api_service.dart'; // Asegúrate de importar tu ApiService
+import 'package:riocaja_smart/services/api_service.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/screens/login_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   @override
@@ -14,44 +16,81 @@ class _HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
   String _selectedFilter = 'Todos'; // Filtro seleccionado
   
-@override
-void initState() {
-  super.initState();
-  print('HistoryScreen initState - cargando comprobantes...');
-  _loadReceipts();
-}
-
-Future<void> _loadReceipts() async {
-  setState(() => _isLoading = true);
-  
-  try {
-    print('HistoryScreen: Intentando cargar comprobantes desde el provider...');
-    
-    // Obtener información sobre la URL del API service
-    final apiService = ApiService(); // Necesitarás importar esta clase
-    print('HistoryScreen: URL del API: ${apiService.baseUrl}/receipts/');
-    
-    await Provider.of<ReceiptsProvider>(context, listen: false).loadReceipts();
-    final receipts = Provider.of<ReceiptsProvider>(context, listen: false).receipts;
-    print('HistoryScreen: Se cargaron ${receipts.length} comprobantes');
-    
-    if (receipts.isEmpty) {
-      print('HistoryScreen: La lista de comprobantes está vacía');
-    } else {
-      // Mostrar el primer comprobante como ejemplo
-      print('HistoryScreen: Muestra del primer comprobante: ${receipts[0].nroTransaccion}');
-    }
-  } catch (e) {
-    print('HistoryScreen: Error al cargar comprobantes: $e');
-    // Mostrar más detalles sobre el error
-    print('HistoryScreen: Tipo de error: ${e.runtimeType}');
-    print('HistoryScreen: Detalles completos: $e');
+  @override
+  void initState() {
+    super.initState();
+    // Verificar autenticación
+    _checkAuthentication();
+    print('HistoryScreen initState - cargando comprobantes...');
+    _loadReceipts();
   }
   
-  setState(() => _isLoading = false);
-}
+  // Método para verificar autenticación
+  void _checkAuthentication() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isAuthenticated) {
+      // Si no está autenticado, redirigir a login
+      Future.microtask(() {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      });
+    }
+  }
+
+  Future<void> _loadReceipts() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      print('HistoryScreen: Intentando cargar comprobantes desde el provider...');
+      
+      // Obtener información sobre la URL del API service
+      final apiService = ApiService(); // Necesitarás importar esta clase
+      print('HistoryScreen: URL del API: ${apiService.baseUrl}/receipts/');
+      
+      // Establecer el contexto en el provider
+      final receiptsProvider = Provider.of<ReceiptsProvider>(context, listen: false);
+      receiptsProvider.setContext(context);
+      
+      await receiptsProvider.loadReceipts();
+      final receipts = receiptsProvider.receipts;
+      print('HistoryScreen: Se cargaron ${receipts.length} comprobantes');
+      
+      if (receipts.isEmpty) {
+        print('HistoryScreen: La lista de comprobantes está vacía');
+      } else {
+        // Mostrar el primer comprobante como ejemplo
+        print('HistoryScreen: Muestra del primer comprobante: ${receipts[0].nroTransaccion}');
+      }
+    } catch (e) {
+      print('HistoryScreen: Error al cargar comprobantes: $e');
+      // Mostrar más detalles sobre el error
+      print('HistoryScreen: Tipo de error: ${e.runtimeType}');
+      print('HistoryScreen: Detalles completos: $e');
+      
+      // Comprobar si es un error de autenticación
+      if (e.toString().contains('Sesión expirada') || e.toString().contains('Token')) {
+        // Mostrar mensaje al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sesión expirada. Inicie sesión nuevamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        
+        // Redirigir a pantalla de login
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+          );
+        });
+      }
+    }
+    
+    setState(() => _isLoading = false);
+  }
   
-   @override
+  @override
   Widget build(BuildContext context) {
     return Consumer<ReceiptsProvider>(
       builder: (context, receiptsProvider, child) {
@@ -488,6 +527,7 @@ Future<void> _loadReceipts() async {
                 
                 // Usar el provider para eliminar el comprobante
                 final provider = Provider.of<ReceiptsProvider>(context, listen: false);
+                provider.setContext(context); // Asegurarse de establecer el contexto
                 
                 try {
                   final success = await provider.deleteReceipt(receipt.nroTransaccion);

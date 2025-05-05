@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'dart:io';
 import 'package:riocaja_smart/screens/preview_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/screens/login_screen.dart';
 
 class ScannerScreen extends StatefulWidget {
   @override
@@ -17,7 +20,22 @@ class _ScannerScreenState extends State<ScannerScreen> {
   @override
   void initState() {
     super.initState();
+    // Verificar autenticación
+    _checkAuthentication();
     _initializeCamera();
+  }
+  
+  // Método para verificar autenticación
+  void _checkAuthentication() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (!authProvider.isAuthenticated) {
+        // Si no está autenticado, redirigir a login
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      }
+    });
   }
 
   _initializeCamera() async {
@@ -78,6 +96,43 @@ class _ScannerScreenState extends State<ScannerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Verificar autenticación en tiempo de renderizado también
+    final authProvider = Provider.of<AuthProvider>(context);
+    
+    // Si no está autenticado, mostrar pantalla de error
+    if (!authProvider.isAuthenticated) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Error de Autenticación')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 80, color: Colors.red),
+              SizedBox(height: 16),
+              Text(
+                'Sesión no válida',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text('Por favor inicie sesión nuevamente'),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => LoginScreen()),
+                  );
+                },
+                child: Text('Ir a Iniciar Sesión'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     if (_isLoading) {
       return Scaffold(
         appBar: AppBar(title: Text('Escanear Comprobante')),

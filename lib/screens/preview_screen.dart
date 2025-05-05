@@ -6,6 +6,8 @@ import 'package:riocaja_smart/services/ocr_service.dart';
 import 'package:riocaja_smart/models/receipt.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/screens/login_screen.dart';
 
 class PreviewScreen extends StatefulWidget {
   final String imagePath;
@@ -24,7 +26,22 @@ class _PreviewScreenState extends State<PreviewScreen> {
   @override
   void initState() {
     super.initState();
+    // Verificar autenticación
+    _checkAuthentication();
     _processImage();
+  }
+  
+  // Método para verificar autenticación
+  void _checkAuthentication() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.isAuthenticated) {
+      // Si no está autenticado, redirigir a login
+      Future.microtask(() {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      });
+    }
   }
 
   Future<void> _processImage() async {
@@ -80,6 +97,42 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Verificar autenticación
+    final authProvider = Provider.of<AuthProvider>(context);
+    if (!authProvider.isAuthenticated) {
+      // Si no está autenticado, mostrar pantalla de error
+      return Scaffold(
+        appBar: AppBar(title: Text('Error de Autenticación')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 80, color: Colors.red),
+              SizedBox(height: 16),
+              Text(
+                'Sesión no válida',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text('Por favor inicie sesión nuevamente'),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => LoginScreen()),
+                  );
+                },
+                child: Text('Ir a Iniciar Sesión'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
     return Scaffold(
       appBar: AppBar(title: Text('Revisar Comprobante')),
       body:
@@ -163,6 +216,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
                                 context,
                                 listen: false,
                               );
+                              
+                              // Establecer el contexto en el provider
+                              provider.setContext(context);
 
                               try {
                                 final success = await provider.addReceipt(
@@ -191,11 +247,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
                                   );
                                 }
                               } catch (e) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Error: ${e.toString()}'),
-                                  ),
-                                );
+                                // Verificar si es un error de autenticación
+                                if (e.toString().contains('Sesión expirada') || 
+                                    e.toString().contains('Token')) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Sesión expirada. Inicie sesión nuevamente.'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                  
+                                  // Navegar a la pantalla de login
+                                  Future.delayed(Duration(seconds: 2), () {
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                                    );
+                                  });
+                                } else {
+                                  // Otro tipo de error
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: ${e.toString()}'),
+                                    ),
+                                  );
+                                }
                               }
                             },
                             child: Text('Guardar'),

@@ -2,7 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
-import 'package:riocaja_smart/screens/home_screen.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 void main() async {
@@ -19,6 +20,10 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        // Proveedor de autenticación (debe inicializarse primero)
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        
+        // Proveedor de comprobantes
         ChangeNotifierProvider(create: (_) => ReceiptsProvider()),
       ],
       child: MaterialApp(
@@ -36,7 +41,7 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        home: HomeScreen(),
+        home: SplashScreen(), // Iniciar con la pantalla de carga
         debugShowCheckedModeBanner: false,
       ),
     );
