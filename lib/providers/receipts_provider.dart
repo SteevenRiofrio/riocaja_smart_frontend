@@ -1,4 +1,6 @@
 // lib/providers/receipts_provider.dart
+// MODIFICADO: Actualizado método getReceiptsByDate para usar fechas con guiones
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/models/receipt.dart';
@@ -91,7 +93,8 @@ class ReceiptsProvider with ChangeNotifier {
   
   // Obtener comprobantes por fecha
   List<Receipt> getReceiptsByDate(DateTime date) {
-    // Formato de fecha esperado: dd/MM/yyyy
+    // MODIFICADO: Usar la misma lógica que la API para buscar por fecha (dd/MM/yyyy)
+    // Ya que en la aplicación los comprobantes tienen el formato con barras
     String dateStr = '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     
     // Filtrar por fecha

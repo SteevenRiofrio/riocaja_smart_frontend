@@ -26,6 +26,7 @@ class ApiService {
       final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
       if (authProvider.isAuthenticated) {
         _authToken = authProvider.user?.token;
+        print('ApiService: Token configurado desde setContext');
       }
     }
   }
@@ -39,10 +40,16 @@ class ApiService {
   // Método para establecer el token de autenticación directamente
   void setAuthToken(String? token) {
     _authToken = token;
+    print('ApiService: Token establecido manualmente: ${token != null ? token.substring(0, min(10, token.length)) : "null"}...');
   }
 
-  // Crear los headers HTTP con o sin token de autenticación
-  Map<String, String> _getHeaders() {
+  // Método para convertir formato de fecha de dd/mm/aaaa a dd-mm-aaaa
+  String _convertDateFormat(String dateStr) {
+    return dateStr.replaceAll('/', '-');
+  }
+
+  // Crear los headers HTTP con o sin token de autenticación (método público)
+  Map<String, String> getHeaders() {
     Map<String, String> headers = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
@@ -50,6 +57,9 @@ class ApiService {
 
     if (_authToken != null) {
       headers['Authorization'] = 'Bearer $_authToken';
+      print('ApiService: Incluyendo token en los headers');
+    } else {
+      print('ApiService: ATENCIÓN - No hay token disponible para los headers');
     }
 
     return headers;
@@ -63,11 +73,11 @@ class ApiService {
 
       // Mejorar el registro de la petición HTTP
       print('Enviando petición GET a: $url');
-      print('Headers: ${_getHeaders()}');
+      print('Headers: ${getHeaders()}');
 
       // Aumentar el timeout para servicios en la nube que pueden tener cold starts
       final response = await http
-          .get(Uri.parse(url), headers: _getHeaders())
+          .get(Uri.parse(url), headers: getHeaders())
           .timeout(
             Duration(seconds: 60),
           ); // 60 segundos para manejar cold starts
@@ -141,8 +151,6 @@ class ApiService {
     }
   }
 
-  
-
   // Guardar un nuevo comprobante
   Future<bool> saveReceipt(Receipt receipt) async {
     try {
@@ -151,12 +159,26 @@ class ApiService {
 
       // Convertir el objeto Receipt a JSON con el formato correcto
       final Map<String, dynamic> receiptJson = receipt.toJson();
+      
+      // Convertir formato de fecha de dd/mm/aaaa a dd-mm-aaaa
+      if (receiptJson.containsKey('fecha') && receiptJson['fecha'] != null) {
+        receiptJson['fecha'] = _convertDateFormat(receiptJson['fecha']);
+        print('Fecha convertida al formato con guiones: ${receiptJson['fecha']}');
+      }
+      
+      // También convertir fecha alternativa si existe
+      if (receiptJson.containsKey('fecha_alternativa') && 
+          receiptJson['fecha_alternativa'] != null && 
+          receiptJson['fecha_alternativa'].isNotEmpty) {
+        receiptJson['fecha_alternativa'] = _convertDateFormat(receiptJson['fecha_alternativa']);
+      }
+      
       final String jsonBody = jsonEncode(receiptJson);
 
       print('Datos a enviar: $jsonBody');
 
       final response = await http
-          .post(Uri.parse(url), headers: _getHeaders(), body: jsonBody)
+          .post(Uri.parse(url), headers: getHeaders(), body: jsonBody)
           .timeout(Duration(seconds: 60));
 
       print('Respuesta del servidor: ${response.statusCode}');
@@ -228,7 +250,7 @@ class ApiService {
       final response = await http
           .delete(
             Uri.parse('$baseUrl/receipts/$transactionNumber'),
-            headers: _getHeaders(),
+            headers: getHeaders(),
           )
           .timeout(Duration(seconds: 60));
 
@@ -272,9 +294,10 @@ class ApiService {
   // Obtener reporte de cierre
   Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
     try {
-      // Formato de fecha esperado: dd/MM/yyyy
+      // Formato de fecha con guiones: dd-MM-yyyy
+      // MODIFICADO: Cambiado formato a guiones directamente
       String dateStr =
-          '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+          '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
 
       // Imprimir el formato de fecha para verificar
       print('Formato de fecha enviado: $dateStr');
@@ -285,10 +308,10 @@ class ApiService {
 
       // Añadir logs detallados
       print('Enviando solicitud GET a: $url');
-      print('Headers: ${_getHeaders()}');
+      print('Headers: ${getHeaders()}');
 
       final response = await http
-          .get(Uri.parse(url), headers: _getHeaders())
+          .get(Uri.parse(url), headers: getHeaders())
           .timeout(Duration(seconds: 60));
 
       print('Código de respuesta: ${response.statusCode}');

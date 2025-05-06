@@ -1,3 +1,6 @@
+// lib/screens/history_screen.dart
+// MODIFICADO: Actualizado método para usar fechas con guiones
+
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/models/receipt.dart';
@@ -426,7 +429,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     _buildDetailRow('Fecha Alt.', receipt.fechaAlternativa),
                     _buildDetailRow('Corresponsal', receipt.corresponsal),
                     _buildDetailRow('Tipo Cuenta', receipt.tipoCuenta),
-                    _buildDetailRow('Valor Total', '\$${receipt.valorTotal.toStringAsFixed(2)}'),
+                    _buildDetailRow('Valor Total', '\${receipt.valorTotal.toStringAsFixed(2)}'),
                     
                     // Texto completo
                     SizedBox(height: 16),

@@ -11,6 +11,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/screens/login_screen.dart';
 
 class ReportScreen extends StatefulWidget {
   @override
@@ -20,6 +22,7 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   DateTime _selectedDate = DateTime.now();
   bool _isGenerating = false;
+  bool _isLoading = true;
   bool _reportGenerated = false;
   Map<String, dynamic> _reportData = {};
   final ApiService _apiService = ApiService();
@@ -27,8 +30,40 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   void initState() {
     super.initState();
-    // Generar reporte al iniciar para la fecha actual
-    _generateReport();
+
+    // Inicializar la API con el contexto y verificar autenticación
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Verificar si el usuario está autenticado
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (!authProvider.isAuthenticated) {
+        // Si no está autenticado, redirigir a login
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sesión no válida. Inicie sesión para continuar.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+          );
+        });
+        return;
+      }
+
+      // Si está autenticado, configurar API y generar reporte
+      _apiService.setContext(context);
+      if (authProvider.user?.token != null) {
+        _apiService.setAuthToken(authProvider.user!.token);
+        print(
+          'Token configurado: ${authProvider.user!.token.substring(0, 10)}...',
+        );
+      }
+
+      // Generar reporte al iniciar para la fecha actual
+      _generateReport();
+    });
   }
 
   void _selectDate(BuildContext context) async {
@@ -54,15 +89,18 @@ class _ReportScreenState extends State<ReportScreen> {
       _reportGenerated = false;
     });
 
-    // Formato de la fecha para mostrar
-    String formattedDate = DateFormat('dd/MM/yyyy').format(_selectedDate);
-    print('Generando reporte para la fecha: $formattedDate');
+    // Usar formato con guiones para la URL del endpoint
+    String formattedDateWithDashes = DateFormat(
+      'dd-MM-yyyy',
+    ).format(_selectedDate);
+    print('Generando reporte para la fecha: $formattedDateWithDashes');
 
     // Construir reporte manualmente
-    _buildManualReport(formattedDate)
+    _buildManualReport(formattedDateWithDashes)
         .then((reportData) {
           setState(() {
             _reportData = reportData;
+            _isLoading = false;
             _isGenerating = false;
             _reportGenerated = true;
 
@@ -72,6 +110,7 @@ class _ReportScreenState extends State<ReportScreen> {
         .catchError((error) {
           print('Error al generar reporte manual: $error');
           setState(() {
+            _isLoading = false;
             _isGenerating = false;
             // Mostrar mensaje de error
             ScaffoldMessenger.of(context).showSnackBar(
@@ -84,15 +123,49 @@ class _ReportScreenState extends State<ReportScreen> {
   // Método para construir el reporte manualmente
   Future<Map<String, dynamic>> _buildManualReport(String dateStr) async {
     try {
-      // Obtener comprobantes por fecha directamente
+      // Obtener comprobantes por fecha directamente usando el formato con guiones
       final url = '${_apiService.baseUrl}/receipts/date/$dateStr';
       print('Obteniendo comprobantes para reporte manual: $url');
 
+      // Usamos el método público getHeaders
+      final headers = _apiService.getHeaders();
+      print('Headers de autenticación: $headers');
+
       final response = await http
-          .get(Uri.parse(url), headers: {'Content-Type': 'application/json'})
+          .get(Uri.parse(url), headers: headers)
           .timeout(Duration(seconds: 60));
 
       print('Código de respuesta: ${response.statusCode}');
+
+      // Verificar si el token ha expirado y manejarlo adecuadamente
+      if (response.statusCode == 401) {
+        print('Error 401: Token expirado o no válido');
+        // Mostrar mensaje al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sesión expirada. Inicie sesión nuevamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        // Cerrar sesión para refrescar token
+        Provider.of<AuthProvider>(context, listen: false).logout();
+
+        // Navegar a pantalla de login después de un retraso
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+          );
+        });
+
+        return {
+          'summary': {},
+          'total': 0.0,
+          'date': dateStr,
+          'count': 0,
+          'error': 'Sesión expirada',
+        };
+      }
 
       if (response.statusCode == 200 && response.body.isNotEmpty) {
         print(
@@ -176,230 +249,259 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
- // Método para generar y compartir un reporte en PDF
-Future<void> _generateAndDownloadPDF() async {
-  try {
-    // Mostrar indicador de progreso
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Generando PDF...')),
-    );
+  // Método para generar y compartir un reporte en PDF
+  Future<void> _generateAndDownloadPDF() async {
+    try {
+      // Mostrar indicador de progreso
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Generando PDF...')));
 
-    // Crear el PDF
-    final pdf = pw.Document();
-    
-    // Formato de la fecha 
-    final dateStr = DateFormat('dd/MM/yyyy').format(_selectedDate);
-    final currentTime = DateFormat('HH:mm:ss').format(DateTime.now());
-    
-    // Obtener datos del reporte
-    final summary = _reportData['summary'] as Map<dynamic, dynamic>? ?? {};
-    final total = _reportData['total'] as double? ?? 0.0;
-    final count = _reportData['count'] as int? ?? 0;
-    final totalPagos = _reportData['totalPagos'] as double? ?? 0.0;
-    final totalRetiros = _reportData['totalRetiros'] as double? ?? 0.0;
-    
-    // Agregar contenido al PDF
-    pdf.addPage(pw.Page(
-      build: (pw.Context context) {
-        return pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Text('RíoCaja Smart - Reporte de Cierre',
-              style: pw.TextStyle(fontSize: 18, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 20),
-            
-            // Información del reporte
-            pw.Container(
-              padding: pw.EdgeInsets.all(10),
-              decoration: pw.BoxDecoration(
-                color: PdfColors.grey200,
-                borderRadius: pw.BorderRadius.circular(5),
-              ),
-              child: pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      pw.Text('Fecha de reporte:'),
-                      pw.Text('CNB:'),
-                      pw.Text('Generado el:'),
-                    ],
+      // Crear el PDF
+      final pdf = pw.Document();
+
+      // Mantener formato con barras para visualización
+      final dateStr = DateFormat('dd/MM/yyyy').format(_selectedDate);
+      final currentTime = DateFormat('HH:mm:ss').format(DateTime.now());
+
+      // Obtener datos del reporte
+      final summary = _reportData['summary'] as Map<dynamic, dynamic>? ?? {};
+      final total = _reportData['total'] as double? ?? 0.0;
+      final count = _reportData['count'] as int? ?? 0;
+      final totalPagos = _reportData['totalPagos'] as double? ?? 0.0;
+      final totalRetiros = _reportData['totalRetiros'] as double? ?? 0.0;
+
+      // Agregar contenido al PDF
+      pdf.addPage(
+        pw.Page(
+          build: (pw.Context context) {
+            return pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  'RíoCaja Smart - Reporte de Cierre',
+                  style: pw.TextStyle(
+                    fontSize: 18,
+                    fontWeight: pw.FontWeight.bold,
                   ),
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.end,
-                    children: [
-                      pw.Text(dateStr),
-                      pw.Text('Banco del Barrio'),
-                      pw.Text('${DateFormat('dd/MM/yyyy').format(DateTime.now())} $currentTime'),
-                    ],
+                ),
+                pw.SizedBox(height: 20),
+
+                // Información del reporte
+                pw.Container(
+                  padding: pw.EdgeInsets.all(10),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.grey200,
+                    borderRadius: pw.BorderRadius.circular(5),
                   ),
-                ],
-              ),
-            ),
-            
-            pw.SizedBox(height: 20),
-            
-            // Resumen de transacciones
-            pw.Text('Resumen de Transacciones',
-              style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 14)),
-            pw.SizedBox(height: 10),
-            
-            if (count > 0) ...[
-              pw.Table(
-                border: pw.TableBorder.all(color: PdfColors.grey),
-                children: [
-                  // Encabezados
-                  pw.TableRow(
-                    decoration: pw.BoxDecoration(color: PdfColors.grey200),
+                  child: pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
                     children: [
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Tipo', 
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.start,
+                        children: [
+                          pw.Text('Fecha de reporte:'),
+                          pw.Text('CNB:'),
+                          pw.Text('Generado el:'),
+                        ],
                       ),
-                      pw.Padding(
-                        padding: pw.EdgeInsets.all(5),
-                        child: pw.Text('Valor', 
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold), 
-                          textAlign: pw.TextAlign.right),
-                      ),
-                    ],
-                  ),
-                  
-                  // Filas de datos
-                  ...summary.entries.map((entry) {
-                    return pw.TableRow(
-                      children: [
-                        pw.Padding(
-                          padding: pw.EdgeInsets.all(5),
-                          child: pw.Text(entry.key.toString()),
-                        ),
-                        pw.Padding(
-                          padding: pw.EdgeInsets.all(5),
-                          child: pw.Text(
-                            '\$${(entry.value as num).toStringAsFixed(2)}',
-                            textAlign: pw.TextAlign.right,
+                      pw.Column(
+                        crossAxisAlignment: pw.CrossAxisAlignment.end,
+                        children: [
+                          pw.Text(dateStr),
+                          pw.Text('Banco del Barrio'),
+                          pw.Text(
+                            '${DateFormat('dd/MM/yyyy').format(DateTime.now())} $currentTime',
                           ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
-                ],
-              ),
-            ] else ...[
-              pw.Container(
-                padding: pw.EdgeInsets.all(20),
-                alignment: pw.Alignment.center,
-                child: pw.Text('No hay transacciones para esta fecha'),
-              ),
-            ],
-            
-            pw.SizedBox(height: 20),
-            
-            // Totales
-            if (count > 0) ...[
-              pw.Divider(color: PdfColors.grey),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Total Pagos:'),
-                  pw.Text('\$${totalPagos.toStringAsFixed(2)}'),
-                ],
-              ),
-              pw.SizedBox(height: 5),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('Total Retiros:'),
-                  pw.Text('\$${totalRetiros.toStringAsFixed(2)}'),
-                ],
-              ),
-              pw.Divider(color: PdfColors.grey),
-              pw.Row(
-                mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-                children: [
-                  pw.Text('TOTAL:',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                  pw.Text('\$${total.toStringAsFixed(2)}',
-                    style: pw.TextStyle(fontWeight: pw.FontWeight.bold)),
-                ],
-              ),
-            ],
-            
-            pw.SizedBox(height: 40),
-            
-            pw.Text('© RíoCaja Smart ${DateTime.now().year}',
-              style: pw.TextStyle(fontSize: 10)),
-          ],
-        );
-      },
-    ));
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
 
-    // Guardar el PDF en un directorio temporal
-    final tempDir = await getTemporaryDirectory();
-    final filePath = '${tempDir.path}/reporte_cierre_${dateStr.replaceAll('/', '_')}.pdf';
-    final file = File(filePath);
-    await file.writeAsBytes(await pdf.save());
-    
-    // Compartir el PDF
-    await Share.shareXFiles(
-      [XFile(filePath)],
-      subject: 'Reporte de Cierre - $dateStr',
-    );
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('PDF generado y compartido')),
-    );
-  } catch (e) {
-    print('Error al generar PDF: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error al generar PDF: $e')),
-    );
-  }
-}
+                pw.SizedBox(height: 20),
 
-// Método para compartir el reporte como texto
-Future<void> _shareReport() async {
-  try {
-    // Generar el contenido del reporte en formato de texto
-    final dateStr = DateFormat('dd/MM/yyyy').format(_selectedDate);
-    final summary = _reportData['summary'] as Map<dynamic, dynamic>? ?? {};
-    final total = _reportData['total'] as double? ?? 0.0;
-    final count = _reportData['count'] as int? ?? 0;
-    final totalPagos = _reportData['totalPagos'] as double? ?? 0.0;
-    final totalRetiros = _reportData['totalRetiros'] as double? ?? 0.0;
-    
-    // Construir el texto del reporte
-    String reportText = 'REPORTE DE CIERRE - RÍOCAJA SMART\n\n';
-    reportText += 'Fecha: $dateStr\n';
-    reportText += 'CNB: Banco del Barrio\n\n';
-    
-    reportText += 'TRANSACCIONES:\n';
-    if (count > 0) {
-      summary.forEach((key, value) {
-        reportText += '- $key: \$${(value as num).toStringAsFixed(2)}\n';
-      });
-      
-      reportText += '\nTotal Pagos: \$${totalPagos.toStringAsFixed(2)}\n';
-      reportText += 'Total Retiros: \$${totalRetiros.toStringAsFixed(2)}\n';
-      reportText += '\nTOTAL: \$${total.toStringAsFixed(2)}\n';
-    } else {
-      reportText += 'No hay transacciones para esta fecha.\n';
+                // Resumen de transacciones
+                pw.Text(
+                  'Resumen de Transacciones',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 14,
+                  ),
+                ),
+                pw.SizedBox(height: 10),
+
+                if (count > 0) ...[
+                  pw.Table(
+                    border: pw.TableBorder.all(color: PdfColors.grey),
+                    children: [
+                      // Encabezados
+                      pw.TableRow(
+                        decoration: pw.BoxDecoration(color: PdfColors.grey200),
+                        children: [
+                          pw.Padding(
+                            padding: pw.EdgeInsets.all(5),
+                            child: pw.Text(
+                              'Tipo',
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          pw.Padding(
+                            padding: pw.EdgeInsets.all(5),
+                            child: pw.Text(
+                              'Valor',
+                              style: pw.TextStyle(
+                                fontWeight: pw.FontWeight.bold,
+                              ),
+                              textAlign: pw.TextAlign.right,
+                            ),
+                          ),
+                        ],
+                      ),
+
+                      // Filas de datos
+                      ...summary.entries.map((entry) {
+                        return pw.TableRow(
+                          children: [
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(entry.key.toString()),
+                            ),
+                            pw.Padding(
+                              padding: pw.EdgeInsets.all(5),
+                              child: pw.Text(
+                                '\$${(entry.value as num).toStringAsFixed(2)}',
+                                textAlign: pw.TextAlign.right,
+                              ),
+                            ),
+                          ],
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ] else ...[
+                  pw.Container(
+                    padding: pw.EdgeInsets.all(20),
+                    alignment: pw.Alignment.center,
+                    child: pw.Text('No hay transacciones para esta fecha'),
+                  ),
+                ],
+
+                pw.SizedBox(height: 20),
+
+                // Totales
+                if (count > 0) ...[
+                  pw.Divider(color: PdfColors.grey),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Total Pagos:'),
+                      pw.Text('\$${totalPagos.toStringAsFixed(2)}'),
+                    ],
+                  ),
+                  pw.SizedBox(height: 5),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text('Total Retiros:'),
+                      pw.Text('\$${totalRetiros.toStringAsFixed(2)}'),
+                    ],
+                  ),
+                  pw.Divider(color: PdfColors.grey),
+                  pw.Row(
+                    mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+                    children: [
+                      pw.Text(
+                        'TOTAL:',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                      pw.Text(
+                        '\$${total.toStringAsFixed(2)}',
+                        style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ],
+
+                pw.SizedBox(height: 40),
+
+                pw.Text(
+                  '© RíoCaja Smart ${DateTime.now().year}',
+                  style: pw.TextStyle(fontSize: 10),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+
+      // Guardar el PDF usando formato con guiones para el nombre del archivo
+      // pero mantener formato con barras para la visualización
+      final tempDir = await getTemporaryDirectory();
+      final fechaGuiones = DateFormat('dd-MM-yyyy').format(_selectedDate);
+      final filePath = '${tempDir.path}/reporte_cierre_${fechaGuiones}.pdf';
+      final file = File(filePath);
+      await file.writeAsBytes(await pdf.save());
+
+      // Compartir el PDF
+      await Share.shareXFiles([
+        XFile(filePath),
+      ], subject: 'Reporte de Cierre - $dateStr');
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('PDF generado y compartido')));
+    } catch (e) {
+      print('Error al generar PDF: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al generar PDF: $e')));
     }
-    
-    reportText += '\nGenerado el: ${DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now())}';
-    
-    // Compartir el texto
-    await Share.share(reportText, subject: 'Reporte de Cierre - $dateStr');
-  } catch (e) {
-    print('Error al compartir reporte: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Error al compartir reporte: $e')),
-    );
   }
-}
 
+  // Método para compartir el reporte como texto
+  Future<void> _shareReport() async {
+    try {
+      // Generar el contenido del reporte en formato de texto
+      final dateStr = DateFormat('dd/MM/yyyy').format(_selectedDate);
+      final summary = _reportData['summary'] as Map<dynamic, dynamic>? ?? {};
+      final total = _reportData['total'] as double? ?? 0.0;
+      final count = _reportData['count'] as int? ?? 0;
+      final totalPagos = _reportData['totalPagos'] as double? ?? 0.0;
+      final totalRetiros = _reportData['totalRetiros'] as double? ?? 0.0;
+
+      // Construir el texto del reporte
+      String reportText = 'REPORTE DE CIERRE - RÍOCAJA SMART\n\n';
+      reportText += 'Fecha: $dateStr\n';
+      reportText += 'CNB: Banco del Barrio\n\n';
+
+      reportText += 'TRANSACCIONES:\n';
+      if (count > 0) {
+        summary.forEach((key, value) {
+          reportText += '- $key: \$${(value as num).toStringAsFixed(2)}\n';
+        });
+
+        reportText += '\nTotal Pagos: \$${totalPagos.toStringAsFixed(2)}\n';
+        reportText += 'Total Retiros: \$${totalRetiros.toStringAsFixed(2)}\n';
+        reportText += '\nTOTAL: \$${total.toStringAsFixed(2)}\n';
+      } else {
+        reportText += 'No hay transacciones para esta fecha.\n';
+      }
+
+      reportText +=
+          '\nGenerado el: ${DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now())}';
+
+      // Compartir el texto
+      await Share.share(reportText, subject: 'Reporte de Cierre - $dateStr');
+    } catch (e) {
+      print('Error al compartir reporte: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error al compartir reporte: $e')));
+    }
+  }
 
   // Método auxiliar para obtener mínimo de dos números
   int min(int a, int b) {
@@ -419,9 +521,45 @@ Future<void> _shareReport() async {
       final url = '${_apiService.baseUrl}/receipts/';
       print('URL: $url');
 
+      // Usamos los headers del ApiService que ya incluyen el token
+      final headers = _apiService.getHeaders();
+      print('Headers para todos los comprobantes: $headers');
+
       final response = await http
-          .get(Uri.parse(url), headers: {'Content-Type': 'application/json'})
+          .get(Uri.parse(url), headers: headers)
           .timeout(Duration(seconds: 60));
+
+      // Verificar si el token ha expirado y manejarlo adecuadamente
+      if (response.statusCode == 401) {
+        print(
+          'Error 401: Token expirado o no válido en obtención de todos los comprobantes',
+        );
+        // Mostrar mensaje al usuario
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sesión expirada. Inicie sesión nuevamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        // Cerrar sesión
+        Provider.of<AuthProvider>(context, listen: false).logout();
+
+        // Navegar a pantalla de login después de un retraso
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+          );
+        });
+
+        return {
+          'summary': {},
+          'total': 0.0,
+          'date': dateStr,
+          'count': 0,
+          'error': 'Sesión expirada',
+        };
+      }
 
       if (response.statusCode == 200 && response.body.isNotEmpty) {
         final jsonResponse = jsonDecode(response.body);
@@ -429,10 +567,20 @@ Future<void> _shareReport() async {
 
         print('Total de comprobantes obtenidos: ${allReceipts.length}');
 
-        // Filtrar por fecha
+        // Si dateStr tiene guiones (como se espera para las llamadas a la API)
+        String fechaConBarras = dateStr;
+        if (dateStr.contains('-')) {
+          fechaConBarras = dateStr.replaceAll('-', '/');
+        }
+
+        // Filtrar por fecha - intentar con ambos formatos para mayor seguridad
         final List<dynamic> receipts =
             allReceipts
-                .where((receipt) => receipt['fecha'] == dateStr)
+                .where(
+                  (receipt) =>
+                      receipt['fecha'] == dateStr ||
+                      receipt['fecha'] == fechaConBarras,
+                )
                 .toList();
 
         print('Comprobantes con fecha $dateStr: ${receipts.length}');
@@ -537,6 +685,7 @@ Future<void> _shareReport() async {
                     SizedBox(width: 12),
                     Expanded(
                       child: Text(
+                        // Mantener formato con barras para visualización en la UI
                         'Fecha: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
                         style: TextStyle(
                           fontSize: 16,
@@ -570,174 +719,34 @@ Future<void> _shareReport() async {
                   children: [
                     CircularProgressIndicator(),
                     SizedBox(height: 16),
-                    Text('Generando reporte...'),
-                  ],
-                ),
-              ),
-
-            // Reporte generado
-            if (_reportGenerated && !_isGenerating) ...[
-              Text(
-                'Resumen del Cierre',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 12),
-              Expanded(
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        // Fecha y CNB
-                        Container(
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade200,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [Text('Fecha:'), Text('CNB:')],
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    DateFormat(
-                                      'dd/MM/yyyy',
-                                    ).format(_selectedDate),
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Banco del Barrio',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _shareReport,
+                            icon: Icon(Icons.share),
+                            label: Text('Compartir'),
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                            ),
                           ),
                         ),
-                        SizedBox(height: 16),
-
-                        // Resumen por tipo
-                        Text(
-                          'Transacciones por tipo:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        SizedBox(height: 8),
-                        Expanded(child: _buildSummaryList()),
-
-                        // Añadir antes del Total final
-                        if (_reportData.containsKey('totalPagos') &&
-                            _reportData.containsKey('totalRetiros')) ...[
-                          Divider(thickness: 1),
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 8.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Total Pagos:',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                                Text(
-                                  '\$${(_reportData['totalPagos'] as double? ?? 0.0).toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.blue.shade700,
-                                  ),
-                                ),
-                              ],
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: _generateAndDownloadPDF,
+                            icon: Icon(Icons.download),
+                            label: Text('Descargar PDF'),
+                            style: ElevatedButton.styleFrom(
+                              padding: EdgeInsets.symmetric(vertical: 12),
                             ),
                           ),
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Total Retiros:',
-                                  style: TextStyle(fontWeight: FontWeight.w500),
-                                ),
-                                Text(
-                                  '\$${(_reportData['totalRetiros'] as double? ?? 0.0).toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.orange.shade700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-
-                        // Total
-                        Divider(thickness: 1),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'TOTAL:',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                            Text(
-                              '\$${(_reportData['total'] as double? ?? 0.0).toStringAsFixed(2)}',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                // Cambiar el color según si es positivo o negativo
-                                color:
-                                    (_reportData['total'] as double? ?? 0.0) >=
-                                            0
-                                        ? Colors.green.shade800
-                                        : Colors.red.shade800,
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ),
               ),
-              SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _shareReport,
-                      icon: Icon(Icons.share),
-                      label: Text('Compartir'),
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: _generateAndDownloadPDF,
-                      icon: Icon(Icons.download),
-                      label: Text('Descargar PDF'),
-                      style: ElevatedButton.styleFrom(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ],
           ],
         ),
       ),

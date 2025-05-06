@@ -1,4 +1,6 @@
 // lib/models/receipt.dart
+// MODIFICADO: Actualizado para manejar formatos de fecha
+
 class Receipt {
   final String banco;
   final String fecha;
@@ -48,9 +50,24 @@ class Receipt {
 
   // Crear objeto desde Map
   factory Receipt.fromJson(Map<String, dynamic> json) {
+    // MODIFICADO: Mejorar el manejo de formatos de fecha
+    String fechaStr = json['fecha'] ?? '';
+    
+    // Si el formato es con guiones, convertir a formato con barras para mantener la 
+    // consistencia en la visualización en la app (el backend espera guiones al enviar)
+    if (fechaStr.contains('-')) {
+      fechaStr = fechaStr.replaceAll('-', '/');
+    }
+    
+    // Hacer lo mismo con fecha alternativa
+    String fechaAlt = json['fecha_alternativa'] ?? '';
+    if (fechaAlt.contains('-')) {
+      fechaAlt = fechaAlt.replaceAll('-', '/');
+    }
+    
     return Receipt(
       banco: json['banco'] ?? 'Banco del Barrio | Banco Guayaquil',
-      fecha: json['fecha'] ?? '',
+      fecha: fechaStr,
       hora: json['hora'] ?? '',
       tipo: json['tipo'] ?? '',
       nroTransaccion:
@@ -58,8 +75,7 @@ class Receipt {
       nroControl:
           json['nro_control'] ?? '', // Nombre del campo según el backend
       local: json['local'] ?? '',
-      fechaAlternativa:
-          json['fecha_alternativa'] ?? '', // Nombre del campo según el backend
+      fechaAlternativa: fechaAlt, // Nombre del campo según el backend
       corresponsal: json['corresponsal'] ?? '',
       tipoCuenta:
           json['tipo_cuenta'] ?? '', // Nombre del campo según el backend
