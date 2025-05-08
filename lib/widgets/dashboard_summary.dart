@@ -120,13 +120,26 @@ class _DashboardSummaryState extends State<DashboardSummary> {
               IconData icon;
               Color iconColor;
 
-              if (entry.key == 'Retiro') {
-                icon = Icons.money_off;
-                iconColor = Colors.orange;
-              } else {
-                // Para Pago de Servicio u otros tipos
-                icon = Icons.payment;
-                iconColor = Colors.blue;
+              switch (entry.key) {
+                case 'Retiro':
+                  icon = Icons.money_off;
+                  iconColor = Colors.orange;
+                  break;
+                case 'EFECTIVO MOVIL':
+                  icon = Icons.mobile_friendly;
+                  iconColor = Colors.purple;
+                  break;
+                case 'DEPOSITO':
+                  icon = Icons.savings;
+                  iconColor = Colors.green;
+                  break;
+                case 'RECARGA CLARO':
+                  icon = Icons.phone_android;
+                  iconColor = Colors.red;
+                  break;
+                default: // Pago de Servicio u otros
+                  icon = Icons.payment;
+                  iconColor = Colors.blue;
               }
 
               return Padding(

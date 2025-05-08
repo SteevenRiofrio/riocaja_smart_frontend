@@ -17,26 +17,34 @@ class _SplashScreenState extends State<SplashScreen> {
     _checkAuth();
   }
 
-  Future<void> _checkAuth() async {
-    // Esperar un breve momento para mostrar la pantalla de splash
-    await Future.delayed(Duration(seconds: 2));
-    
-    if (!mounted) return;
-    
-    // Verificar el estado de autenticación
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Si el usuario está autenticado, ir a Home; de lo contrario, ir a Login
-    if (authProvider.isAuthenticated) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-      );
-    } else {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-      );
-    }
+Future<void> _checkAuth() async {
+  // Esperamos un tiempo suficiente para que el AuthProvider se inicialice
+  await Future.delayed(Duration(seconds: 3));
+  
+  if (!mounted) return;
+  
+  // Verificar el estado de autenticación
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  
+  print('SplashScreen: Estado de autenticación: ${authProvider.authStatus}');
+  print('SplashScreen: ¿Usuario autenticado? ${authProvider.isAuthenticated}');
+  if (authProvider.user != null) {
+    print('SplashScreen: Usuario: ${authProvider.user!.nombre}, Token: ${authProvider.user!.token.substring(0, 10)}...');
   }
+  
+  // Si el usuario está autenticado, ir a Home; de lo contrario, ir a Login
+  if (authProvider.isAuthenticated) {
+    print('SplashScreen: Redirigiendo a Home');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => HomeScreen()),
+    );
+  } else {
+    print('SplashScreen: Redirigiendo a Login');
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+    );
+  }
+}
 
   @override
   Widget build(BuildContext context) {

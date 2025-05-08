@@ -30,7 +30,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
     _checkAuthentication();
     _processImage();
   }
-  
+
   // Método para verificar autenticación
   void _checkAuthentication() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
@@ -54,35 +54,39 @@ class _PreviewScreenState extends State<PreviewScreen> {
       // Extraer texto de la imagen
       final extractedText = await ocrService.extractText(widget.imagePath);
 
-      // Detectar el tipo directamente en el texto
-      String tipoComprobante = 'Pago de Servicio'; // valor por defecto
-      
-      // Comprobar si contiene la palabra RETIRO
-      if (extractedText.toUpperCase().contains('RETIRO')) {
-        tipoComprobante = 'Retiro';
-      }
-
       // Analizar el texto para obtener datos estructurados
       final receiptData = await ocrService.analyzeReceipt(extractedText);
+
+      // Validar que los datos necesarios estén presentes
+      bool isDataValid = _validateReceiptData(receiptData);
 
       setState(() {
         _extractedText = extractedText;
 
-        // Crear el objeto Receipt con los datos extraídos y el tipo detectado
-        _receipt = Receipt(
-          banco: 'Banco del Barrio | Banco Guayaquil',
-          fecha: receiptData['fecha'] ?? '',
-          hora: receiptData['hora'] ?? '',
-          tipo: tipoComprobante, // Usar el tipo detectado directamente
-          nroTransaccion: receiptData['nro_transaccion'] ?? '',
-          nroControl: receiptData['nro_control'] ?? '',
-          local: receiptData['local'] ?? '',
-          fechaAlternativa: receiptData['fecha_alternativa'] ?? '',
-          corresponsal: receiptData['corresponsal'] ?? '',
-          tipoCuenta: receiptData['tipo_cuenta'] ?? '',
-          valorTotal: receiptData['valor_total'] ?? 0.0,
-          fullText: extractedText,
-        );
+        if (isDataValid) {
+          // Crear el objeto Receipt con los datos extraídos
+          _receipt = Receipt(
+            banco: 'Banco del Barrio | Banco Guayaquil',
+            fecha: receiptData['fecha'] ?? '',
+            hora: receiptData['hora'] ?? '',
+            tipo: receiptData['tipo'] ?? 'Pago de Servicio',
+            nroTransaccion: receiptData['nro_transaccion'] ?? '',
+            nroControl: receiptData['nro_control'] ?? '',
+            local: receiptData['local'] ?? '',
+            fechaAlternativa: receiptData['fecha_alternativa'] ?? '',
+            corresponsal: receiptData['corresponsal'] ?? '',
+            tipoCuenta: receiptData['tipo_cuenta'] ?? '',
+            valorTotal: receiptData['valor_total'] ?? 0.0,
+            fullText: extractedText,
+            nroAutorizacion: receiptData['nro_autorizacion'] ?? '',
+            numTelefonico: receiptData['num_telefonico'] ?? '',
+            ilimClaro: receiptData['ilim_claro'] ?? '',
+          );
+        } else {
+          // No se crea el objeto Receipt si los datos no son válidos
+          _receipt = null;
+          // No mostrar mensaje aquí porque ya se muestra en _validateReceiptData
+        }
 
         _isProcessing = false;
       });
@@ -91,8 +95,91 @@ class _PreviewScreenState extends State<PreviewScreen> {
       setState(() {
         _isProcessing = false;
         _extractedText = 'Error al procesar la imagen: $e';
+        _receipt =
+            null; // Asegurarse de que no haya un recibo parcial en caso de error
       });
+
+      // Mostrar un mensaje de error genérico
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Error al procesar la imagen. Por favor, intente nuevamente.',
+          ),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
+  }
+
+  // Método para validar los datos del comprobante
+  bool _validateReceiptData(Map<String, dynamic> receiptData) {
+    // Verificar campos obligatorios para todos los tipos
+    if (receiptData['nro_transaccion'] == null ||
+        receiptData['nro_transaccion'].isEmpty) {
+      _showValidationError(
+        'No se pudo detectar el número de transacción. Por favor, capture una imagen más clara.',
+      );
+      return false;
+    }
+
+    if (receiptData['fecha'] == null || receiptData['fecha'].isEmpty) {
+      _showValidationError(
+        'No se pudo detectar la fecha. Por favor, capture una imagen más clara.',
+      );
+      return false;
+    }
+
+    if (receiptData['valor_total'] == null ||
+        receiptData['valor_total'] == 0.0) {
+      _showValidationError(
+        'No se pudo detectar el valor total. Por favor, capture una imagen más clara.',
+      );
+      return false;
+    }
+
+    // Validaciones específicas por tipo de comprobante
+    String tipo = receiptData['tipo'] ?? '';
+
+    switch (tipo) {
+      case 'EFECTIVO MOVIL':
+        if (receiptData['nro_autorizacion'] == null ||
+            receiptData['nro_autorizacion'].isEmpty) {
+          _showValidationError(
+            'No se pudo detectar el número de autorización. Por favor, capture una imagen más clara.',
+          );
+          return false;
+        }
+        break;
+
+      case 'RECARGA CLARO':
+        if (receiptData['num_telefonico'] == null ||
+            receiptData['num_telefonico'].isEmpty) {
+          _showValidationError(
+            'No se pudo detectar el número telefónico. Por favor, capture una imagen más clara.',
+          );
+          return false;
+        }
+        break;
+
+      case 'DEPOSITO':
+      case 'Pago de Servicio':
+      case 'Retiro':
+        // Aquí puedes agregar validaciones específicas para estos tipos
+        break;
+    }
+
+    return true;
+  }
+
+  void _showValidationError(String message) {
+    // Mostrar un mensaje de error al usuario
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        duration: Duration(seconds: 5),
+      ),
+    );
   }
 
   @override
@@ -111,10 +198,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
               SizedBox(height: 16),
               Text(
                 'Sesión no válida',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 8),
               Text('Por favor inicie sesión nuevamente'),
@@ -132,7 +216,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
         ),
       );
     }
-    
+
     return Scaffold(
       appBar: AppBar(title: Text('Revisar Comprobante')),
       body:
@@ -191,6 +275,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                           ),
                         ),
                         SizedBox(width: 16),
+
                         Expanded(
                           child: ElevatedButton(
                             onPressed: () async {
@@ -198,8 +283,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Error: No se pudo procesar el comprobante',
+                                      'Error: No se pudo procesar el comprobante o los datos son incompletos.',
                                     ),
+                                    backgroundColor: Colors.red,
                                   ),
                                 );
                                 return;
@@ -216,7 +302,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
                                 context,
                                 listen: false,
                               );
-                              
+
                               // Establecer el contexto en el provider
                               provider.setContext(context);
 
@@ -248,19 +334,23 @@ class _PreviewScreenState extends State<PreviewScreen> {
                                 }
                               } catch (e) {
                                 // Verificar si es un error de autenticación
-                                if (e.toString().contains('Sesión expirada') || 
+                                if (e.toString().contains('Sesión expirada') ||
                                     e.toString().contains('Token')) {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
-                                      content: Text('Sesión expirada. Inicie sesión nuevamente.'),
+                                      content: Text(
+                                        'Sesión expirada. Inicie sesión nuevamente.',
+                                      ),
                                       backgroundColor: Colors.red,
                                     ),
                                   );
-                                  
+
                                   // Navegar a la pantalla de login
                                   Future.delayed(Duration(seconds: 2), () {
                                     Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(builder: (context) => LoginScreen()),
+                                      MaterialPageRoute(
+                                        builder: (context) => LoginScreen(),
+                                      ),
                                     );
                                   });
                                 } else {
@@ -300,9 +390,30 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
 
     // Determinar color e icono según el tipo de comprobante
-    final bool isRetiro = _receipt!.tipo == 'Retiro';
-    final Color bannerColor = isRetiro ? Colors.orange.shade100 : Colors.blue.shade100;
-    final IconData bannerIcon = isRetiro ? Icons.money_off : Icons.payment;
+    IconData bannerIcon;
+    Color bannerColor;
+
+    switch (_receipt!.tipo) {
+      case 'Retiro':
+        bannerIcon = Icons.money_off;
+        bannerColor = Colors.orange.shade100;
+        break;
+      case 'EFECTIVO MOVIL':
+        bannerIcon = Icons.mobile_friendly;
+        bannerColor = Colors.purple.shade100;
+        break;
+      case 'DEPOSITO':
+        bannerIcon = Icons.savings;
+        bannerColor = Colors.green.shade100;
+        break;
+      case 'RECARGA CLARO':
+        bannerIcon = Icons.phone_android;
+        bannerColor = Colors.red.shade100;
+        break;
+      default: // Pago de Servicio u otros
+        bannerIcon = Icons.payment;
+        bannerColor = Colors.blue.shade100;
+    }
 
     return Card(
       elevation: 2,
@@ -325,16 +436,14 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   Icon(bannerIcon, size: 24),
                   SizedBox(width: 12),
                   Text(
-                    _receipt!.tipo, // Mostrar directamente el tipo detectado
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
+                    _receipt!.tipo,
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
                   ),
                 ],
               ),
             ),
-            
+
+            // Campos comunes para todos los comprobantes
             _buildInfoRow('Banco', _receipt!.banco),
             _buildInfoRow('Fecha', _receipt!.fecha),
             _buildInfoRow('Hora', _receipt!.hora),
@@ -344,17 +453,44 @@ class _PreviewScreenState extends State<PreviewScreen> {
                   ? 'No detectado'
                   : _receipt!.nroTransaccion,
             ),
-            _buildInfoRow(
-              'Nro. Control',
-              _receipt!.nroControl.isEmpty
-                  ? 'No detectado'
-                  : _receipt!.nroControl,
-            ),
-            _buildInfoRow('Local', _receipt!.local),
+
+            // Campos condicionales según el tipo de comprobante
+            if (_receipt!.tipo == 'Pago de Servicio' ||
+                _receipt!.tipo == 'Retiro' ||
+                _receipt!.tipo == 'DEPOSITO')
+              _buildInfoRow(
+                'Nro. Control',
+                _receipt!.nroControl.isEmpty
+                    ? 'No detectado'
+                    : _receipt!.nroControl,
+              ),
+
+            if (_receipt!.tipo == 'Pago de Servicio' ||
+                _receipt!.tipo == 'Retiro')
+              _buildInfoRow('Local', _receipt!.local),
+
+            _buildInfoRow('Corresponsal', _receipt!.corresponsal),
+
+            if (_receipt!.tipo == 'Pago de Servicio' ||
+                _receipt!.tipo == 'Retiro')
+              _buildInfoRow('Tipo de Cuenta', _receipt!.tipoCuenta),
+
+            if (_receipt!.tipo == 'EFECTIVO MOVIL' &&
+                _receipt!.nroAutorizacion.isNotEmpty)
+              _buildInfoRow('Nro. Autorización', _receipt!.nroAutorizacion),
+
+            // El bloque problemático - RECARGA CLARO
+            if (_receipt!.tipo == 'RECARGA CLARO' &&
+                _receipt!.ilimClaro.isNotEmpty)
+              _buildInfoRow('Ilim. Claro', _receipt!.ilimClaro),
+
+            if (_receipt!.tipo == 'RECARGA CLARO' &&
+                _receipt!.numTelefonico.isNotEmpty)
+              _buildInfoRow('Núm. Telefónico', _receipt!.numTelefonico),
+
             if (_receipt!.fechaAlternativa.isNotEmpty)
               _buildInfoRow('Fecha Alt.', _receipt!.fechaAlternativa),
-            _buildInfoRow('Corresponsal', _receipt!.corresponsal),
-            _buildInfoRow('Tipo de Cuenta', _receipt!.tipoCuenta),
+
             _buildInfoRow(
               'Valor Total',
               '\$${_receipt!.valorTotal.toStringAsFixed(2)}',

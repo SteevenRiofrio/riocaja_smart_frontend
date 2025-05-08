@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
 import 'package:riocaja_smart/screens/register_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -15,6 +16,21 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  bool _rememberMe = true; // Por defecto activado
+
+  @override
+  void initState() {
+    super.initState();
+    // Cargar preferencia de "Mantener sesión iniciada"
+    _loadPreferences();
+  }
+
+  Future<void> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _rememberMe = prefs.getBool('remember_me') ?? true;
+    });
+  }
 
   @override
   void dispose() {
@@ -23,33 +39,43 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _login() async {
-    if (_formKey.currentState!.validate()) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+void _login() async {
+  if (_formKey.currentState!.validate()) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Establecer preferencia de "Mantener sesión iniciada"
+    await authProvider.setRememberMe(_rememberMe);
+    print('LoginScreen: Preferencia de mantener sesión: $_rememberMe');
+    
+    // Intenta iniciar sesión
+    final success = await authProvider.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+    
+    if (success) {
+      print('LoginScreen: Inicio de sesión exitoso');
+      // Imprimir para verificar
+      print('LoginScreen: Usuario: ${authProvider.user!.nombre}, Token: ${authProvider.user!.token.substring(0, 10)}...');
       
-      // Intenta iniciar sesión
-      final success = await authProvider.login(
-        _emailController.text.trim(),
-        _passwordController.text,
+      // Navegar a la pantalla principal
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => HomeScreen()),
       );
-      
-      if (success) {
-        // Navegar a la pantalla principal
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-        );
-      } else {
-        // Mostrar error
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.errorMessage),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } else {
+      // Mostrar error
+      if (!mounted) return;
+      print('LoginScreen: Error - ${authProvider.errorMessage}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -155,6 +181,23 @@ class _LoginScreenState extends State<LoginScreen> {
                               }
                               return null;
                             },
+                          ),
+                          SizedBox(height: 16),
+                          
+                          // Opción "Mantener sesión iniciada"
+                          SwitchListTile(
+                            title: Text('Mantener sesión iniciada'),
+                            subtitle: Text(
+                              'No cerrar sesión al salir de la aplicación',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            value: _rememberMe,
+                            onChanged: (bool value) {
+                              setState(() {
+                                _rememberMe = value;
+                              });
+                            },
+                            activeColor: Colors.green.shade700,
                           ),
                           SizedBox(height: 24),
                           

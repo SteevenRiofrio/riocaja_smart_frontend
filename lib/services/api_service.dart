@@ -160,82 +160,69 @@ class ApiService {
       // Convertir el objeto Receipt a JSON con el formato correcto
       final Map<String, dynamic> receiptJson = receipt.toJson();
       
-      // Convertir formato de fecha de dd/mm/aaaa a dd-mm-aaaa
-      if (receiptJson.containsKey('fecha') && receiptJson['fecha'] != null) {
-        receiptJson['fecha'] = _convertDateFormat(receiptJson['fecha']);
-        print('Fecha convertida al formato con guiones: ${receiptJson['fecha']}');
-      }
-      
-      // También convertir fecha alternativa si existe
-      if (receiptJson.containsKey('fecha_alternativa') && 
-          receiptJson['fecha_alternativa'] != null && 
-          receiptJson['fecha_alternativa'].isNotEmpty) {
-        receiptJson['fecha_alternativa'] = _convertDateFormat(receiptJson['fecha_alternativa']);
-      }
-      
       final String jsonBody = jsonEncode(receiptJson);
 
-      print('Datos a enviar: $jsonBody');
+    print('Datos a enviar: $jsonBody');
 
-      final response = await http
-          .post(Uri.parse(url), headers: getHeaders(), body: jsonBody)
-          .timeout(Duration(seconds: 60));
+    final response = await http
+        .post(Uri.parse(url), headers: getHeaders(), body: jsonBody)
+        .timeout(Duration(seconds: 60));
 
-      print('Respuesta del servidor: ${response.statusCode}');
-      if (response.body.isNotEmpty) {
-        print(
-          'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
-        );
-      }
-
-      // Verificar si el token ha expirado (código 401)
-      if (response.statusCode == 401 && _context != null) {
-        print('Token expirado. Se requiere iniciar sesión nuevamente.');
-        // Notificar al AuthProvider que el token ha expirado
-        Provider.of<AuthProvider>(_context!, listen: false).logout();
-        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
-      }
-
-      // Revisar códigos de estado adicionales
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return true;
-      } else if (response.statusCode == 400) {
-        print('Error 400: Solicitud incorrecta');
-        print('Detalles: ${response.body}');
-        throw Exception('Error 400: ${response.body}');
-      } else if (response.statusCode == 500) {
-        print('Error 500: Error interno del servidor');
-        print('Detalles: ${response.body}');
-        throw Exception('Error 500: ${response.body}');
-      } else {
-        print('Error HTTP no esperado: ${response.statusCode}');
-        print('Detalles: ${response.body}');
-        throw Exception(
-          'Error al guardar comprobante: ${response.statusCode} - ${response.body}',
-        );
-      }
-    } catch (e) {
-      print('Error en saveReceipt: $e');
-
-      if (e is SocketException) {
-        print('Error de socket: No se pudo conectar al servidor');
-        print('Detalles: ${e.message}');
-      } else if (e.toString().contains('TimeoutException')) {
-        print(
-          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
-        );
-        print(
-          'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
-        );
-      } else if (e is FormatException) {
-        print(
-          'Error de formato: La respuesta no tiene el formato JSON esperado',
-        );
-      }
-
-      throw Exception('Error de conexión: $e');
+    print('Respuesta del servidor: ${response.statusCode}');
+    if (response.body.isNotEmpty) {
+      print(
+        'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
+      );
     }
+
+    // Verificar si el token ha expirado (código 401)
+    if (response.statusCode == 401 && _context != null) {
+      print('Token expirado. Se requiere iniciar sesión nuevamente.');
+      // Notificar al AuthProvider que el token ha expirado
+      Provider.of<AuthProvider>(_context!, listen: false).logout();
+      throw Exception('Sesión expirada. Inicie sesión nuevamente.');
+    }
+
+    // Revisar códigos de estado adicionales
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return true;
+    } else if (response.statusCode == 400) {
+      print('Error 400: Solicitud incorrecta');
+      print('Detalles: ${response.body}');
+      throw Exception('Error 400: ${response.body}');
+    } else if (response.statusCode == 500) {
+      print('Error 500: Error interno del servidor');
+      print('Detalles: ${response.body}');
+      throw Exception('Error 500: ${response.body}');
+    } else {
+      print('Error HTTP no esperado: ${response.statusCode}');
+      print('Detalles: ${response.body}');
+      throw Exception(
+        'Error al guardar comprobante: ${response.statusCode} - ${response.body}',
+      );
+    }
+  } catch (e) {
+    print('Error en saveReceipt: $e');
+
+    if (e is SocketException) {
+      print('Error de socket: No se pudo conectar al servidor');
+      print('Detalles: ${e.message}');
+    } else if (e.toString().contains('TimeoutException')) {
+      print(
+        'La conexión al servidor agotó el tiempo de espera (60 segundos)',
+      );
+      print(
+        'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
+      );
+    } else if (e is FormatException) {
+      print(
+        'Error de formato: La respuesta no tiene el formato JSON esperado',
+      );
+    }
+
+    throw Exception('Error de conexión: $e');
   }
+}
 
   // Eliminar un comprobante por número de transacción
   Future<bool> deleteReceipt(String transactionNumber) async {

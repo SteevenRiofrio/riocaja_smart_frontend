@@ -17,33 +17,36 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        // Proveedor de autenticación (debe inicializarse primero)
-        ChangeNotifierProvider(create: (_) => AuthProvider()),
-        
-        // Proveedor de comprobantes
-        ChangeNotifierProvider(create: (_) => ReceiptsProvider()),
-      ],
-      child: MaterialApp(
-        title: 'RíoCaja Smart',
-        theme: ThemeData(
-          primarySwatch: Colors.green,
-          visualDensity: VisualDensity.adaptivePlatformDensity,
-          appBarTheme: AppBarTheme(
+Widget build(BuildContext context) {
+  return MultiProvider(
+    providers: [
+      // Proveedor de autenticación (debe inicializarse primero)
+      ChangeNotifierProvider(
+        create: (_) => AuthProvider(),
+        lazy: false, // Esto hace que se inicialice inmediatamente al inicio, no bajo demanda
+      ),
+      
+      // Proveedor de comprobantes
+      ChangeNotifierProvider(create: (_) => ReceiptsProvider()),
+    ],
+    child: MaterialApp(
+      title: 'RíoCaja Smart',
+      theme: ThemeData(
+        primarySwatch: Colors.green,
+        visualDensity: VisualDensity.adaptivePlatformDensity,
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.green.shade700,
+          elevation: 0,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
             backgroundColor: Colors.green.shade700,
-            elevation: 0,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green.shade700,
-            ),
           ),
         ),
-        home: SplashScreen(), // Iniciar con la pantalla de carga
-        debugShowCheckedModeBanner: false,
       ),
-    );
-  }
+      home: SplashScreen(), // Iniciar con la pantalla de carga
+      debugShowCheckedModeBanner: false,
+    ),
+  );
+}
 }

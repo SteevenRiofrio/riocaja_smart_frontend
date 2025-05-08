@@ -1,5 +1,5 @@
 // lib/models/receipt.dart
-// MODIFICADO: Actualizado para manejar formatos de fecha
+// MODIFICADO: Actualizado para manejar los nuevos tipos de comprobantes
 
 class Receipt {
   final String banco;
@@ -14,6 +14,11 @@ class Receipt {
   final String tipoCuenta;
   final double valorTotal;
   final String fullText;
+  
+  // Nuevos campos para los tipos adicionales
+  final String nroAutorizacion;  // Para EFECTIVO MOVIL
+  final String numTelefonico;    // Para RECARGA CLARO
+  final String ilimClaro;        // Para RECARGA CLARO
 
   Receipt({
     required this.banco,
@@ -28,6 +33,9 @@ class Receipt {
     required this.tipoCuenta,
     required this.valorTotal,
     required this.fullText,
+    this.nroAutorizacion = '',
+    this.numTelefonico = '',
+    this.ilimClaro = '',
   });
 
   // Convertir a Map para almacenamiento local o envío al backend
@@ -45,6 +53,10 @@ class Receipt {
       'tipo_cuenta': tipoCuenta, // Cambiado de 'tipoCuenta'
       'valor_total': valorTotal, // Cambiado de 'valorTotal'
       'full_text': fullText, // Cambiado de 'fullText'
+      // Nuevos campos
+      'nro_autorizacion': nroAutorizacion,
+      'num_telefonico': numTelefonico,
+      'ilim_claro': ilimClaro,
     };
   }
 
@@ -84,6 +96,10 @@ class Receipt {
               ? json['valor_total'].toDouble()
               : 0.0, // Mejor manejo de tipos
       fullText: json['full_text'] ?? '', // Nombre del campo según el backend
+      // Nuevos campos
+      nroAutorizacion: json['nro_autorizacion'] ?? '',
+      numTelefonico: json['num_telefonico'] ?? '',
+      ilimClaro: json['ilim_claro'] ?? '',
     );
   }
 }
