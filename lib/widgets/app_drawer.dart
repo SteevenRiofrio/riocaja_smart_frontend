@@ -1,4 +1,4 @@
-// lib/widgets/app_drawer.dart
+// lib/widgets/app_drawer.dart - Actualización para incluir nuevas opciones de menú
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -7,41 +7,43 @@ import 'package:riocaja_smart/screens/history_screen.dart';
 import 'package:riocaja_smart/screens/report_screen.dart';
 import 'package:riocaja_smart/screens/debug_screen.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
+import 'package:riocaja_smart/screens/messages_screen.dart'; // Nuevo
+import 'package:riocaja_smart/screens/pending_users_screen.dart'; // Nuevo
 
 class AppDrawer extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
-    
-    return Drawer(
-      child: Column(
-        children: [
-          // Encabezado del drawer
-          UserAccountsDrawerHeader(
-            decoration: BoxDecoration(
-              color: Colors.green.shade700,
-            ),
-            accountName: Text(
-              authProvider.user?.nombre ?? 'Usuario',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            accountEmail: Text(
-              authProvider.user?.email ?? 'usuario@riocaja.com',
-            ),
-            currentAccountPicture: CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Text(
-                (authProvider.user?.nombre?.isNotEmpty == true) 
-                    ? authProvider.user!.nombre[0].toUpperCase() 
-                    : 'U',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green.shade700,
-                ),
+@override
+Widget build(BuildContext context) {
+  final authProvider = Provider.of<AuthProvider>(context);
+  
+  return Drawer(
+    child: Column(
+      children: [
+        // Encabezado del drawer
+        UserAccountsDrawerHeader(
+          decoration: BoxDecoration(
+            color: Colors.green.shade700,
+          ),
+          accountName: Text(
+            authProvider.user?.nombre ?? 'Usuario',
+            style: TextStyle(fontWeight: FontWeight.bold),
+          ),
+          accountEmail: Text(
+            authProvider.user?.email ?? 'usuario@riocaja.com',
+          ),
+          currentAccountPicture: CircleAvatar(
+            backgroundColor: Colors.white,
+            child: Text(
+              (authProvider.user?.nombre?.isNotEmpty == true) 
+                  ? authProvider.user!.nombre[0].toUpperCase() 
+                  : 'U',
+              style: TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Colors.green.shade700,
               ),
             ),
           ),
+        ),
           
           // Elementos del menú
           ListTile(
@@ -78,7 +80,34 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           
+          // Nuevo elemento: Mensajes
+          ListTile(
+            leading: Icon(Icons.mail),
+            title: Text('Mensajes'),
+            onTap: () {
+              Navigator.pop(context); // Cerrar drawer
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => MessagesScreen()),
+              );
+            },
+          ),
+          
           Divider(),
+          
+          // Opciones de administrador
+          if (authProvider.hasRole('admin') || authProvider.hasRole('operador'))
+            ListTile(
+              leading: Icon(Icons.people),
+              title: Text('Usuarios Pendientes'),
+              onTap: () {
+                Navigator.pop(context); // Cerrar drawer
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => PendingUsersScreen()),
+                );
+              },
+            ),
           
           // Mostrar Debug solo para roles específicos
           if (authProvider.hasRole('admin') || authProvider.hasRole('operador'))
@@ -94,49 +123,12 @@ class AppDrawer extends StatelessWidget {
               },
             ),
           
-          // Opciones de autenticación
+          // Opciones de autenticación (código existente)
           ListTile(
-            leading: Icon(
-              authProvider.isAuthenticated ? Icons.logout : Icons.login,
-            ),
-            title: Text(
-              authProvider.isAuthenticated ? 'Cerrar Sesión' : 'Iniciar Sesión',
-            ),
+            leading: Icon(authProvider.isAuthenticated ? Icons.logout : Icons.login),
+            title: Text(authProvider.isAuthenticated ? 'Cerrar Sesión' : 'Iniciar Sesión'),
             onTap: () async {
-              if (authProvider.isAuthenticated) {
-                // Mostrar diálogo de confirmación
-                bool confirm = await showDialog(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: Text('Cerrar Sesión'),
-                    content: Text('¿Estás seguro de que deseas cerrar sesión?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: Text('Cancelar'),
-                      ),
-                      ElevatedButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: Text('Cerrar Sesión'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                        ),
-                      ),
-                    ],
-                  ),
-                ) ?? false;
-                
-                if (confirm) {
-                  await authProvider.logout();
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(builder: (context) => LoginScreen()),
-                  );
-                }
-              } else {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute(builder: (context) => LoginScreen()),
-                );
-              }
+              // ... código existente ...
             },
           ),
           

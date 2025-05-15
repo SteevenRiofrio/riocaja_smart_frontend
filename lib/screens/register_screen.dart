@@ -26,39 +26,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  void _register() async {
-    if (_formKey.currentState!.validate()) {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      
-      // Intenta registrar al usuario
-      final success = await authProvider.register(
-        _nombreController.text.trim(),
-        _emailController.text.trim(),
-        _passwordController.text,
+void _register() async {
+  if (_formKey.currentState!.validate()) {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Intenta registrar al usuario
+    final success = await authProvider.register(
+      _nombreController.text.trim(),
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+    
+    if (success) {
+      // Muestra mensaje indicando que la cuenta está pendiente de aprobación
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => AlertDialog(
+          title: Text('Registro Exitoso'),
+          content: Text(
+            'Su cuenta ha sido creada y está pendiente de aprobación por parte de un administrador. '
+            'Recibirá notificación una vez que su cuenta sea aprobada.'
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Cerrar diálogo
+                Navigator.of(context).pop(); // Volver a pantalla de login
+              },
+              child: Text('Entendido'),
+            ),
+          ],
+        ),
       );
-      
-      if (success) {
-        // Muestra mensaje de éxito y vuelve a la pantalla de login
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Usuario registrado exitosamente. Inicia sesión para continuar.'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop(); // Regresar a la pantalla de login
-      } else {
-        // Muestra mensaje de error
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.errorMessage),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+    } else {
+      // Muestra mensaje de error
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
+}
 
   @override
   Widget build(BuildContext context) {

@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/providers/message_provider.dart';
+import 'package:riocaja_smart/providers/admin_provider.dart';
 import 'package:riocaja_smart/screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
@@ -17,36 +19,40 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   @override
-Widget build(BuildContext context) {
-  return MultiProvider(
-    providers: [
-      // Proveedor de autenticación (debe inicializarse primero)
-      ChangeNotifierProvider(
-        create: (_) => AuthProvider(),
-        lazy: false, // Esto hace que se inicialice inmediatamente al inicio, no bajo demanda
-      ),
-      
-      // Proveedor de comprobantes
-      ChangeNotifierProvider(create: (_) => ReceiptsProvider()),
-    ],
-    child: MaterialApp(
-      title: 'RíoCaja Smart',
-      theme: ThemeData(
-        primarySwatch: Colors.green,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-        appBarTheme: AppBarTheme(
-          backgroundColor: Colors.green.shade700,
-          elevation: 0,
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        // Proveedor de autenticación (debe inicializarse primero)
+        ChangeNotifierProvider(
+          create: (_) => AuthProvider(),
+          lazy: false, // Esto hace que se inicialice inmediatamente al inicio, no bajo demanda
         ),
-        elevatedButtonTheme: ElevatedButtonThemeData(
-          style: ElevatedButton.styleFrom(
+        
+        // Proveedor de comprobantes
+        ChangeNotifierProvider(create: (_) => ReceiptsProvider()),
+        
+        // Nuevos providers para la gestión de usuarios y mensajes
+        ChangeNotifierProvider(create: (_) => MessageProvider()),
+        ChangeNotifierProvider(create: (_) => AdminProvider()),
+      ],
+      child: MaterialApp(
+        title: 'RíoCaja Smart',
+        theme: ThemeData(
+          primarySwatch: Colors.green,
+          visualDensity: VisualDensity.adaptivePlatformDensity,
+          appBarTheme: AppBarTheme(
             backgroundColor: Colors.green.shade700,
+            elevation: 0,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+            ),
           ),
         ),
+        home: SplashScreen(), // Iniciar con la pantalla de carga
+        debugShowCheckedModeBanner: false,
       ),
-      home: SplashScreen(), // Iniciar con la pantalla de carga
-      debugShowCheckedModeBanner: false,
-    ),
-  );
-}
+    );
+  }
 }

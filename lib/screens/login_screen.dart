@@ -45,7 +45,6 @@ void _login() async {
     
     // Establecer preferencia de "Mantener sesión iniciada"
     await authProvider.setRememberMe(_rememberMe);
-    print('LoginScreen: Preferencia de mantener sesión: $_rememberMe');
     
     // Intenta iniciar sesión
     final success = await authProvider.login(
@@ -54,25 +53,42 @@ void _login() async {
     );
     
     if (success) {
-      print('LoginScreen: Inicio de sesión exitoso');
-      // Imprimir para verificar
-      print('LoginScreen: Usuario: ${authProvider.user!.nombre}, Token: ${authProvider.user!.token.substring(0, 10)}...');
-      
       // Navegar a la pantalla principal
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => HomeScreen()),
       );
     } else {
-      // Mostrar error
-      if (!mounted) return;
-      print('LoginScreen: Error - ${authProvider.errorMessage}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Comprobar si el error es debido a que la cuenta está pendiente
+      if (authProvider.errorMessage.contains('pendiente') || 
+          authProvider.errorMessage.contains('pendientes') ||
+          authProvider.errorMessage.contains('aprobación')) {
+        // Mostrar un mensaje específico para cuentas pendientes
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Cuenta Pendiente de Aprobación'),
+            content: Text(
+              'Su cuenta aún no ha sido aprobada por un administrador. '
+              'Por favor, espere a que un administrador revise y apruebe su solicitud.'
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Entendido'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Mostrar error general
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 }

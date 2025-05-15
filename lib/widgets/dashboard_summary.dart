@@ -1,6 +1,13 @@
+// lib/widgets/dashboard_summary.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/providers/admin_provider.dart';
+import 'package:riocaja_smart/providers/message_provider.dart';
+import 'package:riocaja_smart/screens/pending_users_screen.dart';
+import 'package:riocaja_smart/screens/messages_screen.dart';
+import 'package:intl/intl.dart';
 
 class DashboardSummary extends StatefulWidget {
   @override
@@ -15,6 +22,15 @@ class _DashboardSummaryState extends State<DashboardSummary> {
   void initState() {
     super.initState();
     _loadReportData();
+    
+    // Inicializar providers adicionales si es administrador
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+      _loadAdminData();
+    }
+    
+    // Cargar mensajes para todos los usuarios
+    _loadMessages();
   }
 
   Future<void> _loadReportData() async {
@@ -41,47 +57,92 @@ class _DashboardSummaryState extends State<DashboardSummary> {
         _reportData = {
           'summary': {},
           'total': 0.0,
-          'date': DateTime.now(),
+          'date': DateTime.now().toString(),
           'count': 0,
         };
         _isLoading = false;
       });
     }
   }
+  
+  // Método para cargar datos de administrador
+  Future<void> _loadAdminData() async {
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    adminProvider.setContext(context);
+    
+    // Establecer token desde el AuthProvider
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.isAuthenticated) {
+      adminProvider.setAuthToken(authProvider.user?.token);
+    }
+    
+    await adminProvider.loadPendingUsers();
+  }
+  
+  // Método para cargar mensajes
+  Future<void> _loadMessages() async {
+    final messageProvider = Provider.of<MessageProvider>(context, listen: false);
+    messageProvider.setContext(context);
+    
+    // Establecer token desde el AuthProvider
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (authProvider.isAuthenticated) {
+      messageProvider.setAuthToken(authProvider.user?.token);
+    }
+    
+    await messageProvider.loadMessages();
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Verificar si está cargando
-    if (_isLoading) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Center(child: CircularProgressIndicator()),
-        ),
-      );
-    }
-
-    // Si no hay datos
-    if (_reportData.isEmpty || (_reportData['count'] as int) == 0) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            children: [
-              Icon(Icons.insert_chart, size: 48, color: Colors.grey.shade400),
-              SizedBox(height: 8),
-              Text(
-                'No hay datos para mostrar hoy',
-                style: TextStyle(color: Colors.grey.shade600),
+    final authProvider = Provider.of<AuthProvider>(context);
+    
+    // Verificar si es admin o operador
+    final isAdmin = authProvider.hasRole('admin');
+    final isOperador = authProvider.hasRole('operador');
+    
+    return Column(
+      children: [
+        // Sección de alertas para usuarios pendientes (solo para admin/operador)
+        if (isAdmin || isOperador)
+          _buildPendingUsersAlert(),
+          
+        // Mensajes para todos los usuarios
+        _buildMessagesAlert(),
+        
+        // Resumen del día
+        if (_isLoading) 
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          )
+        else if (_reportData.isEmpty || (_reportData['count'] as int) == 0) 
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                children: [
+                  Icon(Icons.insert_chart, size: 48, color: Colors.grey.shade400),
+                  SizedBox(height: 8),
+                  Text(
+                    'No hay datos para mostrar hoy',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Mostrar el resumen
-    final summary = _reportData['summary'] as Map<String, dynamic>;
+            ),
+          )
+        else 
+          _buildSummaryCard(),
+      ],
+    );
+  }
+  
+  // Widget para mostrar el resumen del día
+  Widget _buildSummaryCard() {
+    final summary = _reportData['summary'] as Map<dynamic, dynamic>;
     final total = _reportData['total'] as double;
     final count = _reportData['count'] as int;
 
@@ -148,7 +209,7 @@ class _DashboardSummaryState extends State<DashboardSummary> {
                   children: [
                     Icon(icon, size: 16, color: iconColor),
                     SizedBox(width: 8),
-                    Text(entry.key),
+                    Text(entry.key.toString()),
                     Spacer(),
                     Text('\$${(entry.value as num).toStringAsFixed(2)}'),
                   ],
@@ -158,6 +219,177 @@ class _DashboardSummaryState extends State<DashboardSummary> {
           ],
         ),
       ),
+    );
+  }
+  
+  // Widget para mostrar alerta de usuarios pendientes
+  Widget _buildPendingUsersAlert() {
+    return Consumer<AdminProvider>(
+      builder: (context, adminProvider, child) {
+        final pendingUsersCount = adminProvider.pendingUsers.length;
+        
+        if (pendingUsersCount == 0) {
+          return SizedBox.shrink(); // No mostrar nada si no hay pendientes
+        }
+        
+        return Card(
+          margin: EdgeInsets.only(bottom: 16),
+          color: Colors.amber.shade100,
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.person_add, color: Colors.amber.shade800),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Usuarios pendientes de aprobación',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.amber.shade800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '$pendingUsersCount',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.amber.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'Hay usuarios esperando su aprobación para acceder al sistema.',
+                  style: TextStyle(fontSize: 14),
+                ),
+                SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PendingUsersScreen(),
+                        ),
+                      );
+                    },
+                    child: Text('Ver pendientes'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+  
+  // Widget para mostrar mensajes sin leer
+  Widget _buildMessagesAlert() {
+    return Consumer2<MessageProvider, AuthProvider>(
+      builder: (context, messageProvider, authProvider, child) {
+        // Filtrar mensajes no leídos por el usuario actual
+        final unreadMessages = messageProvider.messages.where((message) {
+          if (authProvider.user?.id == null) return false;
+          return !message.isReadBy(authProvider.user!.id);
+        }).toList();
+        
+        if (unreadMessages.isEmpty) {
+          return SizedBox.shrink(); // No mostrar nada si no hay mensajes sin leer
+        }
+        
+        return Card(
+          margin: EdgeInsets.only(bottom: 16),
+          color: Colors.blue.shade100,
+          child: Padding(
+            padding: EdgeInsets.all(16),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.mail, color: Colors.blue.shade800),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Mensajes nuevos',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade800,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      '${unreadMessages.length}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.blue.shade800,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                // Mostrar el primer mensaje sin leer
+                if (unreadMessages.isNotEmpty)
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          unreadMessages.first.titulo,
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          unreadMessages.first.contenido.length > 50 
+                              ? '${unreadMessages.first.contenido.substring(0, 50)}...' 
+                              : unreadMessages.first.contenido,
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (unreadMessages.length > 1)
+                      Text(
+                        '${unreadMessages.length - 1} más...',
+                        style: TextStyle(fontSize: 12),
+                      )
+                    else
+                      SizedBox.shrink(),
+                    TextButton(
+                      onPressed: () {
+                        // Navegar a la pantalla de mensajes
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => MessagesScreen(),
+                          ),
+                        );
+                      },
+                      child: Text('Ver todos'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

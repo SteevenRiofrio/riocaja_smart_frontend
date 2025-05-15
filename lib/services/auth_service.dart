@@ -6,7 +6,7 @@ import 'package:riocaja_smart/models/user.dart';
 
 class AuthService {
   // Usar la misma URL base que el ApiService
-  String baseUrl = 'http://35.225.88.153:8080/api/v1';
+  String baseUrl = 'http://34.28.127.172:8080/api/v1';
   
   // Token almacenado en memoria
   String? _token;
@@ -82,57 +82,59 @@ Future<bool> init() async {
 }
   
   // Registro de nuevo usuario
-  Future<Map<String, dynamic>> register(String nombre, String email, String password, {String rol = 'lector'}) async {
-    try {
-      final url = '$baseUrl/auth/register';
-      print('Registrando usuario en: $url');
+Future<Map<String, dynamic>> register(String nombre, String email, String password, {String rol = 'lector'}) async {
+  try {
+    final url = '$baseUrl/auth/register';
+    print('Registrando usuario en: $url');
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'nombre': nombre,
+        'email': email,
+        'password': password,
+        'rol': rol,
+      }),
+    ).timeout(Duration(seconds: 60));
+    
+    print('Respuesta del servidor: ${response.statusCode}');
+    
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      // Registro exitoso, parseamos la respuesta
+      final responseData = jsonDecode(response.body);
+      print('Registro exitoso: $responseData');
       
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'nombre': nombre,
-          'email': email,
-          'password': password,
-          'rol': rol,
-        }),
-      ).timeout(Duration(seconds: 60));
-      
-      print('Respuesta del servidor: ${response.statusCode}');
-      
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Registro exitoso, parseamos la respuesta
-        final responseData = jsonDecode(response.body);
-        print('Registro exitoso: $responseData');
-        return {
-          'success': true,
-          'message': 'Usuario registrado exitosamente',
-          'data': responseData,
-        };
-      } else {
-        // Error en el registro
-        Map<String, dynamic> errorData = {};
-        try {
-          errorData = jsonDecode(response.body);
-        } catch (e) {
-          errorData = {'detail': 'Error en el servidor'};
-        }
-        
-        print('Error en registro: $errorData');
-        return {
-          'success': false,
-          'message': errorData['detail'] ?? 'Error al registrar usuario',
-          'statusCode': response.statusCode,
-        };
+      // Aquí el mensaje debería indicar que el usuario está pendiente de aprobación
+      return {
+        'success': true,
+        'message': responseData['msg'] ?? 'Usuario registrado. Espere la aprobación de un administrador.',
+        'data': responseData,
+      };
+    } else {
+      // Error en el registro
+      Map<String, dynamic> errorData = {};
+      try {
+        errorData = jsonDecode(response.body);
+      } catch (e) {
+        errorData = {'detail': 'Error en el servidor'};
       }
-    } catch (e) {
-      print('Error en register: $e');
+      
+      print('Error en registro: $errorData');
       return {
         'success': false,
-        'message': 'Error de conexión: $e',
+        'message': errorData['detail'] ?? 'Error al registrar usuario',
+        'statusCode': response.statusCode,
       };
     }
+  } catch (e) {
+    print('Error en register: $e');
+    return {
+      'success': false,
+      'message': 'Error de conexión: $e',
+    };
   }
+}
   
  // Login de usuario
 Future<Map<String, dynamic>> login(String email, String password) async {

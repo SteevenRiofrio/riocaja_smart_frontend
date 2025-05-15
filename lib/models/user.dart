@@ -5,6 +5,7 @@ class User {
   final String email;
   final String rol;
   final String token;
+  final String estado;
 
   User({
     required this.id,
@@ -12,6 +13,7 @@ class User {
     required this.email,
     required this.rol,
     required this.token,
+    this.estado = 'activo',
   });
 
   // Convertir a Map para almacenamiento local
@@ -22,6 +24,7 @@ class User {
       'email': email,
       'rol': rol,
       'token': token,
+      'estado': estado,
     };
   }
 
@@ -33,6 +36,7 @@ class User {
       email: json['email'] ?? '',
       rol: json['rol'] ?? 'lector',
       token: json['token'] ?? '',
+      estado: json['estado'] ?? 'activo',
     );
   }
 }
