@@ -17,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = true; // Por defecto activado
+  bool _isLoading = false; // Estado para mostrar indicador de carga
 
   @override
   void initState() {
@@ -39,59 +40,106 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-void _login() async {
-  if (_formKey.currentState!.validate()) {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    // Establecer preferencia de "Mantener sesión iniciada"
-    await authProvider.setRememberMe(_rememberMe);
-    
-    // Intenta iniciar sesión
-    final success = await authProvider.login(
-      _emailController.text.trim(),
-      _passwordController.text,
-    );
-    
-    if (success) {
-      // Navegar a la pantalla principal
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen()),
+  void _login() async {
+    if (_formKey.currentState!.validate()) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      // Mostrar indicador de carga mientras se inicia sesión
+      setState(() {
+        _isLoading = true;
+      });
+      
+      // Establecer preferencia de "Mantener sesión iniciada"
+      await authProvider.setRememberMe(_rememberMe);
+      
+      // Intenta iniciar sesión
+      final success = await authProvider.login(
+        _emailController.text.trim(),
+        _passwordController.text,
       );
-    } else {
-      // Comprobar si el error es debido a que la cuenta está pendiente
-      if (authProvider.errorMessage.contains('pendiente') || 
-          authProvider.errorMessage.contains('pendientes') ||
-          authProvider.errorMessage.contains('aprobación')) {
-        // Mostrar un mensaje específico para cuentas pendientes
-        showDialog(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Cuenta Pendiente de Aprobación'),
-            content: Text(
-              'Su cuenta aún no ha sido aprobada por un administrador. '
-              'Por favor, espere a que un administrador revise y apruebe su solicitud.'
+      
+      // Ocultar indicador de carga
+      setState(() {
+        _isLoading = false;
+      });
+      
+      if (success) {
+        // Mostrar mensaje de éxito
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Inicio de sesión exitoso'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('Entendido'),
-              ),
-            ],
-          ),
-        );
+          );
+        }
+        
+        // Navegar a la pantalla principal después de un breve retraso
+        Future.delayed(Duration(milliseconds: 500), () {
+          if (mounted) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => HomeScreen()),
+            );
+          }
+        });
       } else {
-        // Mostrar error general
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(authProvider.errorMessage),
-            backgroundColor: Colors.red,
-          ),
-        );
+        // Comprobar si el error es debido a que la cuenta está pendiente
+        if (authProvider.errorMessage.contains('pendiente') || 
+            authProvider.errorMessage.contains('pendientes') ||
+            authProvider.errorMessage.contains('aprobación')) {
+          // Mostrar un mensaje específico para cuentas pendientes
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('Cuenta Pendiente de Aprobación'),
+                content: Text(
+                  'Su cuenta aún no ha sido aprobada por un administrador. '
+                  'Por favor, espere a que un administrador revise y apruebe su solicitud.'
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('Entendido'),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else if (authProvider.errorMessage.toLowerCase().contains('token')) {
+          // Si el error está relacionado con el token
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text('Error de Autenticación'),
+                content: Text(
+                  'Hubo un problema con la autenticación. Por favor, intente nuevamente.'
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('Entendido'),
+                  ),
+                ],
+              ),
+            );
+          }
+        } else {
+          // Mostrar error general
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(authProvider.errorMessage),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       }
     }
   }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -221,12 +269,22 @@ void _login() async {
                           SizedBox(
                             height: 50,
                             child: ElevatedButton(
-                              onPressed: authProvider.isLoading ? null : _login,
-                              child: authProvider.isLoading
-                                  ? CircularProgressIndicator(
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white,
-                                      ),
+                              onPressed: (_isLoading || authProvider.isLoading) ? null : _login,
+                              child: (_isLoading || authProvider.isLoading)
+                                  ? Row(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                            strokeWidth: 2.0,
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Text('Iniciando sesión...'),
+                                      ],
                                     )
                                   : Text(
                                       'Iniciar Sesión',
@@ -246,7 +304,7 @@ void _login() async {
                             children: [
                               Text('¿No tienes una cuenta?'),
                               TextButton(
-                                onPressed: () {
+                                onPressed: (_isLoading || authProvider.isLoading) ? null : () {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
@@ -257,6 +315,36 @@ void _login() async {
                                 child: Text('Regístrate'),
                               ),
                             ],
+                          ),
+                          
+                          // Mostrar mensaje de error si existe
+                          if (authProvider.errorMessage.isNotEmpty && !authProvider.isLoading && !_isLoading)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 16.0),
+                              child: Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  authProvider.errorMessage,
+                                  style: TextStyle(color: Colors.red.shade900),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          
+                          // Versión de la aplicación
+                          SizedBox(height: 40),
+                          Center(
+                            child: Text(
+                              'Versión 1.0.0',
+                              style: TextStyle(
+                                color: Colors.grey.shade500,
+                                fontSize: 12,
+                              ),
+                            ),
                           ),
                         ],
                       ),

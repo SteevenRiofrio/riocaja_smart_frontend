@@ -8,6 +8,23 @@ import 'package:riocaja_smart/providers/admin_provider.dart';
 import 'package:riocaja_smart/screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 
+// Clase para interceptar errores de autenticación globalmente
+class AuthErrorHandler extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    // Verificar el token cuando se navega a una nueva pantalla
+    Future.microtask(() {
+      if (navigator != null && navigator!.context != null) {
+        final authProvider = Provider.of<AuthProvider>(navigator!.context, listen: false);
+        if (authProvider.isAuthenticated) {
+          authProvider.checkAndRefreshToken();
+        }
+      }
+    });
+  }
+}
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -51,6 +68,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
         home: SplashScreen(), // Iniciar con la pantalla de carga
+        navigatorObservers: [AuthErrorHandler()], // Agregar observador para errores de autenticación
         debugShowCheckedModeBanner: false,
       ),
     );

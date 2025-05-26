@@ -7,6 +7,7 @@ import 'package:riocaja_smart/models/receipt.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/screens/login_screen.dart';
 
 class ApiService {
   // URL con dirección IP directa
@@ -26,7 +27,11 @@ class ApiService {
       final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
       if (authProvider.isAuthenticated) {
         _authToken = authProvider.user?.token;
-        print('ApiService: Token configurado desde setContext');
+        print('ApiService: Token configurado desde setContext: ${_authToken != null ? _authToken!.substring(0, min(10, _authToken!.length)) : "null"}...');
+      } else {
+        print('ApiService: AuthProvider no está autenticado');
+        // Si no está autenticado, redirigir a login
+        _redirectToLogin();
       }
     }
   }
@@ -55,14 +60,115 @@ class ApiService {
       'Accept': 'application/json',
     };
 
-    if (_authToken != null) {
+    if (_authToken != null && _authToken!.isNotEmpty) {
       headers['Authorization'] = 'Bearer $_authToken';
       print('ApiService: Incluyendo token en los headers');
     } else {
       print('ApiService: ATENCIÓN - No hay token disponible para los headers');
+      // Si no hay token y estamos en un contexto, redirigir a login
+      if (_context != null) {
+        _redirectToLogin();
+      }
     }
 
     return headers;
+  }
+
+  // Método auxiliar para redirigir a login
+  void _redirectToLogin() {
+    // Solo redirigir si tenemos un contexto y está montado
+    if (_context != null && Navigator.canPop(_context!)) {
+      // Usar Future.microtask para evitar problemas durante la construcción
+      Future.microtask(() {
+        ScaffoldMessenger.of(_context!).showSnackBar(
+          SnackBar(
+            content: Text('Sesión expirada. Por favor inicie sesión nuevamente.'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        Navigator.of(_context!).pushReplacement(
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      });
+    }
+  }
+
+  // Método para realizar una petición HTTP con manejo de errores y reintentos
+  Future<http.Response> _retryableRequest(
+    String method,
+    String url,
+    {Map<String, String>? headers, String? body, int maxRetries = 3}
+  ) async {
+    int retryCount = 0;
+    Duration retryDelay = Duration(seconds: 2);
+    
+    while (true) {
+      try {
+        http.Response response;
+        
+        switch (method.toUpperCase()) {
+          case 'GET':
+            response = await http.get(
+              Uri.parse(url),
+              headers: headers ?? getHeaders(),
+            ).timeout(Duration(seconds: 60));
+            break;
+          case 'POST':
+            response = await http.post(
+              Uri.parse(url),
+              headers: headers ?? getHeaders(),
+              body: body,
+            ).timeout(Duration(seconds: 60));
+            break;
+          case 'DELETE':
+            response = await http.delete(
+              Uri.parse(url),
+              headers: headers ?? getHeaders(),
+            ).timeout(Duration(seconds: 60));
+            break;
+          default:
+            throw Exception('Método HTTP no soportado: $method');
+        }
+        
+        // Verificar estado de autenticación
+        if (response.statusCode == 401) {
+          // Token inválido o expirado
+          print('Error 401: Token inválido o expirado');
+          
+          // Intentar cerrar sesión y redirigir a login
+          if (_context != null) {
+            final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+            await authProvider.logout();
+            _redirectToLogin();
+          }
+          
+          throw Exception('Token inválido o expirado');
+        }
+        
+        return response;
+      } catch (e) {
+        retryCount++;
+        print('Error en petición HTTP ($retryCount/$maxRetries): $e');
+        
+        // Si es un error de autenticación, no reintentar
+        if (e.toString().contains('Token inválido') || e.toString().contains('401')) {
+          throw e;
+        }
+        
+        // Si hemos alcanzado el número máximo de reintentos, lanzar excepción
+        if (retryCount >= maxRetries) {
+          throw e;
+        }
+        
+        // Esperar antes de reintentar
+        await Future.delayed(retryDelay);
+        
+        // Incrementar el tiempo de espera para el próximo reintento
+        retryDelay *= 2;
+      }
+    }
   }
 
   // Obtener todos los comprobantes
@@ -75,22 +181,9 @@ class ApiService {
       print('Enviando petición GET a: $url');
       print('Headers: ${getHeaders()}');
 
-      // Aumentar el timeout para servicios en la nube que pueden tener cold starts
-      final response = await http
-          .get(Uri.parse(url), headers: getHeaders())
-          .timeout(
-            Duration(seconds: 60),
-          ); // 60 segundos para manejar cold starts
+      final response = await _retryableRequest('GET', url);
 
       print('Código de respuesta: ${response.statusCode}');
-
-      // Verificar si el token ha expirado (código 401)
-      if (response.statusCode == 401 && _context != null) {
-        print('Token expirado. Se requiere iniciar sesión nuevamente.');
-        // Notificar al AuthProvider que el token ha expirado
-        Provider.of<AuthProvider>(_context!, listen: false).logout();
-        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
-      }
 
       if (response.body.isNotEmpty) {
         try {
@@ -162,67 +255,57 @@ class ApiService {
       
       final String jsonBody = jsonEncode(receiptJson);
 
-    print('Datos a enviar: $jsonBody');
+      print('Datos a enviar: $jsonBody');
 
-    final response = await http
-        .post(Uri.parse(url), headers: getHeaders(), body: jsonBody)
-        .timeout(Duration(seconds: 60));
+      final response = await _retryableRequest('POST', url, body: jsonBody);
 
-    print('Respuesta del servidor: ${response.statusCode}');
-    if (response.body.isNotEmpty) {
-      print(
-        'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
-      );
+      print('Respuesta del servidor: ${response.statusCode}');
+      if (response.body.isNotEmpty) {
+        print(
+          'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
+        );
+      }
+
+      // Revisar códigos de estado adicionales
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return true;
+      } else if (response.statusCode == 400) {
+        print('Error 400: Solicitud incorrecta');
+        print('Detalles: ${response.body}');
+        throw Exception('Error 400: ${response.body}');
+      } else if (response.statusCode == 500) {
+        print('Error 500: Error interno del servidor');
+        print('Detalles: ${response.body}');
+        throw Exception('Error 500: ${response.body}');
+      } else {
+        print('Error HTTP no esperado: ${response.statusCode}');
+        print('Detalles: ${response.body}');
+        throw Exception(
+          'Error al guardar comprobante: ${response.statusCode} - ${response.body}',
+        );
+      }
+    } catch (e) {
+      print('Error en saveReceipt: $e');
+
+      if (e is SocketException) {
+        print('Error de socket: No se pudo conectar al servidor');
+        print('Detalles: ${e.message}');
+      } else if (e.toString().contains('TimeoutException')) {
+        print(
+          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
+        );
+        print(
+          'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
+        );
+      } else if (e is FormatException) {
+        print(
+          'Error de formato: La respuesta no tiene el formato JSON esperado',
+        );
+      }
+
+      throw Exception('Error de conexión: $e');
     }
-
-    // Verificar si el token ha expirado (código 401)
-    if (response.statusCode == 401 && _context != null) {
-      print('Token expirado. Se requiere iniciar sesión nuevamente.');
-      // Notificar al AuthProvider que el token ha expirado
-      Provider.of<AuthProvider>(_context!, listen: false).logout();
-      throw Exception('Sesión expirada. Inicie sesión nuevamente.');
-    }
-
-    // Revisar códigos de estado adicionales
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return true;
-    } else if (response.statusCode == 400) {
-      print('Error 400: Solicitud incorrecta');
-      print('Detalles: ${response.body}');
-      throw Exception('Error 400: ${response.body}');
-    } else if (response.statusCode == 500) {
-      print('Error 500: Error interno del servidor');
-      print('Detalles: ${response.body}');
-      throw Exception('Error 500: ${response.body}');
-    } else {
-      print('Error HTTP no esperado: ${response.statusCode}');
-      print('Detalles: ${response.body}');
-      throw Exception(
-        'Error al guardar comprobante: ${response.statusCode} - ${response.body}',
-      );
-    }
-  } catch (e) {
-    print('Error en saveReceipt: $e');
-
-    if (e is SocketException) {
-      print('Error de socket: No se pudo conectar al servidor');
-      print('Detalles: ${e.message}');
-    } else if (e.toString().contains('TimeoutException')) {
-      print(
-        'La conexión al servidor agotó el tiempo de espera (60 segundos)',
-      );
-      print(
-        'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
-      );
-    } else if (e is FormatException) {
-      print(
-        'Error de formato: La respuesta no tiene el formato JSON esperado',
-      );
-    }
-
-    throw Exception('Error de conexión: $e');
   }
-}
 
   // Eliminar un comprobante por número de transacción
   Future<bool> deleteReceipt(String transactionNumber) async {
@@ -234,26 +317,17 @@ class ApiService {
       print(
         'Eliminando comprobante con número de transacción: $transactionNumber',
       );
-      final response = await http
-          .delete(
-            Uri.parse('$baseUrl/receipts/$transactionNumber'),
-            headers: getHeaders(),
-          )
-          .timeout(Duration(seconds: 60));
+      
+      final response = await _retryableRequest(
+        'DELETE', 
+        '$baseUrl/receipts/$transactionNumber'
+      );
 
       print('Respuesta del servidor: ${response.statusCode}');
       if (response.body.isNotEmpty) {
         print(
           'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
         );
-      }
-
-      // Verificar si el token ha expirado (código 401)
-      if (response.statusCode == 401 && _context != null) {
-        print('Token expirado. Se requiere iniciar sesión nuevamente.');
-        // Notificar al AuthProvider que el token ha expirado
-        Provider.of<AuthProvider>(_context!, listen: false).logout();
-        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
       }
 
       if (response.statusCode == 200) {
@@ -282,7 +356,6 @@ class ApiService {
   Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
     try {
       // Formato de fecha con guiones: dd-MM-yyyy
-      // MODIFICADO: Cambiado formato a guiones directamente
       String dateStr =
           '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
 
@@ -297,20 +370,10 @@ class ApiService {
       print('Enviando solicitud GET a: $url');
       print('Headers: ${getHeaders()}');
 
-      final response = await http
-          .get(Uri.parse(url), headers: getHeaders())
-          .timeout(Duration(seconds: 60));
+      final response = await _retryableRequest('GET', url);
 
       print('Código de respuesta: ${response.statusCode}');
       print('Cuerpo de respuesta: ${response.body}');
-
-      // Verificar si el token ha expirado (código 401)
-      if (response.statusCode == 401 && _context != null) {
-        print('Token expirado. Se requiere iniciar sesión nuevamente.');
-        // Notificar al AuthProvider que el token ha expirado
-        Provider.of<AuthProvider>(_context!, listen: false).logout();
-        throw Exception('Sesión expirada. Inicie sesión nuevamente.');
-      }
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);

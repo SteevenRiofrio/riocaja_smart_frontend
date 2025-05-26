@@ -89,40 +89,75 @@ class AuthProvider with ChangeNotifier {
   }
   
   // Login de usuario
-  Future<bool> login(String email, String password) async {
-    try {
-      _isLoading = true;
-      _errorMessage = '';
+Future<bool> login(String email, String password) async {
+  try {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+    
+    // Limpiar cualquier sesión anterior para evitar problemas
+    await logout();
+    
+    final result = await _authService.login(email, password);
+    
+    _isLoading = false;
+    
+    if (result['success']) {
+      _user = User.fromJson(result['user']);
+      _authStatus = AuthStatus.authenticated;
+      
+      // Guardar preferencia de "Recordar sesión"
+      await _authService.setRememberMe(_rememberMe);
+      
       notifyListeners();
-      
-      final result = await _authService.login(email, password);
-      
-      _isLoading = false;
-      
-      if (result['success']) {
-        _user = User.fromJson(result['user']);
-        _authStatus = AuthStatus.authenticated;
-        
-        // Guardar preferencia de "Recordar sesión"
-        await _authService.setRememberMe(_rememberMe);
-        
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = result['message'];
-        _authStatus = AuthStatus.unauthenticated;
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _isLoading = false;
-      _errorMessage = 'Error: $e';
+      return true;
+    } else {
+      _errorMessage = result['message'];
       _authStatus = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
     }
+  } catch (e) {
+    _isLoading = false;
+    _errorMessage = 'Error: $e';
+    _authStatus = AuthStatus.unauthenticated;
+    notifyListeners();
+    return false;
+  }
+}
+
+// Método para verificar y renovar token si es necesario
+Future<bool> checkAndRefreshToken() async {
+  if (_user == null || _user!.token.isEmpty) {
+    return false;
   }
   
+  try {
+    final userData = await _authService.getUserData();
+    if (userData['success']) {
+      return true; // Token sigue siendo válido
+    }
+    
+    // Si llegamos aquí, el token no es válido
+    // Intentar renovar token
+    final refreshed = await _authService.refreshToken();
+    if (refreshed) {
+      return true;
+    }
+    
+    // Si no se pudo renovar, cerrar sesión
+    await logout();
+    return false;
+  } catch (e) {
+    print('Error al verificar token: $e');
+    return false;
+  }
+}
+  
+
+
+
+
   // Establecer la preferencia de "Recordar sesión"
   Future<void> setRememberMe(bool value) async {
     _rememberMe = value;
