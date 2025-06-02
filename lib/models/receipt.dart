@@ -1,105 +1,91 @@
-// lib/models/receipt.dart
-// MODIFICADO: Actualizado para manejar los nuevos tipos de comprobantes
-
 class Receipt {
-  final String banco;
-  final String fecha;
-  final String hora;
-  final String tipo;
-  final String nroTransaccion;
-  final String nroControl;
-  final String local;
-  final String fechaAlternativa;
-  final String corresponsal;
-  final String tipoCuenta;
-  final double valorTotal;
-  final String fullText;
-  
-  // Nuevos campos para los tipos adicionales
-  final String nroAutorizacion;  // Para EFECTIVO MOVIL
-  final String numTelefonico;    // Para RECARGA CLARO
-  final String ilimClaro;        // Para RECARGA CLARO
+  final String fecha;           // dd/MM/yyyy
+  final String hora;            // HH:mm:ss
+  final String tipo;            // Tipo detectado del escaneo
+  final String nroTransaccion;  // Número de transacción
+  final double valorTotal;      // Valor del comprobante
+  final String fullText;        // Texto completo escaneado
 
   Receipt({
-    required this.banco,
     required this.fecha,
     required this.hora,
-    required this.tipo, 
+    required this.tipo,
     required this.nroTransaccion,
-    required this.nroControl,
-    required this.local,
-    required this.fechaAlternativa,
-    required this.corresponsal,
-    required this.tipoCuenta,
     required this.valorTotal,
     required this.fullText,
-    this.nroAutorizacion = '',
-    this.numTelefonico = '',
-    this.ilimClaro = '',
   });
 
-  // Convertir a Map para almacenamiento local o envío al backend
+  // Convertir a Map para envío al backend
   Map<String, dynamic> toJson() {
     return {
-      'banco': banco,
       'fecha': fecha,
       'hora': hora,
       'tipo': tipo,
-      'nro_transaccion': nroTransaccion, // Cambiado de 'nroTransaccion'
-      'nro_control': nroControl, // Cambiado de 'nroControl'
-      'local': local,
-      'fecha_alternativa': fechaAlternativa, // Cambiado de 'fechaAlternativa'
-      'corresponsal': corresponsal,
-      'tipo_cuenta': tipoCuenta, // Cambiado de 'tipoCuenta'
-      'valor_total': valorTotal, // Cambiado de 'valorTotal'
-      'full_text': fullText, // Cambiado de 'fullText'
-      // Nuevos campos
-      'nro_autorizacion': nroAutorizacion,
-      'num_telefonico': numTelefonico,
-      'ilim_claro': ilimClaro,
+      'nro_transaccion': nroTransaccion,
+      'valor_total': valorTotal,
+      'full_text': fullText,
     };
   }
 
-  // Crear objeto desde Map
+  // Crear objeto desde Map (del backend)
   factory Receipt.fromJson(Map<String, dynamic> json) {
-    // MODIFICADO: Mejorar el manejo de formatos de fecha
+    // Manejar formato de fecha (convertir guiones a barras para consistencia visual)
     String fechaStr = json['fecha'] ?? '';
-    
-    // Si el formato es con guiones, convertir a formato con barras para mantener la 
-    // consistencia en la visualización en la app (el backend espera guiones al enviar)
     if (fechaStr.contains('-')) {
       fechaStr = fechaStr.replaceAll('-', '/');
     }
     
-    // Hacer lo mismo con fecha alternativa
-    String fechaAlt = json['fecha_alternativa'] ?? '';
-    if (fechaAlt.contains('-')) {
-      fechaAlt = fechaAlt.replaceAll('-', '/');
-    }
-    
     return Receipt(
-      banco: json['banco'] ?? 'Banco del Barrio | Banco Guayaquil',
       fecha: fechaStr,
       hora: json['hora'] ?? '',
       tipo: json['tipo'] ?? '',
-      nroTransaccion:
-          json['nro_transaccion'] ?? '', // Nombre del campo según el backend
-      nroControl:
-          json['nro_control'] ?? '', // Nombre del campo según el backend
-      local: json['local'] ?? '',
-      fechaAlternativa: fechaAlt, // Nombre del campo según el backend
-      corresponsal: json['corresponsal'] ?? '',
-      tipoCuenta:
-          json['tipo_cuenta'] ?? '', // Nombre del campo según el backend
-      valorTotal:
-          (json['valor_total'] is num)
-              ? json['valor_total'].toDouble()
-              : 0.0, // Mejor manejo de tipos
-      fullText: json['full_text'] ?? '', // Nombre del campo según el backend
-      // Nuevos campos
-      nroAutorizacion: json['nro_autorizacion'] ?? '',
-      numTelefonico: json['num_telefonico'] ?? '',
-      ilimClaro: json['ilim_claro'] ?? '',
+      nroTransaccion: json['nro_transaccion'] ?? '',
+      valorTotal: (json['valor_total'] is num) 
+          ? json['valor_total'].toDouble() 
+          : 0.0,
+      fullText: json['full_text'] ?? '',
     );
+  }
+
+  // Método para obtener icono según el tipo
+  static String getIconForType(String tipo) {
+    switch (tipo.toUpperCase()) {
+      case 'RETIRO':
+        return 'money_off';
+      case 'EFECTIVO MOVIL':
+      case 'EFECTIVO MÓVIL':
+        return 'mobile_friendly';
+      case 'DEPOSITO':
+      case 'DEPÓSITO':
+        return 'savings';
+      case 'ENVÍO GIRO':
+      case 'ENVIO GIRO':
+        return 'send';
+      case 'PAGO GIRO':
+        return 'receipt';
+      default: // Pago de Servicio y otros
+        return 'payment';
+    }
+  }
+
+  // Método para obtener color según el tipo
+  static String getColorForType(String tipo) {
+    switch (tipo.toUpperCase()) {
+      case 'RETIRO':
+        return 'orange';
+      case 'EFECTIVO MOVIL':
+      case 'EFECTIVO MÓVIL':
+        return 'purple';
+      case 'DEPOSITO':
+      case 'DEPÓSITO':
+        return 'green';
+      case 'ENVÍO GIRO':
+      case 'ENVIO GIRO':
+        return 'indigo';
+      case 'PAGO GIRO':
+        return 'teal';
+      default: // Pago de Servicio y otros
+        return 'blue';
+    }
   }
 }

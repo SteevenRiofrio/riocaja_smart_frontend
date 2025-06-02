@@ -1,4 +1,4 @@
-// lib/screens/preview_screen.dart
+// lib/screens/preview_screen.dart - VERSIÓN COMPLETA SIMPLIFICADA
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'dart:io';
@@ -54,38 +54,28 @@ class _PreviewScreenState extends State<PreviewScreen> {
       // Extraer texto de la imagen
       final extractedText = await ocrService.extractText(widget.imagePath);
 
-      // Analizar el texto para obtener datos estructurados
+      // Analizar el texto para obtener datos estructurados (SIMPLIFICADO)
       final receiptData = await ocrService.analyzeReceipt(extractedText);
 
-      // Validar que los datos necesarios estén presentes
+      // Validar que los datos básicos estén presentes
       bool isDataValid = _validateReceiptData(receiptData);
 
       setState(() {
         _extractedText = extractedText;
 
         if (isDataValid) {
-          // Crear el objeto Receipt con los datos extraídos
+          // Crear el objeto Receipt SIMPLIFICADO con solo los campos básicos
           _receipt = Receipt(
-            banco: 'Banco del Barrio | Banco Guayaquil',
             fecha: receiptData['fecha'] ?? '',
             hora: receiptData['hora'] ?? '',
-            tipo: receiptData['tipo'] ?? 'Pago de Servicio',
+            tipo: receiptData['tipo'] ?? 'PAGO DE SERVICIO',
             nroTransaccion: receiptData['nro_transaccion'] ?? '',
-            nroControl: receiptData['nro_control'] ?? '',
-            local: receiptData['local'] ?? '',
-            fechaAlternativa: receiptData['fecha_alternativa'] ?? '',
-            corresponsal: receiptData['corresponsal'] ?? '',
-            tipoCuenta: receiptData['tipo_cuenta'] ?? '',
             valorTotal: receiptData['valor_total'] ?? 0.0,
             fullText: extractedText,
-            nroAutorizacion: receiptData['nro_autorizacion'] ?? '',
-            numTelefonico: receiptData['num_telefonico'] ?? '',
-            ilimClaro: receiptData['ilim_claro'] ?? '',
           );
         } else {
           // No se crea el objeto Receipt si los datos no son válidos
           _receipt = null;
-          // No mostrar mensaje aquí porque ya se muestra en _validateReceiptData
         }
 
         _isProcessing = false;
@@ -95,8 +85,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       setState(() {
         _isProcessing = false;
         _extractedText = 'Error al procesar la imagen: $e';
-        _receipt =
-            null; // Asegurarse de que no haya un recibo parcial en caso de error
+        _receipt = null;
       });
 
       // Mostrar un mensaje de error genérico
@@ -111,9 +100,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
     }
   }
 
-  // Método para validar los datos del comprobante
+  // Método SIMPLIFICADO para validar los datos del comprobante
   bool _validateReceiptData(Map<String, dynamic> receiptData) {
-    // Verificar campos obligatorios para todos los tipos
+    // Solo verificar campos básicos obligatorios
     if (receiptData['nro_transaccion'] == null ||
         receiptData['nro_transaccion'].isEmpty) {
       _showValidationError(
@@ -137,42 +126,11 @@ class _PreviewScreenState extends State<PreviewScreen> {
       return false;
     }
 
-    // Validaciones específicas por tipo de comprobante
-    String tipo = receiptData['tipo'] ?? '';
-
-    switch (tipo) {
-      case 'EFECTIVO MOVIL':
-        if (receiptData['nro_autorizacion'] == null ||
-            receiptData['nro_autorizacion'].isEmpty) {
-          _showValidationError(
-            'No se pudo detectar el número de autorización. Por favor, capture una imagen más clara.',
-          );
-          return false;
-        }
-        break;
-
-      case 'RECARGA CLARO':
-        if (receiptData['num_telefonico'] == null ||
-            receiptData['num_telefonico'].isEmpty) {
-          _showValidationError(
-            'No se pudo detectar el número telefónico. Por favor, capture una imagen más clara.',
-          );
-          return false;
-        }
-        break;
-
-      case 'DEPOSITO':
-      case 'Pago de Servicio':
-      case 'Retiro':
-        // Aquí puedes agregar validaciones específicas para estos tipos
-        break;
-    }
-
+    // Ya no necesitamos validaciones específicas por tipo - ¡SIMPLIFICADO!
     return true;
   }
 
   void _showValidationError(String message) {
-    // Mostrar un mensaje de error al usuario
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -219,164 +177,158 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text('Revisar Comprobante')),
-      body:
-          _isProcessing
-              ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 20),
-                    Text('Procesando imagen...'),
-                  ],
-                ),
-              )
-              : SingleChildScrollView(
-                padding: EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Imagen capturada
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: Image.file(
-                        File(widget.imagePath),
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                      ),
+      body: _isProcessing
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 20),
+                  Text('Procesando imagen...'),
+                ],
+              ),
+            )
+          : SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Imagen capturada
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.file(
+                      File(widget.imagePath),
+                      width: double.infinity,
+                      fit: BoxFit.cover,
                     ),
-                    SizedBox(height: 20),
+                  ),
+                  SizedBox(height: 20),
 
-                    // Datos extraídos
-                    Text(
-                      'Información Extraída',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+                  // Datos extraídos SIMPLIFICADOS
+                  Text(
+                    'Información Extraída',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
                     ),
-                    SizedBox(height: 8),
-                    _buildExtractionResult(),
+                  ),
+                  SizedBox(height: 8),
+                  _buildExtractionResult(),
 
-                    SizedBox(height: 24),
+                  SizedBox(height: 24),
 
-                    // Botones de acción
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            child: Text('Volver a Capturar'),
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                            ),
+                  // Botones de acción
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text('Volver a Capturar'),
+                          style: OutlinedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
-                        SizedBox(width: 16),
+                      ),
+                      SizedBox(width: 16),
 
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              if (_receipt == null) {
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            if (_receipt == null) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    'Error: No se pudo procesar el comprobante o los datos son incompletos.',
+                                  ),
+                                  backgroundColor: Colors.red,
+                                ),
+                              );
+                              return;
+                            }
+
+                            // Debug log
+                            final receiptJson = _receipt!.toJson();
+                            print('Datos a enviar: ${jsonEncode(receiptJson)}');
+
+                            // Usar el provider para guardar el comprobante en el backend
+                            final provider = Provider.of<ReceiptsProvider>(
+                              context,
+                              listen: false,
+                            );
+
+                            // Establecer el contexto en el provider
+                            provider.setContext(context);
+
+                            try {
+                              final success = await provider.addReceipt(_receipt!);
+
+                              if (success) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
                                     content: Text(
-                                      'Error: No se pudo procesar el comprobante o los datos son incompletos.',
+                                      'Comprobante guardado exitosamente',
+                                    ),
+                                  ),
+                                );
+                                Navigator.of(context).pop();
+                                Navigator.of(context).pop(); // Volver a la pantalla de inicio
+                              } else {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Error al guardar el comprobante',
+                                    ),
+                                  ),
+                                );
+                              }
+                            } catch (e) {
+                              // Verificar si es un error de autenticación
+                              if (e.toString().contains('Sesión expirada') ||
+                                  e.toString().contains('Token')) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      'Sesión expirada. Inicie sesión nuevamente.',
                                     ),
                                     backgroundColor: Colors.red,
                                   ),
                                 );
-                                return;
-                              }
 
-                              // Agregar código de depuración aquí
-                              final receiptJson = _receipt!.toJson();
-                              print(
-                                'Datos a enviar: ${jsonEncode(receiptJson)}',
-                              );
-
-                              // Usar el provider para guardar el comprobante en el backend
-                              final provider = Provider.of<ReceiptsProvider>(
-                                context,
-                                listen: false,
-                              );
-
-                              // Establecer el contexto en el provider
-                              provider.setContext(context);
-
-                              try {
-                                final success = await provider.addReceipt(
-                                  _receipt!,
+                                // Navegar a la pantalla de login
+                                Future.delayed(Duration(seconds: 2), () {
+                                  Navigator.of(context).pushReplacement(
+                                    MaterialPageRoute(
+                                      builder: (context) => LoginScreen(),
+                                    ),
+                                  );
+                                });
+                              } else {
+                                // Otro tipo de error
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error: ${e.toString()}'),
+                                  ),
                                 );
-
-                                if (success) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Comprobante guardado exitosamente',
-                                      ),
-                                    ),
-                                  );
-                                  Navigator.of(context).pop();
-                                  Navigator.of(
-                                    context,
-                                  ).pop(); // Volver a la pantalla de inicio
-                                } else {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Error al guardar el comprobante',
-                                      ),
-                                    ),
-                                  );
-                                }
-                              } catch (e) {
-                                // Verificar si es un error de autenticación
-                                if (e.toString().contains('Sesión expirada') ||
-                                    e.toString().contains('Token')) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(
-                                        'Sesión expirada. Inicie sesión nuevamente.',
-                                      ),
-                                      backgroundColor: Colors.red,
-                                    ),
-                                  );
-
-                                  // Navegar a la pantalla de login
-                                  Future.delayed(Duration(seconds: 2), () {
-                                    Navigator.of(context).pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (context) => LoginScreen(),
-                                      ),
-                                    );
-                                  });
-                                } else {
-                                  // Otro tipo de error
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Error: ${e.toString()}'),
-                                    ),
-                                  );
-                                }
                               }
-                            },
-                            child: Text('Guardar'),
-                            style: ElevatedButton.styleFrom(
-                              padding: EdgeInsets.symmetric(vertical: 12),
-                            ),
+                            }
+                          },
+                          child: Text('Guardar'),
+                          style: ElevatedButton.styleFrom(
+                            padding: EdgeInsets.symmetric(vertical: 12),
                           ),
                         ),
-                      ],
-                    ),
-                  ],
-                ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
+            ),
     );
   }
 
+  // Método SIMPLIFICADO para mostrar los resultados
   Widget _buildExtractionResult() {
     if (_receipt == null) {
       return Container(
@@ -389,31 +341,9 @@ class _PreviewScreenState extends State<PreviewScreen> {
       );
     }
 
-    // Determinar color e icono según el tipo de comprobante
-    IconData bannerIcon;
-    Color bannerColor;
-
-    switch (_receipt!.tipo) {
-      case 'Retiro':
-        bannerIcon = Icons.money_off;
-        bannerColor = Colors.orange.shade100;
-        break;
-      case 'EFECTIVO MOVIL':
-        bannerIcon = Icons.mobile_friendly;
-        bannerColor = Colors.purple.shade100;
-        break;
-      case 'DEPOSITO':
-        bannerIcon = Icons.savings;
-        bannerColor = Colors.green.shade100;
-        break;
-      case 'RECARGA CLARO':
-        bannerIcon = Icons.phone_android;
-        bannerColor = Colors.red.shade100;
-        break;
-      default: // Pago de Servicio u otros
-        bannerIcon = Icons.payment;
-        bannerColor = Colors.blue.shade100;
-    }
+    // Obtener icono y color según el tipo
+    IconData bannerIcon = _getIconForType(_receipt!.tipo);
+    Color bannerColor = _getColorForType(_receipt!.tipo);
 
     return Card(
       elevation: 2,
@@ -443,64 +373,25 @@ class _PreviewScreenState extends State<PreviewScreen> {
               ),
             ),
 
-            // Campos comunes para todos los comprobantes
-            _buildInfoRow('Banco', _receipt!.banco),
+            // SOLO LOS 5 CAMPOS BÁSICOS - ¡SIMPLIFICADO!
             _buildInfoRow('Fecha', _receipt!.fecha),
             _buildInfoRow('Hora', _receipt!.hora),
+            _buildInfoRow('Tipo', _receipt!.tipo),
             _buildInfoRow(
               'Nro. Transacción',
-              _receipt!.nroTransaccion.isEmpty
-                  ? 'No detectado'
-                  : _receipt!.nroTransaccion,
+              _receipt!.nroTransaccion.isEmpty ? 'No detectado' : _receipt!.nroTransaccion,
             ),
-
-            // Campos condicionales según el tipo de comprobante
-            if (_receipt!.tipo == 'Pago de Servicio' ||
-                _receipt!.tipo == 'Retiro' ||
-                _receipt!.tipo == 'DEPOSITO')
-              _buildInfoRow(
-                'Nro. Control',
-                _receipt!.nroControl.isEmpty
-                    ? 'No detectado'
-                    : _receipt!.nroControl,
-              ),
-
-            if (_receipt!.tipo == 'Pago de Servicio' ||
-                _receipt!.tipo == 'Retiro')
-              _buildInfoRow('Local', _receipt!.local),
-
-            _buildInfoRow('Corresponsal', _receipt!.corresponsal),
-
-            if (_receipt!.tipo == 'Pago de Servicio' ||
-                _receipt!.tipo == 'Retiro')
-              _buildInfoRow('Tipo de Cuenta', _receipt!.tipoCuenta),
-
-            if (_receipt!.tipo == 'EFECTIVO MOVIL' &&
-                _receipt!.nroAutorizacion.isNotEmpty)
-              _buildInfoRow('Nro. Autorización', _receipt!.nroAutorizacion),
-
-            // El bloque problemático - RECARGA CLARO
-            if (_receipt!.tipo == 'RECARGA CLARO' &&
-                _receipt!.ilimClaro.isNotEmpty)
-              _buildInfoRow('Ilim. Claro', _receipt!.ilimClaro),
-
-            if (_receipt!.tipo == 'RECARGA CLARO' &&
-                _receipt!.numTelefonico.isNotEmpty)
-              _buildInfoRow('Núm. Telefónico', _receipt!.numTelefonico),
-
-            if (_receipt!.fechaAlternativa.isNotEmpty)
-              _buildInfoRow('Fecha Alt.', _receipt!.fechaAlternativa),
-
             _buildInfoRow(
               'Valor Total',
               '\$${_receipt!.valorTotal.toStringAsFixed(2)}',
             ),
 
-            // Mostrar información extraída y texto original para depuración
             SizedBox(height: 16),
+
+            // Texto completo expandible
             ExpansionTile(
               title: Text(
-                'Ver texto completo',
+                'Ver texto completo escaneado',
                 style: TextStyle(fontSize: 14, color: Colors.blue),
               ),
               children: [
@@ -511,7 +402,10 @@ class _PreviewScreenState extends State<PreviewScreen> {
                     color: Colors.grey.shade100,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Text(_receipt!.fullText),
+                  child: Text(
+                    _receipt!.fullText,
+                    style: TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  ),
                 ),
               ],
             ),
@@ -543,5 +437,46 @@ class _PreviewScreenState extends State<PreviewScreen> {
         ],
       ),
     );
+  }
+
+  // Métodos auxiliares para iconos y colores
+  IconData _getIconForType(String tipo) {
+    switch (tipo.toUpperCase()) {
+      case 'RETIRO':
+        return Icons.money_off;
+      case 'EFECTIVO MOVIL':
+      case 'EFECTIVO MÓVIL':
+        return Icons.mobile_friendly;
+      case 'DEPOSITO':
+      case 'DEPÓSITO':
+        return Icons.savings;
+      case 'ENVÍO GIRO':
+      case 'ENVIO GIRO':
+        return Icons.send;
+      case 'PAGO GIRO':
+        return Icons.receipt;
+      default: // PAGO DE SERVICIO y otros
+        return Icons.payment;
+    }
+  }
+
+  Color _getColorForType(String tipo) {
+    switch (tipo.toUpperCase()) {
+      case 'RETIRO':
+        return Colors.orange.shade100;
+      case 'EFECTIVO MOVIL':
+      case 'EFECTIVO MÓVIL':
+        return Colors.purple.shade100;
+      case 'DEPOSITO':
+      case 'DEPÓSITO':
+        return Colors.green.shade100;
+      case 'ENVÍO GIRO':
+      case 'ENVIO GIRO':
+        return Colors.indigo.shade100;
+      case 'PAGO GIRO':
+        return Colors.teal.shade100;
+      default: // PAGO DE SERVICIO y otros
+        return Colors.blue.shade100;
+    }
   }
 }

@@ -1,3 +1,4 @@
+// lib/services/ocr_service.dart - VERSIÓN MEJORADA PARA RECARGA CLARO
 import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
@@ -16,123 +17,150 @@ class OcrService {
     }
   }
 
-  // Analiza el texto para extraer datos del comprobante
+  // Analiza el texto para extraer SOLO los 5 campos básicos
   Future<Map<String, dynamic>> analyzeReceipt(String text) async {
     try {
-      // Determinar el tipo de comprobante basado en el texto
-      String tipo = _determineReceiptType(text);
-
-      // Campos básicos que todos los comprobantes tienen
-      Map<String, dynamic> result = {
-        'banco': 'Banco del Barrio | Banco Guayaquil',
+      return {
         'fecha': _extractDate(text),
         'hora': _extractTime(text),
-        'tipo': tipo, // Usar el tipo determinado
+        'tipo': _determineReceiptType(text),
         'nro_transaccion': _extractTransactionNumber(text),
-        'corresponsal': _extractCorresponsal(text),
         'valor_total': _extractAmount(text),
         'full_text': text,
-        // Inicializar todos los campos con valores vacíos
-        'nro_control': '',
-        'local': '',
-        'fecha_alternativa': '',
-        'tipo_cuenta': '',
-        'nro_autorizacion': '',
-        'num_telefonico': '',
-        'ilim_claro': '',
       };
-
-      // Campos específicos según el tipo de comprobante
-      switch (tipo) {
-        case 'Pago de Servicio':
-        case 'Retiro':
-          result['nro_control'] = _extractControlNumber(text);
-          result['local'] = _extractLocalName(text);
-          result['fecha_alternativa'] = _extractAlternativeDate(text);
-          result['tipo_cuenta'] = _extractAccountType(text);
-          break;
-
-        case 'EFECTIVO MOVIL':
-          result['nro_autorizacion'] = _extractAuthorizationNumber(text);
-          break;
-
-        case 'DEPOSITO':
-          result['nro_control'] = _extractControlNumber(text);
-          break;
-
-        case 'RECARGA CLARO':
-          result['ilim_claro'] = _extractIlimClaro(text);
-          result['num_telefonico'] = _extractPhoneNumber(text);
-          break;
-      }
-
-      return result;
     } catch (e) {
       print('Error analyzing receipt: $e');
-      return {'tipo': 'No Detectado', 'full_text': text};
+      return {
+        'fecha': '',
+        'hora': '',
+        'tipo': 'No Detectado',
+        'nro_transaccion': '',
+        'valor_total': 0.0,
+        'full_text': text,
+      };
     }
   }
 
-  // Determina el tipo de comprobante basado en el texto
+  // MEJORADO: Determina el tipo de comprobante con mejor detección para RECARGA CLARO
   String _determineReceiptType(String text) {
     String upperText = text.toUpperCase();
+    
+    print('Analizando texto para determinar tipo: ${upperText.substring(0, upperText.length > 100 ? 100 : upperText.length)}...');
 
-    if (upperText.contains("EFECTIVO MOVIL") ||
-        upperText.contains("EFECTIVO MÓVIL")) {
-      return "EFECTIVO MOVIL";
-    } else if (upperText.contains("DEPOSITO") ||
-        upperText.contains("DEPÓSITO")) {
-      return "DEPOSITO";
-    } else if (upperText.contains("ILIM. CLARO") ||
-        upperText.contains("ILIM CLARO")) {
+    // PRIORIDAD 1: RECARGA CLARO - Detectar múltiples variaciones
+    if (upperText.contains("ILIM. CLARO") || 
+        upperText.contains("ILIM CLARO") ||
+        upperText.contains("ILIMCLARO") ||
+        upperText.contains("RECARGA CLARO") ||
+        (upperText.contains("RECARGA") && upperText.contains("CLARO")) ||
+        (upperText.contains("CLARO") && upperText.contains("TELEFON")) ||
+        upperText.contains("NUM. TELEFONICO")) {
+      print('Tipo detectado: RECARGA CLARO');
       return "RECARGA CLARO";
-    } else if (upperText.contains("RETIRO")) {
-      return "Retiro";
-    } else {
-      return "Pago de Servicio"; // Valor por defecto
     }
+
+    // PRIORIDAD 2: EFECTIVO MOVIL
+    if (upperText.contains("EFECTIVO MOVIL") ||
+        upperText.contains("EFECTIVO MÓVIL") ||
+        upperText.contains("EFECTIVOMOVIL")) {
+      print('Tipo detectado: EFECTIVO MOVIL');
+      return "EFECTIVO MOVIL";
+    }
+
+    // PRIORIDAD 3: DEPOSITO
+    if (upperText.contains("DEPOSITO") ||
+        upperText.contains("DEPÓSITO") ||
+        upperText.contains("DEPOSITAR")) {
+      print('Tipo detectado: DEPOSITO');
+      return "DEPOSITO";
+    }
+
+    // PRIORIDAD 4: RETIRO
+    if (upperText.contains("RETIRO") ||
+        upperText.contains("RETIRAR")) {
+      print('Tipo detectado: RETIRO');
+      return "RETIRO";
+    }
+
+    // PRIORIDAD 5: GIROS
+    if (upperText.contains("ENVÍO GIRO") || 
+        upperText.contains("ENVIO GIRO") ||
+        upperText.contains("ENVIAR GIRO")) {
+      print('Tipo detectado: ENVIO GIRO');
+      return "ENVIO GIRO";
+    }
+
+    if (upperText.contains("PAGO GIRO") ||
+        upperText.contains("PAGOGIRO")) {
+      print('Tipo detectado: PAGO GIRO');
+      return "PAGO GIRO";
+    }
+
+    // PRIORIDAD 6: PAGO DE SERVICIO
+    if (upperText.contains("PAGO DE SERVICIO") ||
+        upperText.contains("SERVICIO") ||
+        upperText.contains("PAGAR")) {
+      print('Tipo detectado: PAGO DE SERVICIO');
+      return "PAGO DE SERVICIO";
+    }
+
+    // CASOS ESPECIALES: Si contiene solo "GIRO" sin especificar tipo
+    if (upperText.contains("GIRO")) {
+      print('Tipo detectado: PAGO GIRO (por defecto cuando solo dice GIRO)');
+      return "PAGO GIRO";
+    }
+
+    // CASOS ESPECIALES: Si contiene solo "RECARGA" sin "CLARO"
+    if (upperText.contains("RECARGA")) {
+      print('Tipo detectado: RECARGA CLARO (por defecto cuando solo dice RECARGA)');
+      return "RECARGA CLARO";
+    }
+
+    // VALOR POR DEFECTO
+    print('Tipo detectado: PAGO DE SERVICIO (por defecto)');
+    return "PAGO DE SERVICIO";
   }
 
   // Extrae el número de transacción
   String _extractTransactionNumber(String text) {
-    // Primero, intentar buscar por líneas ya que la expresión regular puede fallar con espacios o formatos inusuales
+    // Buscar por líneas primero
     final lines = text.split('\n');
     for (var line in lines) {
       if (line.toUpperCase().contains('TRANSACC') && line.contains(':')) {
-        // Extraer la parte después de los dos puntos
         final parts = line.split(':');
         if (parts.length > 1) {
-          // Limpiar y extraer solo los dígitos
-          final digitsOnly =
-              RegExp(r'\d+').allMatches(parts[1]).map((m) => m.group(0)).join();
-
+          final digitsOnly = RegExp(r'\d+').allMatches(parts[1]).map((m) => m.group(0)).join();
           if (digitsOnly.isNotEmpty) {
+            print('Número de transacción encontrado: $digitsOnly');
             return digitsOnly;
           }
         }
       }
     }
 
-    // Si la búsqueda por líneas falla, intentar con las expresiones regulares
+    // Expresiones regulares como respaldo
     final regexes = [
       RegExp(r'NRO\.\s*TRANSACC\s*ION\s*:\s*(\d+)', caseSensitive: false),
       RegExp(r'NRO\.\s*TRANSACCI[OÓ]N\s*:\s*(\d+)', caseSensitive: false),
       RegExp(r'TRANSACCI[OÓ]N\s*:\s*(\d+)', caseSensitive: false),
+      RegExp(r'TRANSACCION\s*:\s*(\d+)', caseSensitive: false),
+      RegExp(r'TRANSACC\s*:\s*(\d+)', caseSensitive: false),
     ];
 
     for (var regex in regexes) {
       final match = regex.firstMatch(text);
       if (match != null && match.group(1) != null) {
+        print('Número de transacción encontrado con regex: ${match.group(1)!.trim()}');
         return match.group(1)!.trim();
       }
     }
 
+    print('No se pudo encontrar número de transacción');
     return '';
   }
 
   // Extrae la fecha en formato dd/mm/yyyy
   String _extractDate(String text) {
-    // Expresión regular más flexible que permite espacios entre los componentes
     final datePatternRegex = RegExp(
       r'(\d{1,2}\s*/\s*\d{1,2}\s*/\s*\d{4})',
       caseSensitive: false,
@@ -140,35 +168,32 @@ class OcrService {
     final match = datePatternRegex.firstMatch(text);
 
     if (match != null) {
-      // Limpiar los espacios de la fecha encontrada
       String date = match.group(1) ?? '';
-      return date.replaceAll(RegExp(r'\s+'), '');
+      String cleanDate = date.replaceAll(RegExp(r'\s+'), '');
+      print('Fecha encontrada: $cleanDate');
+      return cleanDate;
     }
 
-    return '';
-  }
-
-  // Extrae la fecha en formato alternativo (DD-MM-YYYY)
-  String _extractAlternativeDate(String text) {
-    // Expresión regular más flexible que permite espacios
-    final datePatternRegex = RegExp(
+    // Buscar formato con guiones y convertir
+    final dateWithDashRegex = RegExp(
       r'(\d{1,2}\s*-\s*\d{1,2}\s*-\s*\d{4})',
       caseSensitive: false,
     );
-    final match = datePatternRegex.firstMatch(text);
+    final dashMatch = dateWithDashRegex.firstMatch(text);
 
-    if (match != null) {
-      // Limpiar los espacios
-      String date = match.group(1) ?? '';
-      return date.replaceAll(RegExp(r'\s+'), '');
+    if (dashMatch != null) {
+      String date = dashMatch.group(1) ?? '';
+      String convertedDate = date.replaceAll(RegExp(r'\s+'), '').replaceAll('-', '/');
+      print('Fecha encontrada (convertida de guiones): $convertedDate');
+      return convertedDate;
     }
 
+    print('No se pudo encontrar fecha');
     return '';
   }
 
   // Extrae la hora en formato hh:mm:ss
   String _extractTime(String text) {
-    // Expresión regular más flexible que permite espacios
     final timePatternRegex = RegExp(
       r'HORA\s*:\s*(\d{1,2}\s*:\s*\d{1,2}\s*:\s*\d{1,2})',
       caseSensitive: false,
@@ -176,9 +201,10 @@ class OcrService {
     final match = timePatternRegex.firstMatch(text);
 
     if (match != null) {
-      // Limpiar los espacios
       String time = match.group(1) ?? '';
-      return time.replaceAll(RegExp(r'\s+'), '');
+      String cleanTime = time.replaceAll(RegExp(r'\s+'), '');
+      print('Hora encontrada: $cleanTime');
+      return cleanTime;
     }
 
     // Buscar directamente un patrón de hora
@@ -189,87 +215,35 @@ class OcrService {
     final timeMatch = timeOnlyRegex.firstMatch(text);
 
     if (timeMatch != null) {
-      // Limpiar los espacios
       String time = timeMatch.group(1) ?? '';
-      return time.replaceAll(RegExp(r'\s+'), '');
+      String cleanTime = time.replaceAll(RegExp(r'\s+'), '');
+      print('Hora encontrada (patrón directo): $cleanTime');
+      return cleanTime;
     }
 
+    print('No se pudo encontrar hora');
     return '';
   }
 
-  // Extrae el corresponsal
-  String _extractCorresponsal(String text) {
-    final RegExp regex = RegExp(
-      r'CORRESPONSAL\s*:?\s*(\d+)',
-      caseSensitive: false,
-    );
-    final match = regex.firstMatch(text);
-    return match?.group(1)?.trim() ?? '';
-  }
-
-  // Extrae el nombre del local
-  String _extractLocalName(String text) {
-    final lines = text.split('\n');
-    for (var line in lines) {
-      if (line.contains('COMERCIAL') || line.trim().startsWith('COMERCIAL')) {
-        return line.trim();
-      }
-    }
-    return '';
-  }
-
-  // Extrae el tipo de cuenta
-  String _extractAccountType(String text) {
-    final RegExp regex = RegExp(
-      r'TIPO DE CUENTA\s*:?\s*([A-Za-z]+)',
-      caseSensitive: false,
-    );
-    final match = regex.firstMatch(text);
-    return match?.group(1)?.trim() ?? '';
-  }
-
-  // Extrae el número de control
-  String _extractControlNumber(String text) {
-    // Expresión mejorada para capturar correctamente después de NRO. DE CONTROL:
-    final RegExp regex = RegExp(
-      r'NRO\.?\s*DE\s*CONTROL\s*:?\s*(\d+)',
-      caseSensitive: false,
-    );
-    final match = regex.firstMatch(text);
-    if (match != null && match.group(1) != null) {
-      return match.group(1)!.trim();
-    }
-
-    // Búsqueda alternativa por líneas
-    final lines = text.split('\n');
-    for (var line in lines) {
-      if (line.toUpperCase().contains('CONTROL')) {
-        // Extraer solo los dígitos
-        final digitsOnly = RegExp(r'\d+').firstMatch(line);
-        if (digitsOnly != null) {
-          return digitsOnly.group(0) ?? '';
-        }
-      }
-    }
-    return '';
-  }
-
-  // Extrae el monto
+  // MEJORADO: Extrae el monto/valor total con mejor detección
   double _extractAmount(String text) {
-    // Buscar por líneas para encontrar el valor total
+    // Buscar por líneas primero
     final lines = text.split('\n');
     for (var line in lines) {
-      if (line.toUpperCase().contains('VALOR') ||
-          line.toUpperCase().contains('TOTAL')) {
-        // Extraer todos los dígitos, puntos y comas, ignorando espacios
+      if (line.toUpperCase().contains('VALOR') || 
+          line.toUpperCase().contains('TOTAL') ||
+          line.toUpperCase().contains('MONTO')) {
+        
         final amountStr = line
             .replaceAll(RegExp(r'[^\d.,]'), '')
-            .replaceAll(',', '.') // Convertir comas a puntos
-            .replaceAll(RegExp(r'\s+'), ''); // Eliminar espacios
+            .replaceAll(',', '.')
+            .replaceAll(RegExp(r'\s+'), '');
 
         if (amountStr.isNotEmpty) {
           try {
-            return double.parse(amountStr);
+            double amount = double.parse(amountStr);
+            print('Valor encontrado: $amount');
+            return amount;
           } catch (e) {
             print('Error parsing amount: $e');
           }
@@ -277,98 +251,37 @@ class OcrService {
       }
     }
 
-    // Si no encontramos el valor por líneas, intentar con expresiones regulares más flexibles
+    // Expresiones regulares como respaldo
     List<RegExp> regexes = [
-      // Patrones que manejan espacios después del punto
       RegExp(r'\$\s*(\d+\.\s*\d+)', caseSensitive: false),
-      RegExp(r'TOTAL\s*:?\s*\$?\s*(\d+\.\s*\d+)', caseSensitive: false),
-      RegExp(r'VALOR\s*TOTAL\s*:?\s*\$?\s*(\d+\.\s*\d+)', caseSensitive: false),
-
-      // Patrones regulares sin considerar espacios
-      RegExp(r'\$\s*(\d+[\.,]?\d*)', caseSensitive: false),
       RegExp(r'TOTAL\s*:?\s*\$?\s*(\d+[\.,]?\d*)', caseSensitive: false),
-      RegExp(
-        r'VALOR\s*TOTAL\s*:?\s*\$?\s*(\d+[\.,]?\d*)',
-        caseSensitive: false,
-      ),
+      RegExp(r'VALOR\s*TOTAL\s*:?\s*\$?\s*(\d+[\.,]?\d*)', caseSensitive: false),
+      RegExp(r'VALOR\s*:?\s*\$?\s*(\d+[\.,]?\d*)', caseSensitive: false),
+      RegExp(r'MONTO\s*:?\s*\$?\s*(\d+[\.,]?\d*)', caseSensitive: false),
+      // NUEVO: Para recargas específicamente
+      RegExp(r'RECARGA\s*:?\s*\$?\s*(\d+[\.,]?\d*)', caseSensitive: false),
     ];
 
     for (var regex in regexes) {
       final match = regex.firstMatch(text);
       if (match != null) {
         String amountStr = match.group(1) ?? '0';
-        // Limpiar la cadena: eliminar espacios y convertir comas a puntos
         amountStr = amountStr.replaceAll(' ', '').replaceAll(',', '.');
         try {
-          return double.parse(amountStr);
+          double amount = double.parse(amountStr);
+          print('Valor encontrado con regex: $amount');
+          return amount;
         } catch (e) {
           print('Error parsing matched amount: $e');
         }
       }
     }
 
+    print('No se pudo encontrar valor total');
     return 0.0;
   }
 
-  // NUEVOS MÉTODOS PARA LOS NUEVOS TIPOS DE COMPROBANTES
-
-  // Extraer número de autorización para EFECTIVO MOVIL
-  String _extractAuthorizationNumber(String text) {
-    final RegExp regex = RegExp(
-      r'NRO\.?\s*DE\s*AUTORIZ\s*:?\s*(\d+)',
-      caseSensitive: false,
-    );
-    final match = regex.firstMatch(text);
-    if (match != null && match.group(1) != null) {
-      return match.group(1)!.trim();
-    }
-
-    // Buscar alternativa
-    final lines = text.split('\n');
-    for (var line in lines) {
-      if (line.toUpperCase().contains('AUTORIZ')) {
-        // Extraer solo los dígitos
-        final digitsOnly = RegExp(r'\d+').firstMatch(line);
-        if (digitsOnly != null) {
-          return digitsOnly.group(0) ?? '';
-        }
-      }
-    }
-    return '';
-  }
-
-  // Extraer ILIM. CLARO para RECARGA CLARO
-  String _extractIlimClaro(String text) {
-    final RegExp regex = RegExp(
-      r'ILIM\.\s*CLARO\s*:?\s*([^\n]+)',
-      caseSensitive: false,
-    );
-    final match = regex.firstMatch(text);
-    return match?.group(1)?.trim() ?? 'ILIM. CLARO';
-  }
-
-  // Extraer número telefónico para RECARGA CLARO
-  String _extractPhoneNumber(String text) {
-    final RegExp regex = RegExp(
-      r'NUM\.\s*TELEFONICO\s*:?\s*(\d+)',
-      caseSensitive: false,
-    );
-    final match = regex.firstMatch(text);
-    if (match != null && match.group(1) != null) {
-      return match.group(1)!.trim();
-    }
-
-    // Buscar un número de teléfono (secuencia de 10 dígitos)
-    final phoneRegex = RegExp(r'\b\d{10}\b');
-    final phoneMatch = phoneRegex.firstMatch(text);
-    if (phoneMatch != null) {
-      return phoneMatch.group(0) ?? '';
-    }
-
-    return '';
-  }
-
-  // Cierra el recognizer cuando ya no se necesite
+  // Cierra el recognizer
   void dispose() {
     _textRecognizer.close();
   }

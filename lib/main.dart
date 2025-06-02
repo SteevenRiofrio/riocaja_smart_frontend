@@ -1,5 +1,6 @@
-// lib/main.dart
+// lib/main.dart - ACTUALIZADO CON SOPORTE ESPAÑOL
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart'; // NUEVO
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -54,6 +55,19 @@ class MyApp extends StatelessWidget {
       ],
       child: MaterialApp(
         title: 'RíoCaja Smart',
+        
+        // NUEVO: Configuración de localización en español
+        locale: Locale('es', 'ES'),
+        localizationsDelegates: [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
+        supportedLocales: [
+          Locale('es', 'ES'), // Español
+          Locale('en', 'US'), // Inglés (respaldo)
+        ],
+        
         theme: ThemeData(
           primarySwatch: Colors.green,
           visualDensity: VisualDensity.adaptivePlatformDensity,

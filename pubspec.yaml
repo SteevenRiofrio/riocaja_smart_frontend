@@ -10,6 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:        # NUEVO - Para soporte de idiomas
+    sdk: flutter
   camera: ^0.10.5+8           # Para acceso a la cámara
   firebase_core: ^2.24.2      # Base de Firebase
   google_mlkit_text_recognition: ^0.11.0  # Para reconocimiento de texto
@@ -20,7 +22,7 @@ dependencies:
   path_provider: ^2.1.1       # Para acceso a directorios
   pdf: ^3.10.1                # Para generar PDF
   share_plus: ^7.0.2          # Para compartir archivos
-  intl: ^0.18.1               # Para formateo de fechas y números
+  intl: 0.19.0               # Para formateo de fechas y números
 
 dev_dependencies:
   flutter_test:
@@ -29,5 +31,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true                # NUEVO - Para generar localizaciones
   assets:
     - assets/images/          # Carpeta de imágenes
