@@ -217,3 +217,128 @@ class ReportSummaryWidget extends StatelessWidget {
             flex: 2,
             child: Text(
               '\$${valor.toStringAsFixed(2)}',
+              textAlign: TextAlign.right,
+              style: TextStyle(fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBalanceSection(double saldoEnCaja) {
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: saldoEnCaja >= 0 ? Colors.green.shade100 : Colors.red.shade100,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: saldoEnCaja >= 0 ? Colors.green.shade300 : Colors.red.shade300,
+          width: 2,
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(
+                saldoEnCaja >= 0 ? Icons.account_balance_wallet : Icons.warning,
+                color: saldoEnCaja >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                size: 24,
+              ),
+              SizedBox(width: 12),
+              Text(
+                'SALDO EN CAJA',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: saldoEnCaja >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            '\$${saldoEnCaja.toStringAsFixed(2)}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 20,
+              color: saldoEnCaja >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTransactionCount(int count) {
+    return Container(
+      padding: EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_long, color: Colors.blue.shade700),
+              SizedBox(width: 8),
+              Text(
+                'TOTAL TRANSACCIONES',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue.shade700,
+                ),
+              ),
+            ],
+          ),
+          Text(
+            '$count',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+              color: Colors.blue.shade700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: onShareReport,
+            icon: Icon(Icons.share),
+            label: Text('Compartir Reporte de Texto'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+        SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: onGeneratePDF,
+            icon: Icon(Icons.picture_as_pdf),
+            label: Text('Generar y Compartir PDF'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: Colors.green.shade700,
+              side: BorderSide(color: Colors.green.shade700),
+              padding: EdgeInsets.symmetric(vertical: 12),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}

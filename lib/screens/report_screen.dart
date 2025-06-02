@@ -1,258 +1,462 @@
-// lib/services/report_service.dart
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+// lib/screens/report_screen.dart - VERSIÓN REFACTORIZADA Y SIMPLIFICADA
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:riocaja_smart/services/api_service.dart';
+import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
+import 'package:riocaja_smart/screens/login_screen.dart';
+import 'package:riocaja_smart/services/report_service.dart';
+import 'package:riocaja_smart/services/pdf_service.dart';
+import 'package:riocaja_smart/widgets/report_summary_widget.dart';
 
-class ReportService {
-  final ApiService _apiService = ApiService();
+class ReportScreen extends StatefulWidget {
+  @override
+  _ReportScreenState createState() => _ReportScreenState();
+}
 
-  // Configurar contexto y token
-  void setContext(context) {
-    _apiService.setContext(context);
-  }
+class _ReportScreenState extends State<ReportScreen> {
+  DateTime _selectedDate = DateTime.now();
+  bool _isLoading = false;
+  Map<String, dynamic> _reportData = {};
+  
+  // Servicios
+  final ReportService _reportService = ReportService();
+  final PdfService _pdfService = PdfService();
 
-  void setAuthToken(String? token) {
-    _apiService.setAuthToken(token);
-  }
-
-  // Clasificar ingresos y egresos
-  Map<String, dynamic> classifyIncomeAndExpenses(List<dynamic> receipts) {
-    // Definir clasificaciones
-    Set<String> incomeTypes = {'DEPOSITO', 'PAGO DE SERVICIO', 'RECARGA CLARO', 'ENVIO GIRO'};
-    Set<String> expenseTypes = {'RETIRO', 'EFECTIVO MOVIL', 'PAGO GIRO'};
-
-    Map<String, double> incomes = {};
-    Map<String, int> incomeCount = {};
-    Map<String, double> expenses = {};
-    Map<String, int> expenseCount = {};
-
-    double totalIncomes = 0.0;
-    double totalExpenses = 0.0;
-    int totalIncomeCount = 0;
-    int totalExpenseCount = 0;
-
-    for (var receipt in receipts) {
-      String tipo = receipt['tipo'] as String? ?? 'Desconocido';
-      double valor = _extractValue(receipt['valor_total']);
-
-      if (incomeTypes.contains(tipo.toUpperCase())) {
-        // Es un ingreso
-        incomes[tipo] = (incomes[tipo] ?? 0.0) + valor;
-        incomeCount[tipo] = (incomeCount[tipo] ?? 0) + 1;
-        totalIncomes += valor;
-        totalIncomeCount++;
-      } else if (expenseTypes.contains(tipo.toUpperCase())) {
-        // Es un egreso
-        expenses[tipo] = (expenses[tipo] ?? 0.0) + valor;
-        expenseCount[tipo] = (expenseCount[tipo] ?? 0) + 1;
-        totalExpenses += valor;
-        totalExpenseCount++;
-      }
-    }
-
-    return {
-      'incomes': incomes,
-      'incomeCount': incomeCount,
-      'expenses': expenses,
-      'expenseCount': expenseCount,
-      'totalIncomes': totalIncomes,
-      'totalExpenses': totalExpenses,
-      'totalIncomeCount': totalIncomeCount,
-      'totalExpenseCount': totalExpenseCount,
-      'saldoEnCaja': totalIncomes - totalExpenses,
-    };
-  }
-
-  // Extraer valor numérico
-  double _extractValue(dynamic value) {
-    if (value == null) return 0.0;
+  @override
+  void initState() {
+    super.initState();
+    // Configurar locale en español
+    Intl.defaultLocale = 'es_ES';
     
-    if (value is int) {
-      return value.toDouble();
-    } else if (value is double) {
-      return value;
-    } else if (value is String) {
-      try {
-        return double.parse(value);
-      } catch (e) {
-        print('Error al convertir valor: $value');
-        return 0.0;
-      }
-    }
-    return 0.0;
+    // Verificar autenticación
+    _checkAuthentication();
+    
+    // Configurar servicios
+    _setupServices();
+    
+    // Generar reporte inicial
+    _generateReport();
   }
 
-  // Generar reporte por fecha específica
-  Future<Map<String, dynamic>> generateReportByDate(String dateStr) async {
+  // Verificar autenticación
+  void _checkAuthentication() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (!authProvider.isAuthenticated) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+        );
+      }
+    });
+  }
+
+  // Configurar servicios con contexto y token
+  void _setupServices() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // Configurar ReportService
+    _reportService.setContext(context);
+    if (authProvider.isAuthenticated) {
+      _reportService.setAuthToken(authProvider.user?.token);
+    }
+    
+    print('Servicios configurados correctamente');
+  }
+
+  // Generar reporte para la fecha seleccionada
+  Future<void> _generateReport() async {
+    setState(() => _isLoading = true);
+
     try {
-      print('Generando reporte para fecha: $dateStr');
+      print('Generando reporte para: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}');
       
-      // Intentar endpoint específico primero
-      final url = '${_apiService.baseUrl}/receipts/date/$dateStr';
-      final headers = _apiService.getHeaders();
+      // Convertir fecha al formato esperado por la API (dd-MM-yyyy)
+      final dateStr = DateFormat('dd-MM-yyyy').format(_selectedDate);
       
-      final response = await http
-          .get(Uri.parse(url), headers: headers)
-          .timeout(Duration(seconds: 60));
-
-      if (response.statusCode == 401) {
-        return _handleAuthError();
+      // Generar reporte usando el servicio
+      final reportData = await _reportService.generateReportByDate(dateStr);
+      
+      // Verificar si hay error de autenticación
+      if (reportData['needsAuth'] == true) {
+        _handleAuthError();
+        return;
       }
-
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final jsonResponse = jsonDecode(response.body);
-        final List<dynamic> receipts = jsonResponse['data'] ?? [];
-        
-        return _processReceipts(receipts, dateStr);
-      } else {
-        // Fallback: obtener todos y filtrar
-        return await _generateReportFromAllReceipts(dateStr);
-      }
+      
+      setState(() {
+        _reportData = reportData;
+        _isLoading = false;
+      });
+      
+      print('Reporte generado exitosamente: ${reportData['count']} comprobantes');
     } catch (e) {
       print('Error al generar reporte: $e');
-      return _generateReportFromAllReceipts(dateStr);
+      
+      // Verificar si es error de autenticación
+      if (e.toString().contains('Sesión expirada') || e.toString().contains('Token')) {
+        _handleAuthError();
+      } else {
+        setState(() {
+          _reportData = {};
+          _isLoading = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar reporte: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-  // Generar reporte desde todos los comprobantes
-  Future<Map<String, dynamic>> _generateReportFromAllReceipts(String dateStr) async {
-    try {
-      final url = '${_apiService.baseUrl}/receipts/';
-      final headers = _apiService.getHeaders();
-      
-      final response = await http
-          .get(Uri.parse(url), headers: headers)
-          .timeout(Duration(seconds: 60));
+  // Manejar errores de autenticación
+  void _handleAuthError() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Sesión expirada. Inicie sesión nuevamente.'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    
+    Future.delayed(Duration(seconds: 2), () {
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+      );
+    });
+  }
 
-      if (response.statusCode == 401) {
-        return _handleAuthError();
+  // Seleccionar fecha
+  Future<void> _selectDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      locale: Locale('es', 'ES'),
+      helpText: 'Seleccionar fecha del reporte',
+      cancelText: 'Cancelar',
+      confirmText: 'Aceptar',
+      fieldLabelText: 'Ingrese fecha',
+      fieldHintText: 'dd/mm/aaaa',
+    );
+
+    if (pickedDate != null && pickedDate != _selectedDate) {
+      setState(() {
+        _selectedDate = pickedDate;
+      });
+      await _generateReport();
+    }
+  }
+
+  // Navegar a fecha anterior
+  void _previousDay() {
+    setState(() {
+      _selectedDate = _selectedDate.subtract(Duration(days: 1));
+    });
+    _generateReport();
+  }
+
+  // Navegar a fecha siguiente
+  void _nextDay() {
+    final tomorrow = _selectedDate.add(Duration(days: 1));
+    if (tomorrow.isBefore(DateTime.now().add(Duration(days: 1)))) {
+      setState(() {
+        _selectedDate = tomorrow;
+      });
+      _generateReport();
+    }
+  }
+
+  // Compartir reporte como texto
+  Future<void> _shareReport() async {
+    try {
+      if (_reportData.isEmpty || (_reportData['count'] as int? ?? 0) == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No hay datos para compartir')),
+        );
+        return;
       }
 
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final jsonResponse = jsonDecode(response.body);
-        final List<dynamic> allReceipts = jsonResponse['data'] ?? [];
+      final reportText = _reportService.generateReportText(_reportData, _selectedDate);
+      await Share.share(
+        reportText,
+        subject: 'Reporte de Cierre - ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
+      );
+    } catch (e) {
+      print('Error al compartir reporte: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al compartir reporte'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
 
-        // Filtrar por fecha
-        String fechaConBarras = dateStr.contains('-') ? dateStr.replaceAll('-', '/') : dateStr;
-        
-        final List<dynamic> receipts = allReceipts
-            .where((receipt) =>
-                receipt['fecha'] == dateStr || receipt['fecha'] == fechaConBarras)
-            .toList();
+  // Generar y compartir PDF
+  Future<void> _generatePDF() async {
+    try {
+      if (_reportData.isEmpty || (_reportData['count'] as int? ?? 0) == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('No hay datos para generar PDF')),
+        );
+        return;
+      }
 
-        return _processReceipts(receipts, dateStr);
+      // Mostrar indicador de carga
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              SizedBox(width: 12),
+              Text('Generando PDF...'),
+            ],
+          ),
+          duration: Duration(seconds: 3),
+        ),
+      );
+
+      final success = await _pdfService.generateAndSharePDF(_reportData, _selectedDate);
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF generado y compartido exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
       } else {
-        return _emptyReport(dateStr);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al generar PDF'),
+            backgroundColor: Colors.red,
+          ),
+        );
       }
     } catch (e) {
-      print('Error al obtener todos los comprobantes: $e');
-      return _emptyReport(dateStr, error: 'Error: $e');
+      print('Error al generar PDF: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al generar PDF: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
-  // Procesar lista de comprobantes
-  Map<String, dynamic> _processReceipts(List<dynamic> receipts, String dateStr) {
-    if (receipts.isEmpty) {
-      return _emptyReport(dateStr);
+  @override
+  Widget build(BuildContext context) {
+    // Verificar autenticación en tiempo de renderizado
+    final authProvider = Provider.of<AuthProvider>(context);
+    
+    if (!authProvider.isAuthenticated) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Error de Autenticación')),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 80, color: Colors.red),
+              SizedBox(height: 16),
+              Text(
+                'Sesión no válida',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              Text('Por favor inicie sesión nuevamente'),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(builder: (context) => LoginScreen()),
+                  );
+                },
+                child: Text('Ir a Iniciar Sesión'),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
-    final classification = classifyIncomeAndExpenses(receipts);
-
-    return {
-      'incomes': classification['incomes'],
-      'incomeCount': classification['incomeCount'],
-      'expenses': classification['expenses'],
-      'expenseCount': classification['expenseCount'],
-      'totalIncomes': classification['totalIncomes'],
-      'totalExpenses': classification['totalExpenses'],
-      'totalIncomeCount': classification['totalIncomeCount'],
-      'totalExpenseCount': classification['totalExpenseCount'],
-      'saldoEnCaja': classification['saldoEnCaja'],
-      'count': receipts.length,
-      'date': dateStr,
-    };
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Reportes de Cierre'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.refresh),
+            onPressed: _isLoading ? null : _generateReport,
+            tooltip: 'Actualizar reporte',
+          ),
+        ],
+      ),
+      body: RefreshIndicator(
+        onRefresh: _generateReport,
+        child: SingleChildScrollView(
+          physics: AlwaysScrollableScrollPhysics(),
+          padding: EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // Selector de fecha
+              _buildDateSelector(),
+              SizedBox(height: 20),
+              
+              // Resumen del reporte
+              if (_isLoading)
+                _buildLoadingWidget()
+              else
+                ReportSummaryWidget(
+                  reportData: _reportData,
+                  selectedDate: _selectedDate,
+                  onShareReport: _shareReport,
+                  onGeneratePDF: _generatePDF,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  // Manejo de error de autenticación
-  Map<String, dynamic> _handleAuthError() {
-    return {
-      'incomes': {},
-      'expenses': {},
-      'saldoEnCaja': 0.0,
-      'count': 0,
-      'error': 'Sesión expirada',
-      'needsAuth': true,
-    };
+  // Widget selector de fecha
+  Widget _buildDateSelector() {
+    return Card(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Seleccionar Fecha',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: 12),
+            
+            // Navegación de fechas
+            Row(
+              children: [
+                IconButton(
+                  onPressed: _isLoading ? null : _previousDay,
+                  icon: Icon(Icons.chevron_left),
+                  tooltip: 'Día anterior',
+                ),
+                
+                Expanded(
+                  child: InkWell(
+                    onTap: _isLoading ? null : _selectDate,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.calendar_today, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            _formatDateInSpanish(_selectedDate),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                
+                IconButton(
+                  onPressed: (_isLoading || _selectedDate.isAfter(DateTime.now().subtract(Duration(days: 1)))) 
+                      ? null 
+                      : _nextDay,
+                  icon: Icon(Icons.chevron_right),
+                  tooltip: 'Día siguiente',
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 8),
+            
+            // Botones de acceso rápido
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
+                  onPressed: _isLoading ? null : () {
+                    setState(() {
+                      _selectedDate = DateTime.now();
+                    });
+                    _generateReport();
+                  },
+                  child: Text('Hoy'),
+                ),
+                TextButton(
+                  onPressed: _isLoading ? null : () {
+                    setState(() {
+                      _selectedDate = DateTime.now().subtract(Duration(days: 1));
+                    });
+                    _generateReport();
+                  },
+                  child: Text('Ayer'),
+                ),
+                TextButton(
+                  onPressed: _isLoading ? null : () {
+                    setState(() {
+                      _selectedDate = DateTime.now().subtract(Duration(days: 7));
+                    });
+                    _generateReport();
+                  },
+                  child: Text('Hace 7 días'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
-  // Reporte vacío
-  Map<String, dynamic> _emptyReport(String dateStr, {String? error}) {
-    return {
-      'incomes': {},
-      'incomeCount': {},
-      'expenses': {},
-      'expenseCount': {},
-      'totalIncomes': 0.0,
-      'totalExpenses': 0.0,
-      'totalIncomeCount': 0,
-      'totalExpenseCount': 0,
-      'saldoEnCaja': 0.0,
-      'count': 0,
-      'date': dateStr,
-      if (error != null) 'error': error,
-    };
+  // Widget de carga
+  Widget _buildLoadingWidget() {
+    return Card(
+      child: Container(
+        height: 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Generando reporte...'),
+              SizedBox(height: 8),
+              Text(
+                'Fecha: ${_formatDateInSpanish(_selectedDate)}',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  // Generar texto del reporte para compartir
-  String generateReportText(Map<String, dynamic> reportData, DateTime selectedDate) {
-    final dateStr = DateFormat('dd/MM/yyyy').format(selectedDate);
-    final incomes = reportData['incomes'] as Map<dynamic, dynamic>? ?? {};
-    final incomeCount = reportData['incomeCount'] as Map<dynamic, dynamic>? ?? {};
-    final expenses = reportData['expenses'] as Map<dynamic, dynamic>? ?? {};
-    final expenseCount = reportData['expenseCount'] as Map<dynamic, dynamic>? ?? {};
-    final totalIncomes = reportData['totalIncomes'] as double? ?? 0.0;
-    final totalExpenses = reportData['totalExpenses'] as double? ?? 0.0;
-    final totalIncomeCount = reportData['totalIncomeCount'] as int? ?? 0;
-    final totalExpenseCount = reportData['totalExpenseCount'] as int? ?? 0;
-    final saldoEnCaja = reportData['saldoEnCaja'] as double? ?? 0.0;
-    final count = reportData['count'] as int? ?? 0;
-
-    String reportText = 'REPORTE DE CIERRE - RIOCAJA SMART\n\n';
-    reportText += 'FECHA: $dateStr\n';
-    reportText += 'CNB: BANCO DEL BARRIO\n\n';
-
-    if (count > 0) {
-      // INGRESOS
-      if (incomes.isNotEmpty) {
-        reportText += 'INGRESOS EFECTIVO\n';
-        reportText += '                    CANT    VALOR\n';
-        incomes.forEach((key, value) {
-          String tipo = key.toString().toUpperCase();
-          int cantidad = incomeCount[key] ?? 0;
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${(value as num).toStringAsFixed(2).padLeft(8)}\n';
-        });
-        reportText += 'TOTAL INGRESOS      ${totalIncomeCount.toString().padLeft(4)} \$${totalIncomes.toStringAsFixed(2).padLeft(8)}\n\n';
-      }
-
-      // EGRESOS
-      if (expenses.isNotEmpty) {
-        reportText += 'EGRESOS EFECTIVO\n';
-        reportText += '                    CANT    VALOR\n';
-        expenses.forEach((key, value) {
-          String tipo = key.toString().toUpperCase();
-          int cantidad = expenseCount[key] ?? 0;
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${(value as num).toStringAsFixed(2).padLeft(8)}\n';
-        });
-        reportText += 'TOTAL EGRESOS       ${totalExpenseCount.toString().padLeft(4)} \$${totalExpenses.toStringAsFixed(2).padLeft(8)}\n\n';
-      }
-
-      reportText += 'SALDO EN CAJA                \$${saldoEnCaja.toStringAsFixed(2)}\n';
-    } else {
-      reportText += 'NO HAY TRANSACCIONES PARA ESTA FECHA.\n';
-    }
-
-    reportText += '\nGenerado el: ${DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now())}';
-    return reportText;
+  // Formatear fecha en español
+  String _formatDateInSpanish(DateTime date) {
+    final formatter = DateFormat('EEEE, dd \'de\' MMMM \'de\' yyyy', 'es_ES');
+    return formatter.format(date);
   }
 }
