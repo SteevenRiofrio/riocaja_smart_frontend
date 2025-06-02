@@ -1,4 +1,4 @@
-// lib/screens/report_screen.dart - VERSIÓN REFACTORIZADA Y SIMPLIFICADA
+// lib/screens/report_screen.dart - VERSIÓN ACTUALIZADA CON SELECTOR INTELIGENTE
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +8,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/services/report_service.dart';
 import 'package:riocaja_smart/services/pdf_service.dart';
 import 'package:riocaja_smart/widgets/report_summary_widget.dart';
+import 'package:riocaja_smart/widgets/smart_date_picker.dart';
 
 class ReportScreen extends StatefulWidget {
   @override
@@ -17,7 +18,9 @@ class ReportScreen extends StatefulWidget {
 class _ReportScreenState extends State<ReportScreen> {
   DateTime _selectedDate = DateTime.now();
   bool _isLoading = false;
+  bool _isLoadingDates = true;
   Map<String, dynamic> _reportData = {};
+  List<String> _availableDates = [];
   
   // Servicios
   final ReportService _reportService = ReportService();
@@ -35,8 +38,8 @@ class _ReportScreenState extends State<ReportScreen> {
     // Configurar servicios
     _setupServices();
     
-    // Generar reporte inicial
-    _generateReport();
+    // Cargar fechas disponibles primero
+    _loadAvailableDates();
   }
 
   // Verificar autenticación
@@ -62,6 +65,77 @@ class _ReportScreenState extends State<ReportScreen> {
     }
     
     print('Servicios configurados correctamente');
+  }
+
+  // Cargar fechas disponibles con comprobantes
+  Future<void> _loadAvailableDates() async {
+    setState(() => _isLoadingDates = true);
+
+    try {
+      print('Cargando fechas disponibles...');
+      
+      // Obtener todas las fechas disponibles del servicio
+      final availableDates = await _reportService.getAvailableDates();
+      
+      setState(() {
+        _availableDates = availableDates;
+        _isLoadingDates = false;
+      });
+      
+      print('Fechas disponibles cargadas: ${availableDates.length}');
+      
+      // Si hay fechas disponibles y la fecha seleccionada no está en la lista,
+      // seleccionar la fecha más reciente
+      if (availableDates.isNotEmpty) {
+        final currentDateStr = DateFormat('dd/MM/yyyy').format(_selectedDate);
+        if (!availableDates.contains(currentDateStr)) {
+          // Asumir que las fechas están ordenadas, tomar la primera (más reciente)
+          final latestDateStr = availableDates.first;
+          _selectedDate = _parseDate(latestDateStr) ?? DateTime.now();
+        }
+        
+        // Generar reporte para la fecha seleccionada
+        await _generateReport();
+      }
+    } catch (e) {
+      print('Error al cargar fechas disponibles: $e');
+      
+      // Verificar si es error de autenticación
+      if (e.toString().contains('Sesión expirada') || e.toString().contains('Token')) {
+        _handleAuthError();
+      } else {
+        setState(() {
+          _availableDates = [];
+          _isLoadingDates = false;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error al cargar fechas: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  // Parsear fecha desde string
+  DateTime? _parseDate(String dateStr) {
+    try {
+      if (dateStr.contains('/')) {
+        final parts = dateStr.split('/');
+        if (parts.length == 3) {
+          return DateTime(
+            int.parse(parts[2]), // año
+            int.parse(parts[1]), // mes
+            int.parse(parts[0]), // día
+          );
+        }
+      }
+    } catch (e) {
+      print('Error al parsear fecha: $dateStr');
+    }
+    return null;
   }
 
   // Generar reporte para la fecha seleccionada
@@ -127,43 +201,11 @@ class _ReportScreenState extends State<ReportScreen> {
     });
   }
 
-  // Seleccionar fecha
-  Future<void> _selectDate() async {
-    final pickedDate = await showDatePicker(
-      context: context,
-      initialDate: _selectedDate,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      locale: Locale('es', 'ES'),
-      helpText: 'Seleccionar fecha del reporte',
-      cancelText: 'Cancelar',
-      confirmText: 'Aceptar',
-      fieldLabelText: 'Ingrese fecha',
-      fieldHintText: 'dd/mm/aaaa',
-    );
-
-    if (pickedDate != null && pickedDate != _selectedDate) {
+  // Manejar selección de nueva fecha
+  void _onDateSelected(DateTime newDate) {
+    if (newDate != _selectedDate) {
       setState(() {
-        _selectedDate = pickedDate;
-      });
-      await _generateReport();
-    }
-  }
-
-  // Navegar a fecha anterior
-  void _previousDay() {
-    setState(() {
-      _selectedDate = _selectedDate.subtract(Duration(days: 1));
-    });
-    _generateReport();
-  }
-
-  // Navegar a fecha siguiente
-  void _nextDay() {
-    final tomorrow = _selectedDate.add(Duration(days: 1));
-    if (tomorrow.isBefore(DateTime.now().add(Duration(days: 1)))) {
-      setState(() {
-        _selectedDate = tomorrow;
+        _selectedDate = newDate;
       });
       _generateReport();
     }
@@ -292,139 +334,45 @@ class _ReportScreenState extends State<ReportScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _generateReport,
-            tooltip: 'Actualizar reporte',
+            onPressed: (_isLoading || _isLoadingDates) ? null : () {
+              _loadAvailableDates(); // Recargar fechas y reporte
+            },
+            tooltip: 'Actualizar',
           ),
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _generateReport,
+        onRefresh: () => _loadAvailableDates(),
         child: SingleChildScrollView(
           physics: AlwaysScrollableScrollPhysics(),
           padding: EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              // Selector de fecha
-              _buildDateSelector(),
+              // Selector inteligente de fechas
+              SmartDatePicker(
+                selectedDate: _selectedDate,
+                onDateSelected: _onDateSelected,
+                availableDates: _availableDates,
+                isLoading: _isLoadingDates,
+              ),
+              
               SizedBox(height: 20),
               
               // Resumen del reporte
               if (_isLoading)
                 _buildLoadingWidget()
-              else
+              else if (_availableDates.isNotEmpty)
                 ReportSummaryWidget(
                   reportData: _reportData,
                   selectedDate: _selectedDate,
                   onShareReport: _shareReport,
                   onGeneratePDF: _generatePDF,
-                ),
+                )
+              else
+                _buildNoDataWidget(),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  // Widget selector de fecha
-  Widget _buildDateSelector() {
-    return Card(
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Seleccionar Fecha',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(height: 12),
-            
-            // Navegación de fechas
-            Row(
-              children: [
-                IconButton(
-                  onPressed: _isLoading ? null : _previousDay,
-                  icon: Icon(Icons.chevron_left),
-                  tooltip: 'Día anterior',
-                ),
-                
-                Expanded(
-                  child: InkWell(
-                    onTap: _isLoading ? null : _selectDate,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.grey.shade300),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.calendar_today, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            _formatDateInSpanish(_selectedDate),
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                
-                IconButton(
-                  onPressed: (_isLoading || _selectedDate.isAfter(DateTime.now().subtract(Duration(days: 1)))) 
-                      ? null 
-                      : _nextDay,
-                  icon: Icon(Icons.chevron_right),
-                  tooltip: 'Día siguiente',
-                ),
-              ],
-            ),
-            
-            SizedBox(height: 8),
-            
-            // Botones de acceso rápido
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: _isLoading ? null : () {
-                    setState(() {
-                      _selectedDate = DateTime.now();
-                    });
-                    _generateReport();
-                  },
-                  child: Text('Hoy'),
-                ),
-                TextButton(
-                  onPressed: _isLoading ? null : () {
-                    setState(() {
-                      _selectedDate = DateTime.now().subtract(Duration(days: 1));
-                    });
-                    _generateReport();
-                  },
-                  child: Text('Ayer'),
-                ),
-                TextButton(
-                  onPressed: _isLoading ? null : () {
-                    setState(() {
-                      _selectedDate = DateTime.now().subtract(Duration(days: 7));
-                    });
-                    _generateReport();
-                  },
-                  child: Text('Hace 7 días'),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );
@@ -444,7 +392,7 @@ class _ReportScreenState extends State<ReportScreen> {
               Text('Generando reporte...'),
               SizedBox(height: 8),
               Text(
-                'Fecha: ${_formatDateInSpanish(_selectedDate)}',
+                'Fecha: ${DateFormat('dd/MM/yyyy').format(_selectedDate)}',
                 style: TextStyle(color: Colors.grey.shade600),
               ),
             ],
@@ -454,9 +402,33 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
-  // Formatear fecha en español
-  String _formatDateInSpanish(DateTime date) {
-    final formatter = DateFormat('EEEE, dd \'de\' MMMM \'de\' yyyy', 'es_ES');
-    return formatter.format(date);
+  // Widget cuando no hay datos
+  Widget _buildNoDataWidget() {
+    return Card(
+      child: Container(
+        height: 200,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.inbox, size: 64, color: Colors.grey.shade400),
+              SizedBox(height: 16),
+              Text(
+                'No hay comprobantes registrados',
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.grey.shade600,
+                ),
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Escanee algunos comprobantes primero',
+                style: TextStyle(color: Colors.grey.shade600),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

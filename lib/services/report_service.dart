@@ -1,4 +1,4 @@
-// lib/services/report_service.dart
+// lib/services/report_service.dart - ACTUALIZADO CON MÉTODO DE FECHAS DISPONIBLES
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
@@ -14,6 +14,113 @@ class ReportService {
 
   void setAuthToken(String? token) {
     _apiService.setAuthToken(token);
+  }
+
+  // NUEVO: Obtener todas las fechas que tienen comprobantes
+  Future<List<String>> getAvailableDates() async {
+    try {
+      print('Obteniendo fechas disponibles...');
+      
+      // Obtener todos los comprobantes
+      final url = '${_apiService.baseUrl}/receipts/';
+      final headers = _apiService.getHeaders();
+      
+      final response = await http
+          .get(Uri.parse(url), headers: headers)
+          .timeout(Duration(seconds: 60));
+
+      if (response.statusCode == 401) {
+        throw Exception('Sesión expirada');
+      }
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final jsonResponse = jsonDecode(response.body);
+        final List<dynamic> allReceipts = jsonResponse['data'] ?? [];
+        
+        // Extraer fechas únicas y ordenarlas
+        Set<String> uniqueDates = {};
+        
+        for (var receipt in allReceipts) {
+          String fecha = receipt['fecha'] as String? ?? '';
+          if (fecha.isNotEmpty) {
+            // Normalizar formato de fecha a dd/MM/yyyy
+            String normalizedDate = _normalizeDateFormat(fecha);
+            if (normalizedDate.isNotEmpty) {
+              uniqueDates.add(normalizedDate);
+            }
+          }
+        }
+        
+        // Convertir a lista y ordenar de más reciente a más antigua
+        List<String> sortedDates = uniqueDates.toList();
+        sortedDates.sort((a, b) {
+          DateTime? dateA = _parseDate(a);
+          DateTime? dateB = _parseDate(b);
+          
+          if (dateA == null || dateB == null) return 0;
+          return dateB.compareTo(dateA); // Orden descendente (más reciente primero)
+        });
+        
+        print('Fechas disponibles encontradas: ${sortedDates.length}');
+        return sortedDates;
+      } else {
+        print('Error al obtener comprobantes: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('Error al obtener fechas disponibles: $e');
+      throw e;
+    }
+  }
+
+  // Normalizar formato de fecha
+  String _normalizeDateFormat(String dateStr) {
+    try {
+      if (dateStr.contains('-')) {
+        // Convertir dd-MM-yyyy a dd/MM/yyyy
+        return dateStr.replaceAll('-', '/');
+      }
+      
+      // Validar formato dd/MM/yyyy
+      if (dateStr.contains('/')) {
+        final parts = dateStr.split('/');
+        if (parts.length == 3) {
+          final day = int.tryParse(parts[0]);
+          final month = int.tryParse(parts[1]);
+          final year = int.tryParse(parts[2]);
+          
+          if (day != null && month != null && year != null &&
+              day >= 1 && day <= 31 &&
+              month >= 1 && month <= 12 &&
+              year >= 2020 && year <= 2030) {
+            // Formatear con ceros a la izquierda si es necesario
+            return '${day.toString().padLeft(2, '0')}/${month.toString().padLeft(2, '0')}/$year';
+          }
+        }
+      }
+    } catch (e) {
+      print('Error al normalizar fecha: $dateStr - $e');
+    }
+    return '';
+  }
+
+  // Parsear fecha desde string
+  DateTime? _parseDate(String dateStr) {
+    try {
+      if (dateStr.contains('/')) {
+        final parts = dateStr.split('/');
+        if (parts.length == 3) {
+          return DateTime(
+            int.parse(parts[2]), // año
+            int.parse(parts[1]), // mes
+            int.parse(parts[0]), // día
+          );
+        }
+      }
+    } catch (e) {
+      print('Error al parsear fecha: $dateStr');
+    }
+    return null;
   }
 
   // Clasificar ingresos y egresos
@@ -133,12 +240,17 @@ class ReportService {
         final jsonResponse = jsonDecode(response.body);
         final List<dynamic> allReceipts = jsonResponse['data'] ?? [];
 
-        // Filtrar por fecha
+        // Filtrar por fecha con múltiples formatos
         String fechaConBarras = dateStr.contains('-') ? dateStr.replaceAll('-', '/') : dateStr;
+        String fechaConGuiones = dateStr.contains('/') ? dateStr.replaceAll('/', '-') : dateStr;
         
         final List<dynamic> receipts = allReceipts
-            .where((receipt) =>
-                receipt['fecha'] == dateStr || receipt['fecha'] == fechaConBarras)
+            .where((receipt) {
+              String receiptDate = receipt['fecha'] ?? '';
+              return receiptDate == dateStr || 
+                     receiptDate == fechaConBarras || 
+                     receiptDate == fechaConGuiones;
+            })
             .toList();
 
         return _processReceipts(receipts, dateStr);
@@ -230,9 +342,9 @@ class ReportService {
         incomes.forEach((key, value) {
           String tipo = key.toString().toUpperCase();
           int cantidad = incomeCount[key] ?? 0;
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${(value as num).toStringAsFixed(2).padLeft(8)}\n';
+          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \${(value as num).toStringAsFixed(2).padLeft(8)}\n';
         });
-        reportText += 'TOTAL INGRESOS      ${totalIncomeCount.toString().padLeft(4)} \$${totalIncomes.toStringAsFixed(2).padLeft(8)}\n\n';
+        reportText += 'TOTAL INGRESOS      ${totalIncomeCount.toString().padLeft(4)} \${totalIncomes.toStringAsFixed(2).padLeft(8)}\n\n';
       }
 
       // EGRESOS
@@ -242,12 +354,12 @@ class ReportService {
         expenses.forEach((key, value) {
           String tipo = key.toString().toUpperCase();
           int cantidad = expenseCount[key] ?? 0;
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${(value as num).toStringAsFixed(2).padLeft(8)}\n';
+          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \${(value as num).toStringAsFixed(2).padLeft(8)}\n';
         });
-        reportText += 'TOTAL EGRESOS       ${totalExpenseCount.toString().padLeft(4)} \$${totalExpenses.toStringAsFixed(2).padLeft(8)}\n\n';
+        reportText += 'TOTAL EGRESOS       ${totalExpenseCount.toString().padLeft(4)} \${totalExpenses.toStringAsFixed(2).padLeft(8)}\n\n';
       }
 
-      reportText += 'SALDO EN CAJA                \$${saldoEnCaja.toStringAsFixed(2)}\n';
+      reportText += 'SALDO EN CAJA                \${saldoEnCaja.toStringAsFixed(2)}\n';
     } else {
       reportText += 'NO HAY TRANSACCIONES PARA ESTA FECHA.\n';
     }
