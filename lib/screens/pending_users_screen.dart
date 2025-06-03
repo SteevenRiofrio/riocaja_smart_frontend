@@ -1,7 +1,8 @@
-// lib/screens/pending_users_screen.dart
+// lib/screens/pending_users_screen.dart - ACTUALIZADA CON CÓDIGO CORRESPONSAL
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/admin_provider.dart';
+import 'package:riocaja_smart/services/admin_service.dart';
 import 'package:intl/intl.dart';
 
 class PendingUsersScreen extends StatefulWidget {
@@ -225,6 +226,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   
   void _showApproveUserDialog(BuildContext context, Map<String, dynamic> user) {
     String selectedRole = user['rol'] ?? 'lector';
+    final codigoController = TextEditingController();
     
     showDialog(
       context: context,
@@ -232,31 +234,74 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
         builder: (context, setState) {
           return AlertDialog(
             title: Text('Aprobar Usuario'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Nombre: ${user['nombre']}'),
-                Text('Email: ${user['email']}'),
-                SizedBox(height: 16),
-                Text('Seleccione el rol:'),
-                DropdownButton<String>(
-                  value: selectedRole,
-                  isExpanded: true,
-                  items: [
-                    DropdownMenuItem(value: 'lector', child: Text('Lector')),
-                    DropdownMenuItem(value: 'operador', child: Text('Operador')),
-                    DropdownMenuItem(value: 'admin', child: Text('Administrador')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        selectedRole = value;
-                      });
-                    }
-                  },
-                ),
-              ],
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Información del usuario
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Información del Usuario:', style: TextStyle(fontWeight: FontWeight.bold)),
+                        SizedBox(height: 8),
+                        Text('Nombre: ${user['nombre']}'),
+                        Text('Email: ${user['email']}'),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  
+                  // Campo para código de corresponsal
+                  Text('Código de Corresponsal:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  TextField(
+                    controller: codigoController,
+                    decoration: InputDecoration(
+                      hintText: 'Ej: CNB001, FARM123, etc.',
+                      labelText: 'Código único del corresponsal',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.qr_code),
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Este código será utilizado por el usuario para completar su perfil.',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  SizedBox(height: 16),
+                  
+                  // Selector de rol
+                  Text('Seleccione el rol:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: selectedRole,
+                    decoration: InputDecoration(
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    items: [
+                      DropdownMenuItem(value: 'lector', child: Text('Lector')),
+                      DropdownMenuItem(value: 'operador', child: Text('Operador')),
+                      DropdownMenuItem(value: 'admin', child: Text('Administrador')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) {
+                        setState(() {
+                          selectedRole = value;
+                        });
+                      }
+                    },
+                  ),
+                ],
+              ),
             ),
             actions: [
               TextButton(
@@ -265,26 +310,98 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
               ),
               ElevatedButton(
                 onPressed: () async {
-                  Navigator.of(context).pop();
-                  
-                  // Si el rol seleccionado es diferente al original, actualizarlo primero
-                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-                  
-                  if (selectedRole != user['rol']) {
-                    await adminProvider.changeUserRole(user['_id'], selectedRole);
-                  }
-                  
-                  // Aprobar usuario
-                  final success = await adminProvider.approveUser(user['_id']);
-                  
-                  if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Usuario aprobado correctamente')),
-                    );
-                  } else {
+                  // Validar que se haya ingresado el código
+                  if (codigoController.text.trim().isEmpty) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Error al aprobar usuario'),
+                        content: Text('Debe ingresar un código de corresponsal'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  if (codigoController.text.trim().length < 3) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('El código debe tener al menos 3 caracteres'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+                  
+                  Navigator.of(context).pop();
+                  
+                  // Mostrar indicador de carga
+                  showDialog(
+                    context: context,
+                    barrierDismissible: false,
+                    builder: (context) => Center(
+                      child: Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(20),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(),
+                              SizedBox(height: 16),
+                              Text('Aprobando usuario...'),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                  
+                  try {
+                    // Usar el nuevo método que incluye código de corresponsal
+                    final adminService = AdminService();
+                    adminService.setContext(context);
+                    
+                    final success = await adminService.approveUserWithCode(
+                      user['_id'],
+                      codigoController.text.trim().toUpperCase(),
+                    );
+                    
+                    // Cerrar indicador de carga
+                    Navigator.of(context).pop();
+                    
+                    if (success) {
+                      // Cambiar rol si es diferente al original
+                      if (selectedRole != user['rol']) {
+                        await adminService.changeUserRole(user['_id'], selectedRole);
+                      }
+                      
+                      // Recargar lista
+                      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+                      await adminProvider.loadPendingUsers();
+                      
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Usuario aprobado correctamente.\n'
+                            'Código asignado: ${codigoController.text.trim().toUpperCase()}',
+                          ),
+                          backgroundColor: Colors.green,
+                          duration: Duration(seconds: 4),
+                        ),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error al aprobar usuario. Verifique que el código no esté en uso.'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    // Cerrar indicador de carga
+                    Navigator.of(context).pop();
+                    
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: $e'),
                         backgroundColor: Colors.red,
                       ),
                     );

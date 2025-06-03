@@ -1,9 +1,10 @@
-// lib/screens/login_screen.dart
+// lib/screens/login_screen.dart - CODIGO COMPLETO ACTUALIZADO
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
 import 'package:riocaja_smart/screens/register_screen.dart';
+import 'package:riocaja_smart/screens/complete_profile_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -75,12 +76,29 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
         
-        // Navegar a la pantalla principal después de un breve retraso
+        // Determinar a qué pantalla navegar basado en el rol y estado del perfil
         Future.delayed(Duration(milliseconds: 500), () {
           if (mounted) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (context) => HomeScreen()),
-            );
+            // Admin y operador van directo a Home
+            if (authProvider.user?.rol == 'admin' || authProvider.user?.rol == 'operador') {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => HomeScreen()),
+              );
+            } else if (authProvider.needsProfileCompletion) {
+              // Solo usuarios normales completan perfil
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => CompleteProfileScreen(
+                    codigoCorresponsal: authProvider.codigoCorresponsal,
+                  ),
+                ),
+              );
+            } else {
+              // Usuario normal con perfil completo
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(builder: (context) => HomeScreen()),
+              );
+            }
           }
         });
       } else {
@@ -335,6 +353,47 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           
+                          // Información adicional para usuarios nuevos
+                          SizedBox(height: 24),
+                          Container(
+                            padding: EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.shade200),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(Icons.info_outline, 
+                                         color: Colors.blue.shade700, 
+                                         size: 20),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Información para nuevos usuarios',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.blue.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                SizedBox(height: 8),
+                                Text(
+                                  '• Los nuevos usuarios deben ser aprobados por un administrador\n'
+                                  '• Después de la aprobación, completará su perfil con el código de corresponsal\n'
+                                  '• Contacte al administrador si tiene dudas',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue.shade800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
                           // Versión de la aplicación
                           SizedBox(height: 40),
                           Center(
@@ -358,4 +417,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}
+}   

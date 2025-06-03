@@ -1,4 +1,4 @@
-// lib/providers/auth_provider.dart
+// lib/providers/auth_provider.dart - CORREGIDO PARA ADMIN
 import 'package:flutter/foundation.dart';
 import 'package:riocaja_smart/models/user.dart';
 import 'package:riocaja_smart/services/auth_service.dart';
@@ -8,6 +8,7 @@ enum AuthStatus {
   uninitialized,
   authenticated,
   unauthenticated,
+  needsProfileCompletion, // Solo para usuarios normales
 }
 
 class AuthProvider with ChangeNotifier {
@@ -17,7 +18,9 @@ class AuthProvider with ChangeNotifier {
   User? _user;
   String _errorMessage = '';
   bool _isLoading = false;
-  bool _rememberMe = true; // Por defecto activado
+  bool _rememberMe = true;
+  bool _perfilCompleto = false;
+  String? _codigoCorresponsal;
   
   // Getters
   AuthStatus get authStatus => _authStatus;
@@ -26,8 +29,11 @@ class AuthProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _authStatus == AuthStatus.authenticated;
   bool get rememberMe => _rememberMe;
+  bool get perfilCompleto => _perfilCompleto;
+  String? get codigoCorresponsal => _codigoCorresponsal;
+  bool get needsProfileCompletion => _authStatus == AuthStatus.needsProfileCompletion;
   
-  // Constructor - inicializar el proveedor
+  // Constructor
   AuthProvider() {
     print('Inicializando AuthProvider...');
     _initializeAuth();
@@ -38,7 +44,6 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
     
     try {
-      // Cargar preferencia de "Recordar sesión"
       final prefs = await SharedPreferences.getInstance();
       _rememberMe = prefs.getBool(AuthService.REMEMBER_ME_KEY) ?? true;
       
@@ -88,84 +93,163 @@ class AuthProvider with ChangeNotifier {
     }
   }
   
-  // Login de usuario
-Future<bool> login(String email, String password) async {
-  try {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
-    
-    // Limpiar cualquier sesión anterior para evitar problemas
-    await logout();
-    
-    final result = await _authService.login(email, password);
-    
-    _isLoading = false;
-    
-    if (result['success']) {
-      _user = User.fromJson(result['user']);
-      _authStatus = AuthStatus.authenticated;
-      
-      // Guardar preferencia de "Recordar sesión"
-      await _authService.setRememberMe(_rememberMe);
-      
+  // Login de usuario - CORREGIDO PARA ADMIN
+  Future<bool> login(String email, String password) async {
+    try {
+      _isLoading = true;
+      _errorMessage = '';
       notifyListeners();
-      return true;
-    } else {
-      _errorMessage = result['message'];
+      
+      await logout();
+      
+      final result = await _authService.login(email, password);
+      
+      _isLoading = false;
+      
+      if (result['success']) {
+        _user = User.fromJson(result['user']);
+        _perfilCompleto = result['perfil_completo'] ?? false;
+        _codigoCorresponsal = result['codigo_corresponsal'];
+        
+        // LÓGICA CORREGIDA: Admin y operador siempre van directamente
+        if (_user!.rol == 'admin' || _user!.rol == 'operador') {
+          _authStatus = AuthStatus.authenticated;
+          print('AuthProvider: Admin/Operador - acceso directo');
+        } else {
+          // Solo usuarios normales necesitan completar perfil
+          if (_perfilCompleto) {
+            _authStatus = AuthStatus.authenticated;
+          } else {
+            _authStatus = AuthStatus.needsProfileCompletion;
+          }
+          print('AuthProvider: Usuario normal - perfil completo: $_perfilCompleto');
+        }
+        
+        await _authService.setRememberMe(_rememberMe);
+        
+        notifyListeners();
+        return true;
+      } else {
+        _errorMessage = result['message'];
+        _authStatus = AuthStatus.unauthenticated;
+        notifyListeners();
+        return false;
+      }
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Error: $e';
       _authStatus = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
     }
-  } catch (e) {
-    _isLoading = false;
-    _errorMessage = 'Error: $e';
-    _authStatus = AuthStatus.unauthenticated;
-    notifyListeners();
-    return false;
   }
-}
 
-// Método para verificar y renovar token si es necesario
-Future<bool> checkAndRefreshToken() async {
-  if (_user == null || _user!.token.isEmpty) {
-    return false;
+  // Completar perfil (solo para usuarios normales)
+  Future<bool> completeProfile({
+    required String codigoCorresponsal,
+    required String nombreLocal,
+    required String nombreCompleto,
+    required String password,
+  }) async {
+    try {
+      _isLoading = true;
+      _errorMessage = '';
+      notifyListeners();
+      
+      final success = await _authService.completeProfile(
+        codigoCorresponsal: codigoCorresponsal,
+        nombreLocal: nombreLocal,
+        nombreCompleto: nombreCompleto,
+        password: password,
+      );
+      
+      if (success) {
+        _perfilCompleto = true;
+        _authStatus = AuthStatus.authenticated;
+        
+        if (_user != null) {
+          _user = User(
+            id: _user!.id,
+            nombre: nombreCompleto,
+            email: _user!.email,
+            rol: _user!.rol,
+            token: _user!.token,
+            perfilCompleto: true,
+          );
+        }
+        
+        print('AuthProvider: Perfil completado exitosamente');
+      } else {
+        _errorMessage = 'Error al completar perfil';
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = 'Error: $e';
+      notifyListeners();
+      return false;
+    }
   }
-  
-  try {
-    final userData = await _authService.getUserData();
-    if (userData['success']) {
-      return true; // Token sigue siendo válido
+
+  // Verificar código de corresponsal
+  Future<bool> verifyCorresponsalCode(String codigo) async {
+    try {
+      return await _authService.verifyCorresponsalCode(codigo);
+    } catch (e) {
+      print('Error al verificar código: $e');
+      return false;
+    }
+  }
+
+  // Verificar y renovar token - CORREGIDO
+  Future<bool> checkAndRefreshToken() async {
+    if (_user == null || _user!.token.isEmpty) {
+      return false;
     }
     
-    // Si llegamos aquí, el token no es válido
-    // Intentar renovar token
-    final refreshed = await _authService.refreshToken();
-    if (refreshed) {
-      return true;
+    try {
+      final userData = await _authService.getUserData();
+      if (userData['success']) {
+        final userInfo = userData['data'];
+        
+        // Solo verificar perfil completo para usuarios normales
+        if (_user!.rol != 'admin' && _user!.rol != 'operador') {
+          _perfilCompleto = userInfo['perfil_completo'] ?? false;
+          
+          if (!_perfilCompleto && _authStatus == AuthStatus.authenticated) {
+            _authStatus = AuthStatus.needsProfileCompletion;
+            notifyListeners();
+          } else if (_perfilCompleto && _authStatus == AuthStatus.needsProfileCompletion) {
+            _authStatus = AuthStatus.authenticated;
+            notifyListeners();
+          }
+        }
+        
+        return true;
+      }
+      
+      final refreshed = await _authService.refreshToken();
+      if (refreshed) {
+        return true;
+      }
+      
+      await logout();
+      return false;
+    } catch (e) {
+      print('Error al verificar token: $e');
+      return false;
     }
-    
-    // Si no se pudo renovar, cerrar sesión
-    await logout();
-    return false;
-  } catch (e) {
-    print('Error al verificar token: $e');
-    return false;
   }
-}
   
-
-
-
-
-  // Establecer la preferencia de "Recordar sesión"
   Future<void> setRememberMe(bool value) async {
     _rememberMe = value;
     await _authService.setRememberMe(value);
     notifyListeners();
   }
   
-  // Logout
   Future<void> logout() async {
     _isLoading = true;
     notifyListeners();
@@ -174,17 +258,17 @@ Future<bool> checkAndRefreshToken() async {
     
     _user = null;
     _authStatus = AuthStatus.unauthenticated;
+    _perfilCompleto = false;
+    _codigoCorresponsal = null;
     _isLoading = false;
     
     notifyListeners();
   }
   
-  // Actualizar URL del API
   void updateBaseUrl(String newUrl) {
     _authService.updateBaseUrl(newUrl);
   }
   
-  // Verificar si el usuario tiene cierto rol
   bool hasRole(String role) {
     if (_user == null) return false;
     return _user!.rol == role;

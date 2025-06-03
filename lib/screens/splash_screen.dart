@@ -1,9 +1,10 @@
-// lib/screens/splash_screen.dart
+// lib/screens/splash_screen.dart - ACTUALIZADO CON FLUJO DE PERFIL
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
+import 'package:riocaja_smart/screens/complete_profile_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   @override
@@ -17,34 +18,57 @@ class _SplashScreenState extends State<SplashScreen> {
     _checkAuth();
   }
 
-Future<void> _checkAuth() async {
-  // Esperamos un tiempo suficiente para que el AuthProvider se inicialice
-  await Future.delayed(Duration(seconds: 3));
-  
-  if (!mounted) return;
-  
-  // Verificar el estado de autenticación
-  final authProvider = Provider.of<AuthProvider>(context, listen: false);
-  
-  print('SplashScreen: Estado de autenticación: ${authProvider.authStatus}');
-  print('SplashScreen: ¿Usuario autenticado? ${authProvider.isAuthenticated}');
-  if (authProvider.user != null) {
-    print('SplashScreen: Usuario: ${authProvider.user!.nombre}, Token: ${authProvider.user!.token.substring(0, 10)}...');
+  Future<void> _checkAuth() async {
+    // Esperamos un tiempo suficiente para que el AuthProvider se inicialice
+    await Future.delayed(Duration(seconds: 3));
+    
+    if (!mounted) return;
+    
+    // Verificar el estado de autenticación
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    print('SplashScreen: Estado de autenticación: ${authProvider.authStatus}');
+    print('SplashScreen: ¿Usuario autenticado? ${authProvider.isAuthenticated}');
+    print('SplashScreen: ¿Necesita completar perfil? ${authProvider.needsProfileCompletion}');
+    
+    if (authProvider.user != null) {
+      print('SplashScreen: Usuario: ${authProvider.user!.nombre}');
+      print('SplashScreen: Rol: ${authProvider.user!.rol}');
+      print('SplashScreen: Perfil completo: ${authProvider.perfilCompleto}');
+      print('SplashScreen: Código corresponsal: ${authProvider.codigoCorresponsal}');
+    }
+    
+    // Determinar a qué pantalla dirigir al usuario
+    if (authProvider.isAuthenticated) {
+      print('SplashScreen: Usuario autenticado - Redirigiendo a Home');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    } else if (authProvider.needsProfileCompletion) {
+      print('SplashScreen: Usuario necesita completar perfil');
+      // Verificar que no sea admin/operador (seguridad adicional)
+      if (authProvider.user?.rol == 'admin' || authProvider.user?.rol == 'operador') {
+        print('SplashScreen: Admin/Operador detectado - Redirigiendo a Home directamente');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+      } else {
+        print('SplashScreen: Redirigiendo a Completar Perfil');
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => CompleteProfileScreen(
+              codigoCorresponsal: authProvider.codigoCorresponsal,
+            ),
+          ),
+        );
+      }
+    } else {
+      print('SplashScreen: Redirigiendo a Login');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => LoginScreen()),
+      );
+    }
   }
-  
-  // Si el usuario está autenticado, ir a Home; de lo contrario, ir a Login
-  if (authProvider.isAuthenticated) {
-    print('SplashScreen: Redirigiendo a Home');
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => HomeScreen()),
-    );
-  } else {
-    print('SplashScreen: Redirigiendo a Login');
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => LoginScreen()),
-    );
-  }
-}
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +105,7 @@ Future<void> _checkAuth() async {
             ),
             SizedBox(height: 8),
             Text(
-              'Gestión de Comprobantes',
+              'Gestión de Comprobantes CNB',
               style: TextStyle(
                 fontSize: 16,
                 color: Colors.grey.shade700,
@@ -92,6 +116,14 @@ Future<void> _checkAuth() async {
             // Indicador de carga
             CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade700),
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Verificando credenciales...',
+              style: TextStyle(
+                color: Colors.grey.shade600,
+                fontSize: 14,
+              ),
             ),
           ],
         ),

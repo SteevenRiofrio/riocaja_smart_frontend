@@ -1,4 +1,4 @@
-// lib/services/auth_service.dart
+// lib/services/auth_service.dart - ACTUALIZADO CON NUEVOS MÉTODOS
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -45,7 +45,6 @@ class AuthService {
       final now = DateTime.now().millisecondsSinceEpoch;
       if (tokenExpiry > 0 && now > tokenExpiry) {
         print('Token expirado. Se requiere nuevo inicio de sesión.');
-        // Limpiar datos y solicitar nuevo inicio de sesión
         await prefs.remove(USER_DATA_KEY);
         await prefs.remove(TOKEN_EXPIRY_KEY);
         return false;
@@ -70,7 +69,6 @@ class AuthService {
             final validationResult = await getUserData();
             if (!validationResult['success']) {
               print('Token no válido o expirado');
-              // Limpiar datos y solicitar nuevo inicio de sesión
               await prefs.remove(USER_DATA_KEY);
               await prefs.remove(TOKEN_EXPIRY_KEY);
               return false;
@@ -78,8 +76,6 @@ class AuthService {
             print('Token validado correctamente');
           } catch (e) {
             print('Error al validar token: $e');
-            // En caso de error de conexión, consideramos el token válido temporalmente
-            // para no bloquear al usuario, pero marcamos para revalidar después
             return true;
           }
           
@@ -117,18 +113,15 @@ class AuthService {
       print('Respuesta del servidor: ${response.statusCode}');
       
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // Registro exitoso, parseamos la respuesta
         final responseData = jsonDecode(response.body);
         print('Registro exitoso: $responseData');
         
-        // Aquí el mensaje debería indicar que el usuario está pendiente de aprobación
         return {
           'success': true,
           'message': responseData['msg'] ?? 'Usuario registrado. Espere la aprobación de un administrador.',
           'data': responseData,
         };
       } else {
-        // Error en el registro
         Map<String, dynamic> errorData = {};
         try {
           errorData = jsonDecode(response.body);
@@ -170,11 +163,9 @@ class AuthService {
       print('Respuesta del servidor login: ${response.statusCode}');
       
       if (response.statusCode == 200) {
-        // Login exitoso, parseamos la respuesta
         final responseData = jsonDecode(response.body);
         print('Login exitoso con datos: $responseData');
         
-        // Extraer el token
         _token = responseData['access_token'];
         
         if (_token == null || _token!.isEmpty) {
@@ -187,31 +178,32 @@ class AuthService {
         
         print('Token recibido: ${_token!.substring(0, min(10, _token!.length))}...');
         
+        // Verificar si el perfil está completo
+        final perfilCompleto = responseData['perfil_completo'] ?? false;
+        final codigoCorresponsal = responseData['codigo_corresponsal'];
+        
         // Crear datos de usuario básicos con el token
         final basicUser = User(
           id: 'temp_id',
           nombre: email.split('@')[0],
           email: email,
-          rol: 'lector', // Valor por defecto
+          rol: 'lector',
           token: _token!,
         );
         
-        // Guardar inmediatamente en SharedPreferences para no perder el token
+        // Guardar inmediatamente en SharedPreferences
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(USER_DATA_KEY, jsonEncode(basicUser.toJson()));
         await prefs.setBool(REMEMBER_ME_KEY, true);
         
-        // Calcular y guardar la fecha de expiración del token (ejemplo: 24 horas)
+        // Calcular y guardar la fecha de expiración del token
         final expiryTime = DateTime.now().millisecondsSinceEpoch + (24 * 60 * 60 * 1000);
         await prefs.setInt(TOKEN_EXPIRY_KEY, expiryTime);
-        
-        print('Datos básicos guardados en SharedPreferences');
         
         // Intentar obtener datos adicionales del usuario
         try {
           final userData = await getUserData();
           if (userData['success']) {
-            // Actualizar usuario con datos completos
             _currentUser = User(
               id: userData['data']['sub'] ?? basicUser.id,
               nombre: userData['data']['nombre'] ?? basicUser.nombre,
@@ -220,16 +212,13 @@ class AuthService {
               token: _token!,
             );
             
-            // Actualizar en SharedPreferences
             await prefs.setString(USER_DATA_KEY, jsonEncode(_currentUser!.toJson()));
-            print('Datos completos del usuario guardados en SharedPreferences');
+            print('Datos completos del usuario guardados');
           } else {
-            // Si no podemos obtener datos adicionales, usar los básicos
             _currentUser = basicUser;
             print('No se pudieron obtener datos adicionales. Usando datos básicos.');
           }
         } catch (e) {
-          // En caso de error, usar los datos básicos
           _currentUser = basicUser;
           print('Error al obtener datos adicionales: $e. Usando datos básicos.');
         }
@@ -238,9 +227,10 @@ class AuthService {
           'success': true,
           'message': 'Sesión iniciada correctamente',
           'user': _currentUser!.toJson(),
+          'perfil_completo': perfilCompleto,
+          'codigo_corresponsal': codigoCorresponsal,
         };
       } else {
-        // Error en el login
         Map<String, dynamic> errorData = {};
         try {
           errorData = jsonDecode(response.body);
@@ -261,6 +251,86 @@ class AuthService {
         'success': false,
         'message': 'Error de conexión: $e',
       };
+    }
+  }
+  
+  // NUEVO: Completar perfil de usuario
+  Future<bool> completeProfile({
+    required String codigoCorresponsal,
+    required String nombreLocal,
+    required String nombreCompleto,
+    required String password,
+  }) async {
+    try {
+      if (_token == null) {
+        print('Error: No hay token de autenticación');
+        return false;
+      }
+      
+      final url = '$baseUrl/auth/complete-profile';
+      print('Completando perfil en: $url');
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode({
+          'codigo_corresponsal': codigoCorresponsal,
+          'nombre_local': nombreLocal,
+          'nombre_completo': nombreCompleto,
+          'password': password,
+        }),
+      ).timeout(Duration(seconds: 60));
+      
+      print('Respuesta completar perfil: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        print('Perfil completado exitosamente');
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('Error al completar perfil: $errorData');
+        return false;
+      }
+    } catch (e) {
+      print('Error en completeProfile: $e');
+      return false;
+    }
+  }
+  
+  // NUEVO: Verificar código de corresponsal
+  Future<bool> verifyCorresponsalCode(String codigo) async {
+    try {
+      if (_token == null) {
+        print('Error: No hay token de autenticación');
+        return false;
+      }
+      
+      final url = '$baseUrl/auth/verify-code/$codigo';
+      print('Verificando código en: $url');
+      
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+      ).timeout(Duration(seconds: 30));
+      
+      print('Respuesta verificación código: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        return responseData['valid'] ?? false;
+      } else {
+        print('Error al verificar código: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('Error en verifyCorresponsalCode: $e');
+      return false;
     }
   }
   
@@ -315,17 +385,12 @@ class AuthService {
   // Cerrar sesión
   Future<bool> logout() async {
     try {
-      // Eliminar datos de usuario y token
       _token = null;
       _currentUser = null;
       
-      // Eliminar datos de SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(USER_DATA_KEY);
       await prefs.remove(TOKEN_EXPIRY_KEY);
-      
-      // Importante: No eliminamos la preferencia REMEMBER_ME_KEY
-      // para que se mantenga la elección del usuario
       
       print('Sesión cerrada exitosamente');
       return true;
@@ -353,15 +418,8 @@ class AuthService {
     return _token != null && _currentUser != null;
   }
   
-  // Renovar token (implementación básica)
+  // Renovar token
   Future<bool> refreshToken() async {
-    // Aquí deberías implementar la lógica para renovar el token
-    // usando un endpoint de refresh si tu backend lo soporta
-    
-    // Si no tienes un endpoint de refresh, puedes forzar un nuevo login
-    // con las credenciales almacenadas (si las tienes)
-    
-    // Por ahora, simplemente devolvemos false para indicar que se necesita un nuevo login
     return false;
   }
   

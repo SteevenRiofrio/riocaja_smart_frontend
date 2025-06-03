@@ -1,4 +1,4 @@
-// lib/services/admin_service.dart
+// lib/services/admin_service.dart - ACTUALIZADO CON CÓDIGO CORRESPONSAL
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -33,7 +33,7 @@ class AdminService {
     baseUrl = '$apiBaseUrl/auth';
   }
   
-// Método para establecer el token de autenticación
+  // Método para establecer el token de autenticación
   void setAuthToken(String? token) {
     _authToken = token;
     print('AdminService: Token establecido manualmente: ${token != null ? token.substring(0, min(10, token.length)) : "null"}...');
@@ -166,7 +166,34 @@ class AdminService {
     }
   }
   
-  // Aprobar un usuario
+  // NUEVO: Aprobar usuario con código de corresponsal
+  Future<bool> approveUserWithCode(String userId, String codigoCorresponsal) async {
+    try {
+      print('Aprobando usuario $userId con código: $codigoCorresponsal');
+      final response = await _retryableRequest(
+        'POST',
+        '$baseUrl/approve-user-with-code',
+        body: {
+          'user_id': userId,
+          'codigo_corresponsal': codigoCorresponsal,
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        print('Usuario aprobado exitosamente con código');
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('Error al aprobar usuario: ${response.statusCode} - ${errorData['detail']}');
+        throw Exception(errorData['detail'] ?? 'Error al aprobar usuario');
+      }
+    } catch (e) {
+      print('Error al aprobar usuario con código: $e');
+      throw e;
+    }
+  }
+  
+  // Aprobar un usuario (método legacy)
   Future<bool> approveUser(String userId) async {
     try {
       print('Aprobando usuario con ID: $userId');
