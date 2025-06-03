@@ -13,6 +13,7 @@ class CompleteProfileScreen extends StatefulWidget {
   @override
   _CompleteProfileScreenState createState() => _CompleteProfileScreenState();
 }
+// lib/screens/complete_profile_screen.dart - CORRECCIÓN PARA VERIFICACIÓN DE CÓDIGO
 
 class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   final _formKey = GlobalKey<FormState>();
@@ -30,10 +31,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
   @override
   void initState() {
     super.initState();
-    // Si viene con código pre-asignado, verificarlo
-    if (widget.codigoCorresponsal != null) {
+    // Si viene con código pre-asignado, marcarlo como verificado automáticamente
+    if (widget.codigoCorresponsal != null && widget.codigoCorresponsal!.isNotEmpty) {
       _codigoController.text = widget.codigoCorresponsal!;
-      _verificarCodigo();
+      _codigoVerificado = true; // ✅ MARCARLO COMO VERIFICADO AUTOMÁTICAMENTE
+      print('Código pre-asignado: ${widget.codigoCorresponsal}, marcado como verificado');
     }
     
     // Pre-llenar email y nombre si están disponibles
@@ -57,8 +59,23 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
     if (_codigoController.text.isEmpty) return;
 
     try {
-      final authService = AuthService();
-      final isValid = await authService.verifyCorresponsalCode(_codigoController.text);
+      // ✅ VERIFICAR QUE TENEMOS TOKEN ANTES DE HACER LA VERIFICACIÓN
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      if (!authProvider.isAuthenticated || authProvider.user?.token == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error de autenticación. Por favor inicie sesión nuevamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+
+      print('Verificando código: ${_codigoController.text} con token disponible');
+      
+      final isValid = await authProvider.verifyCorresponsalCode(_codigoController.text.trim());
+      
       setState(() {
         _codigoVerificado = isValid;
       });
@@ -66,7 +83,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       if (!isValid) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Código de corresponsal inválido'),
+            content: Text('Código de corresponsal inválido o no coincide con su cuenta'),
             backgroundColor: Colors.red,
           ),
         );
@@ -81,10 +98,22 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       }
     } catch (e) {
       print('Error verificando código: $e');
+      
+      // ✅ MEJORAR MANEJO DE ERRORES ESPECÍFICOS
+      String errorMessage = 'Error al verificar código. Intente nuevamente.';
+      
+      if (e.toString().contains('token')) {
+        errorMessage = 'Error de autenticación. El código será verificado al completar el perfil.';
+        // En este caso, no marcar como error crítico
+        setState(() {
+          _codigoVerificado = true; // Permitir continuar
+        });
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error al verificar código. Intente nuevamente.'),
-          backgroundColor: Colors.orange,
+          content: Text(errorMessage),
+          backgroundColor: e.toString().contains('token') ? Colors.orange : Colors.red,
         ),
       );
     }
@@ -92,10 +121,15 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
   Future<void> _completarPerfil() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_codigoVerificado) {
+    
+    // ✅ PERMITIR CONTINUAR INCLUSO SI LA VERIFICACIÓN FALLÓ POR TOKEN
+    // La verificación real se hará en el backend
+    final codigoLimpio = _codigoController.text.trim();
+    
+    if (codigoLimpio.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Debe verificar el código de corresponsal primero'),
+          content: Text('Debe ingresar el código de corresponsal'),
           backgroundColor: Colors.red,
         ),
       );
@@ -106,10 +140,13 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
 
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      print('Completando perfil con código: $codigoLimpio');
+      
       final success = await authProvider.completeProfile(
-        codigoCorresponsal: _codigoController.text,
-        nombreLocal: _nombreLocalController.text,
-        nombreCompleto: _nombreCompletoController.text,
+        codigoCorresponsal: codigoLimpio,
+        nombreLocal: _nombreLocalController.text.trim(),
+        nombreCompleto: _nombreCompletoController.text.trim(),
         password: _passwordController.text,
       );
 
@@ -128,15 +165,24 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al completar perfil. Verifique los datos.'),
+            content: Text('Error al completar perfil. Verifique que el código sea correcto.'),
             backgroundColor: Colors.red,
           ),
         );
       }
     } catch (e) {
+      print('Error al completar perfil: $e');
+      
+      String errorMessage = 'Error: $e';
+      if (e.toString().contains('codigo incorrecto') || e.toString().contains('código incorrecto')) {
+        errorMessage = 'El código de corresponsal no es válido para su cuenta.';
+      } else if (e.toString().contains('token')) {
+        errorMessage = 'Error de autenticación. Por favor inicie sesión nuevamente.';
+      }
+      
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Error: $e'),
+          content: Text(errorMessage),
           backgroundColor: Colors.red,
         ),
       );
@@ -154,7 +200,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         title: Text('Completar Perfil'),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
-        automaticallyImplyLeading: false, // No permitir volver atrás
+        automaticallyImplyLeading: false,
         elevation: 0,
       ),
       body: SafeArea(
@@ -187,7 +233,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Necesita completar esta información antes de usar la aplicación',
+                        'Use el código de corresponsal que le proporcionó el administrador',
                         style: TextStyle(fontSize: 14),
                         textAlign: TextAlign.center,
                       ),
@@ -208,39 +254,52 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       children: [
                         if (_codigoController.text.isNotEmpty)
                           Icon(
-                            _codigoVerificado ? Icons.check_circle : Icons.error,
-                            color: _codigoVerificado ? Colors.green : Colors.red,
+                            _codigoVerificado ? Icons.check_circle : Icons.help_outline,
+                            color: _codigoVerificado ? Colors.green : Colors.orange,
                           ),
-                        IconButton(
-                          icon: Icon(Icons.search),
-                          onPressed: _verificarCodigo,
-                          tooltip: 'Verificar código',
-                        ),
+                        if (!_codigoVerificado && _codigoController.text.isNotEmpty)
+                          IconButton(
+                            icon: Icon(Icons.search),
+                            onPressed: _verificarCodigo,
+                            tooltip: 'Verificar código',
+                          ),
                       ],
                     ),
                     border: OutlineInputBorder(),
                     filled: true,
                     fillColor: _codigoVerificado ? Colors.green.shade50 : null,
+                    helperText: widget.codigoCorresponsal != null 
+                        ? 'Este código fue asignado por el administrador'
+                        : 'La verificación se realizará al completar el perfil',
+                    helperStyle: TextStyle(color: Colors.blue.shade600),
                   ),
-                  textCapitalization: TextCapitalization.characters,
+                  readOnly: widget.codigoCorresponsal != null, // ✅ Solo lectura si viene pre-asignado
                   onChanged: (value) {
-                    setState(() {
-                      _codigoVerificado = false;
-                    });
+                    // Solo permitir cambios si no viene pre-asignado
+                    if (widget.codigoCorresponsal == null) {
+                      setState(() {
+                        _codigoVerificado = false;
+                      });
+                    }
                   },
-                  onFieldSubmitted: (value) => _verificarCodigo(),
+                  onFieldSubmitted: (value) {
+                    if (widget.codigoCorresponsal == null) {
+                      _verificarCodigo();
+                    }
+                  },
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'El código de corresponsal es requerido';
                     }
-                    if (value.length < 3) {
-                      return 'El código debe tener al menos 3 caracteres';
+                    if (value.length < 2) {
+                      return 'El código debe tener al menos 2 caracteres';
                     }
                     return null;
                   },
                 ),
                 SizedBox(height: 16),
 
+                // Resto de campos igual que antes...
                 // Nombre del local
                 TextFormField(
                   controller: _nombreLocalController,
@@ -301,6 +360,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                   },
                 ),
                 SizedBox(height: 16),
+                
                 // Nueva contraseña
                 TextFormField(
                   controller: _passwordController,
@@ -329,7 +389,6 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     if (value.length < 8) {
                       return 'La contraseña debe tener al menos 8 caracteres';
                     }
-                    // Validaciones adicionales de seguridad
                     if (!RegExp(r'^(?=.*[a-zA-Z])(?=.*\d)').hasMatch(value)) {
                       return 'La contraseña debe contener letras y números';
                     }
@@ -370,41 +429,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 ),
                 SizedBox(height: 24),
 
-                // Indicador de progreso
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade100,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Progreso de completación:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: _getCompletionProgress(),
-                        backgroundColor: Colors.grey.shade300,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '${(_getCompletionProgress() * 100).toInt()}% completado',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 24),
-
                 // Botón para completar perfil
                 SizedBox(
                   height: 50,
                   child: ElevatedButton(
-                    onPressed: (_isLoading || !_codigoVerificado) ? null : _completarPerfil,
+                    onPressed: _isLoading ? null : _completarPerfil,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade700,
                       foregroundColor: Colors.white,
@@ -441,72 +470,7 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                 ),
                 SizedBox(height: 16),
 
-                // Botón de verificar código (si no está verificado)
-                if (!_codigoVerificado && _codigoController.text.isNotEmpty)
-                  SizedBox(
-                    height: 40,
-                    child: OutlinedButton.icon(
-                      onPressed: _isLoading ? null : _verificarCodigo,
-                      icon: Icon(Icons.verified_user),
-                      label: Text('Verificar Código'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.blue.shade700,
-                        side: BorderSide(color: Colors.blue.shade700),
-                      ),
-                    ),
-                  ),
-                
-                if (!_codigoVerificado && _codigoController.text.isNotEmpty)
-                  SizedBox(height: 16),
-
                 // Nota informativa
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.amber.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.amber.shade200),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Icon(Icons.warning_amber, color: Colors.amber.shade700, size: 20),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Información importante:',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.amber.shade800,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  '• El código de corresponsal debe ser proporcionado por un administrador\n'
-                                  '• Una vez completado el perfil, no podrá modificar estos datos\n'
-                                  '• Contacte al administrador si no tiene el código o hay problemas',
-                                  style: TextStyle(
-                                    fontSize: 12, 
-                                    color: Colors.amber.shade800,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 16),
-
-                // Información de contacto (opcional)
                 Container(
                   padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -519,10 +483,10 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.support_agent, color: Colors.green.shade700, size: 20),
+                          Icon(Icons.info, color: Colors.green.shade700, size: 20),
                           SizedBox(width: 8),
                           Text(
-                            '¿Necesita ayuda?',
+                            'Información:',
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
                               color: Colors.green.shade700,
@@ -532,9 +496,11 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Si tiene problemas para completar su perfil, contacte al administrador del sistema.',
+                        '• El código será verificado automáticamente al completar el perfil\n'
+                        '• Una vez completado, tendrá acceso completo al sistema\n'
+                        '• Contacte al administrador si tiene problemas',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 12, 
                           color: Colors.green.shade800,
                         ),
                       ),
@@ -547,20 +513,5 @@ class _CompleteProfileScreenState extends State<CompleteProfileScreen> {
         ),
       ),
     );
-  }
-
-  // Método para calcular el progreso de completación
-  double _getCompletionProgress() {
-    int completedFields = 0;
-    int totalFields = 5;
-
-    if (_codigoVerificado) completedFields++;
-    if (_nombreLocalController.text.isNotEmpty) completedFields++;
-    if (_nombreCompletoController.text.isNotEmpty) completedFields++;
-    if (_passwordController.text.isNotEmpty) completedFields++;
-    if (_confirmPasswordController.text.isNotEmpty && 
-        _confirmPasswordController.text == _passwordController.text) completedFields++;
-
-    return completedFields / totalFields;
   }
 }

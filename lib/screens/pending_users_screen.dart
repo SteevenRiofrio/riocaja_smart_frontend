@@ -224,195 +224,236 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
     );
   }
   
-  void _showApproveUserDialog(BuildContext context, Map<String, dynamic> user) {
-    String selectedRole = user['rol'] ?? 'lector';
-    final codigoController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('Aprobar Usuario'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Información del usuario
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Información del Usuario:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        SizedBox(height: 8),
-                        Text('Nombre: ${user['nombre']}'),
-                        Text('Email: ${user['email']}'),
-                      ],
-                    ),
+ void _showApproveUserDialog(BuildContext context, Map<String, dynamic> user) {
+  String selectedRole = user['rol'] ?? 'lector';
+  final codigoController = TextEditingController();
+  
+  showDialog(
+    context: context,
+    builder: (context) => StatefulBuilder(
+      builder: (context, setState) {
+        return AlertDialog(
+          title: Text('Aprobar Usuario'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Información del usuario
+                Container(
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  SizedBox(height: 16),
-                  
-                  // Campo para código de corresponsal
-                  Text('Código de Corresponsal:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  TextField(
-                    controller: codigoController,
-                    decoration: InputDecoration(
-                      hintText: 'Ej: CNB001, FARM123, etc.',
-                      labelText: 'Código único del corresponsal',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.qr_code),
-                    ),
-                    textCapitalization: TextCapitalization.characters,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Este código será utilizado por el usuario para completar su perfil.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  SizedBox(height: 16),
-                  
-                  // Selector de rol
-                  Text('Seleccione el rol:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedRole,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    items: [
-                      DropdownMenuItem(value: 'lector', child: Text('Lector')),
-                      DropdownMenuItem(value: 'operador', child: Text('Operador')),
-                      DropdownMenuItem(value: 'admin', child: Text('Administrador')),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Información del Usuario:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      SizedBox(height: 8),
+                      Text('Nombre: ${user['nombre']}'),
+                      Text('Email: ${user['email']}'),
                     ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          selectedRole = value;
-                        });
-                      }
-                    },
                   ),
-                ],
-              ),
+                ),
+                SizedBox(height: 16),
+                
+                // Campo para código de corresponsal - CORREGIDO
+                Text('Código de Corresponsal:', style: TextStyle(fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                TextFormField(
+                  controller: codigoController,
+                  decoration: InputDecoration(
+                    hintText: 'Ej: 001, 0123, CNB001, etc.',
+                    labelText: 'Código único del corresponsal',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.qr_code),
+                    helperText: 'Puede empezar con 0. Se preservará el formato exacto.',
+                    helperStyle: TextStyle(color: Colors.blue.shade600),
+                  ),
+                  keyboardType: TextInputType.text,
+                ),
+                SizedBox(height: 16),
+                
+                // Selector de rol
+                Text('Seleccione el rol:', style: TextStyle(fontWeight: FontWeight.bold)),
+                SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: InputDecoration(
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  items: [
+                    DropdownMenuItem(value: 'lector', child: Text('Lector')),
+                    DropdownMenuItem(value: 'operador', child: Text('Operador')),
+                    DropdownMenuItem(value: 'admin', child: Text('Administrador')),
+                  ],
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() {
+                        selectedRole = value;
+                      });
+                    }
+                  },
+                ),
+              ],
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  // Validar que se haya ingresado el código
-                  if (codigoController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Debe ingresar un código de corresponsal'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-                  
-                  if (codigoController.text.trim().length < 3) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('El código debe tener al menos 3 caracteres'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-                  
-                  Navigator.of(context).pop();
-                  
-                  // Mostrar indicador de carga
-                  showDialog(
-                    context: context,
-                    barrierDismissible: false,
-                    builder: (context) => Center(
-                      child: Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              CircularProgressIndicator(),
-                              SizedBox(height: 16),
-                              Text('Aprobando usuario...'),
-                            ],
-                          ),
-                        ),
-                      ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                // VALIDACIÓN CORREGIDA
+                final codigoOriginal = codigoController.text.trim();
+                
+                if (codigoOriginal.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Debe ingresar un código de corresponsal'),
+                      backgroundColor: Colors.red,
                     ),
                   );
+                  return;
+                }
+                
+                if (codigoOriginal.length < 2) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('El código debe tener al menos 2 caracteres'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                  return;
+                }
+                
+                // CORRECCIÓN: Cerrar el diálogo primero y guardar el contexto
+                Navigator.of(context).pop();
+                
+                // Usar el contexto principal de la pantalla, no del diálogo
+                final mainContext = this.context; // Contexto del widget principal
+                
+                // Variable para controlar el diálogo de carga
+                bool isLoadingDialogOpen = false;
+                
+                try {
+                  // Mostrar indicador de carga
+                  showDialog(
+                    context: mainContext,
+                    barrierDismissible: false,
+                    builder: (loadingContext) {
+                      isLoadingDialogOpen = true;
+                      return WillPopScope(
+                        onWillPop: () async => false, // Prevenir cierre accidental
+                        child: Center(
+                          child: Card(
+                            child: Padding(
+                              padding: EdgeInsets.all(20),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(),
+                                  SizedBox(height: 16),
+                                  Text('Aprobando usuario...'),
+                                  SizedBox(height: 8),
+                                  Text(
+                                    'Código: $codigoOriginal',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  );
                   
-                  try {
-                    // Usar el nuevo método que incluye código de corresponsal
-                    final adminService = AdminService();
-                    adminService.setContext(context);
+                  // Realizar la aprobación
+                  final adminService = AdminService();
+                  adminService.setContext(mainContext);
+                  
+                  final success = await adminService.approveUserWithCode(
+                    user['_id'],
+                    codigoOriginal,
+                  );
+                  
+                  // Cerrar indicador de carga si sigue abierto
+                  if (isLoadingDialogOpen && Navigator.canPop(mainContext)) {
+                    Navigator.of(mainContext).pop();
+                    isLoadingDialogOpen = false;
+                  }
+                  
+                  if (success) {
+                    // Cambiar rol si es diferente al original
+                    if (selectedRole != user['rol']) {
+                      await adminService.changeUserRole(user['_id'], selectedRole);
+                    }
                     
-                    final success = await adminService.approveUserWithCode(
-                      user['_id'],
-                      codigoController.text.trim().toUpperCase(),
-                    );
+                    // Recargar lista
+                    final adminProvider = Provider.of<AdminProvider>(mainContext, listen: false);
+                    await adminProvider.loadPendingUsers();
                     
-                    // Cerrar indicador de carga
-                    Navigator.of(context).pop();
-                    
-                    if (success) {
-                      // Cambiar rol si es diferente al original
-                      if (selectedRole != user['rol']) {
-                        await adminService.changeUserRole(user['_id'], selectedRole);
-                      }
-                      
-                      // Recargar lista
-                      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-                      await adminProvider.loadPendingUsers();
-                      
-                      ScaffoldMessenger.of(context).showSnackBar(
+                    // Mostrar mensaje de éxito
+                    if (mounted) {  // Verificar que el widget sigue montado
+                      ScaffoldMessenger.of(mainContext).showSnackBar(
                         SnackBar(
                           content: Text(
                             'Usuario aprobado correctamente.\n'
-                            'Código asignado: ${codigoController.text.trim().toUpperCase()}',
+                            'Código asignado: $codigoOriginal',
                           ),
                           backgroundColor: Colors.green,
                           duration: Duration(seconds: 4),
                         ),
                       );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
+                    }
+                  } else {
+                    // Mostrar error
+                    if (mounted) {
+                      ScaffoldMessenger.of(mainContext).showSnackBar(
                         SnackBar(
                           content: Text('Error al aprobar usuario. Verifique que el código no esté en uso.'),
                           backgroundColor: Colors.red,
                         ),
                       );
                     }
-                  } catch (e) {
-                    // Cerrar indicador de carga
-                    Navigator.of(context).pop();
-                    
-                    ScaffoldMessenger.of(context).showSnackBar(
+                  }
+                } catch (e) {
+                  // Cerrar indicador de carga si sigue abierto
+                  if (isLoadingDialogOpen && Navigator.canPop(mainContext)) {
+                    try {
+                      Navigator.of(mainContext).pop();
+                    } catch (navError) {
+                      print('Error cerrando diálogo de carga: $navError');
+                    }
+                    isLoadingDialogOpen = false;
+                  }
+                  
+                  // Mostrar error
+                  if (mounted) {
+                    ScaffoldMessenger.of(mainContext).showSnackBar(
                       SnackBar(
                         content: Text('Error: $e'),
                         backgroundColor: Colors.red,
                       ),
                     );
                   }
-                },
-                child: Text('Aprobar'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
+                  
+                  print('Error completo al aprobar usuario: $e');
+                }
+              },
+              child: Text('Aprobar'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
 }
