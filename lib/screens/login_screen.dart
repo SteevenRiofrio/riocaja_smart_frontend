@@ -1,10 +1,11 @@
-// lib/screens/login_screen.dart - CODIGO COMPLETO ACTUALIZADO
+// lib/screens/login_screen.dart - ACTUALIZADO CON ENLACE DE RECUPERACIÓN
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
 import 'package:riocaja_smart/screens/register_screen.dart';
 import 'package:riocaja_smart/screens/complete_profile_screen.dart';
+import 'package:riocaja_smart/screens/forgot_password_screen.dart';  // NUEVA IMPORTACIÓN
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -17,13 +18,12 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
-  bool _rememberMe = true; // Por defecto activado
-  bool _isLoading = false; // Estado para mostrar indicador de carga
+  bool _rememberMe = true;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
-    // Cargar preferencia de "Mantener sesión iniciada"
     _loadPreferences();
   }
 
@@ -45,27 +45,22 @@ class _LoginScreenState extends State<LoginScreen> {
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
-      // Mostrar indicador de carga mientras se inicia sesión
       setState(() {
         _isLoading = true;
       });
       
-      // Establecer preferencia de "Mantener sesión iniciada"
       await authProvider.setRememberMe(_rememberMe);
       
-      // Intenta iniciar sesión
       final success = await authProvider.login(
         _emailController.text.trim(),
         _passwordController.text,
       );
       
-      // Ocultar indicador de carga
       setState(() {
         _isLoading = false;
       });
       
       if (success) {
-        // Mostrar mensaje de éxito
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -76,16 +71,13 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
         
-        // Determinar a qué pantalla navegar basado en el rol y estado del perfil
         Future.delayed(Duration(milliseconds: 500), () {
           if (mounted) {
-            // Admin y operador van directo a Home
             if (authProvider.user?.rol == 'admin' || authProvider.user?.rol == 'operador') {
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (context) => HomeScreen()),
               );
             } else if (authProvider.needsProfileCompletion) {
-              // Solo usuarios normales completan perfil
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => CompleteProfileScreen(
@@ -94,7 +86,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               );
             } else {
-              // Usuario normal con perfil completo
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(builder: (context) => HomeScreen()),
               );
@@ -102,11 +93,9 @@ class _LoginScreenState extends State<LoginScreen> {
           }
         });
       } else {
-        // Comprobar si el error es debido a que la cuenta está pendiente
         if (authProvider.errorMessage.contains('pendiente') || 
             authProvider.errorMessage.contains('pendientes') ||
             authProvider.errorMessage.contains('aprobación')) {
-          // Mostrar un mensaje específico para cuentas pendientes
           if (mounted) {
             showDialog(
               context: context,
@@ -126,7 +115,6 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
         } else if (authProvider.errorMessage.toLowerCase().contains('token')) {
-          // Si el error está relacionado con el token
           if (mounted) {
             showDialog(
               context: context,
@@ -145,7 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
             );
           }
         } else {
-          // Mostrar error general
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -264,7 +251,31 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                           ),
-                          SizedBox(height: 16),
+                          SizedBox(height: 8),
+                          
+                          // NUEVO: Enlace "¿Olvidaste tu contraseña?"
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: (_isLoading || authProvider.isLoading) ? null : () {
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ForgotPasswordScreen(),
+                                  ),
+                                );
+                              },
+                              child: Text(
+                                '¿Olvidaste tu contraseña?',
+                                style: TextStyle(
+                                  color: Colors.blue.shade700,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                          
+                          SizedBox(height: 8),
                           
                           // Opción "Mantener sesión iniciada"
                           SwitchListTile(
@@ -417,4 +428,4 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
-}   
+}
