@@ -18,9 +18,7 @@ class _DebugScreenState extends State<DebugScreen> {
   TextEditingController _urlController = TextEditingController();
 
   // Lista simplificada con únicamente la IP del servidor Debian
-  List<String> _predefinedUrls = [
-    'http://35.202.219.87/api/v1', // IP del servidor Debian (producción)
-  ];
+  List<String> _predefinedUrls = ['http://34.63.192.239/api/v1'];
 
   @override
   void initState() {
