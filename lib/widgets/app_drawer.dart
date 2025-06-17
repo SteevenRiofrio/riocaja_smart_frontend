@@ -1,4 +1,4 @@
-// lib/widgets/app_drawer.dart - CORREGIDO CON LOGOUT FUNCIONAL
+// lib/widgets/app_drawer.dart - ACTUALIZADO CON NUEVA PANTALLA
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -9,6 +9,7 @@ import 'package:riocaja_smart/screens/debug_screen.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/screens/messages_screen.dart';
 import 'package:riocaja_smart/screens/pending_users_screen.dart';
+import 'package:riocaja_smart/screens/user_management_screen.dart';  // NUEVA IMPORTACIÓN
 
 class AppDrawer extends StatelessWidget {
   @override
@@ -131,9 +132,26 @@ class AppDrawer extends StatelessWidget {
                       ),
                     ),
                   ),
+                  
+                  // NUEVA OPCIÓN: Gestión Completa de Usuarios
                   ListTile(
-                    leading: Icon(Icons.people, color: Colors.orange.shade700),
+                    leading: Icon(Icons.people_alt, color: Colors.green.shade700),
+                    title: Text('Gestión de Usuarios'),
+                    subtitle: Text('Administrar todos los usuarios'),
+                    onTap: () {
+                      Navigator.pop(context); // Cerrar drawer
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => UserManagementScreen()),
+                      );
+                    },
+                  ),
+                  
+                  // Mantener la opción original para compatibilidad
+                  ListTile(
+                    leading: Icon(Icons.person_add, color: Colors.orange.shade700),
                     title: Text('Usuarios Pendientes'),
+                    subtitle: Text('Solo pendientes de aprobación'),
                     onTap: () {
                       Navigator.pop(context); // Cerrar drawer
                       Navigator.push(
@@ -142,6 +160,7 @@ class AppDrawer extends StatelessWidget {
                       );
                     },
                   ),
+                  
                   ListTile(
                     leading: Icon(Icons.bug_report, color: Colors.red.shade700),
                     title: Text('Diagnóstico'),

@@ -1,4 +1,4 @@
-// lib/services/admin_service.dart - ACTUALIZADO CON CÓDIGO CORRESPONSAL
+// lib/services/admin_service.dart - VERSIÓN EXTENDIDA
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -105,6 +105,13 @@ class AdminService {
               body: body != null ? jsonEncode(body) : null,
             ).timeout(Duration(seconds: 30));
             break;
+          case 'PUT':
+            response = await http.put(
+              Uri.parse(url),
+              headers: _getHeaders(),
+              body: body != null ? jsonEncode(body) : null,
+            ).timeout(Duration(seconds: 30));
+            break;
           default:
             throw Exception('Método HTTP no soportado: $method');
         }
@@ -146,7 +153,7 @@ class AdminService {
     }
   }
   
-  // Obtener usuarios pendientes
+  // Obtener usuarios pendientes (existente)
   Future<List<Map<String, dynamic>>> getPendingUsers() async {
     try {
       print('Obteniendo usuarios pendientes...');
@@ -166,7 +173,27 @@ class AdminService {
     }
   }
   
-  // NUEVO: Aprobar usuario con código de corresponsal
+  // NUEVO: Obtener todos los usuarios
+  Future<List<Map<String, dynamic>>> getAllUsers() async {
+    try {
+      print('Obteniendo todos los usuarios...');
+      final response = await _retryableRequest('GET', '$baseUrl/all-users');
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> users = jsonDecode(response.body);
+        print('Todos los usuarios obtenidos: ${users.length}');
+        return users.map((user) => user as Map<String, dynamic>).toList();
+      } else {
+        print('Error al obtener todos los usuarios: ${response.statusCode} - ${response.body}');
+        return [];
+      }
+    } catch (e) {
+      print('Error al obtener todos los usuarios: $e');
+      return [];
+    }
+  }
+  
+  // Aprobar usuario con código (existente)
   Future<bool> approveUserWithCode(String userId, String codigoCorresponsal) async {
     try {
       print('Aprobando usuario $userId con código: $codigoCorresponsal');
@@ -193,7 +220,7 @@ class AdminService {
     }
   }
   
-  // Aprobar un usuario (método legacy)
+  // Aprobar usuario (existente)
   Future<bool> approveUser(String userId) async {
     try {
       print('Aprobando usuario con ID: $userId');
@@ -210,7 +237,7 @@ class AdminService {
     }
   }
   
-  // Rechazar un usuario
+  // Rechazar usuario (existente)
   Future<bool> rejectUser(String userId) async {
     try {
       print('Rechazando usuario con ID: $userId');
@@ -227,7 +254,7 @@ class AdminService {
     }
   }
   
-  // Cambiar rol de un usuario
+  // Cambiar rol de usuario (existente)
   Future<bool> changeUserRole(String userId, String newRole) async {
     try {
       print('Cambiando rol del usuario $userId a $newRole');
@@ -244,6 +271,96 @@ class AdminService {
     } catch (e) {
       print('Error al cambiar rol de usuario: $e');
       return false;
+    }
+  }
+  
+  // NUEVO: Cambiar estado del usuario
+  Future<bool> changeUserState(String userId, String newState) async {
+    try {
+      print('Cambiando estado del usuario $userId a $newState');
+      final response = await _retryableRequest(
+        'PUT',
+        '$baseUrl/change-state',
+        body: {
+          'user_id': userId,
+          'state': newState
+        },
+      );
+      
+      if (response.statusCode == 200) {
+        print('Estado de usuario cambiado exitosamente');
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('Error al cambiar estado: ${response.statusCode} - ${errorData['detail']}');
+        return false;
+      }
+    } catch (e) {
+      print('Error al cambiar estado de usuario: $e');
+      return false;
+    }
+  }
+  
+  // NUEVO: Obtener detalles de un usuario específico
+  Future<Map<String, dynamic>?> getUserDetails(String userId) async {
+    try {
+      print('Obteniendo detalles del usuario: $userId');
+      final response = await _retryableRequest('GET', '$baseUrl/user-details/$userId');
+      
+      if (response.statusCode == 200) {
+        final userData = jsonDecode(response.body);
+        print('Detalles del usuario obtenidos');
+        return userData as Map<String, dynamic>;
+      } else {
+        print('Error al obtener detalles del usuario: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      print('Error al obtener detalles del usuario: $e');
+      return null;
+    }
+  }
+  
+  // NUEVO: Buscar usuarios
+  Future<List<Map<String, dynamic>>> searchUsers(String searchTerm) async {
+    try {
+      print('Buscando usuarios con término: $searchTerm');
+      final response = await _retryableRequest(
+        'GET', 
+        '$baseUrl/search-users?q=${Uri.encodeComponent(searchTerm)}'
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> users = jsonDecode(response.body);
+        print('Usuarios encontrados: ${users.length}');
+        return users.map((user) => user as Map<String, dynamic>).toList();
+      } else {
+        print('Error al buscar usuarios: ${response.statusCode}');
+        return [];
+      }
+    } catch (e) {
+      print('Error al buscar usuarios: $e');
+      return [];
+    }
+  }
+  
+  // NUEVO: Obtener estadísticas de usuarios
+  Future<Map<String, dynamic>> getUserStats() async {
+    try {
+      print('Obteniendo estadísticas de usuarios...');
+      final response = await _retryableRequest('GET', '$baseUrl/user-stats');
+      
+      if (response.statusCode == 200) {
+        final stats = jsonDecode(response.body);
+        print('Estadísticas obtenidas');
+        return stats as Map<String, dynamic>;
+      } else {
+        print('Error al obtener estadísticas: ${response.statusCode}');
+        return {};
+      }
+    } catch (e) {
+      print('Error al obtener estadísticas de usuarios: $e');
+      return {};
     }
   }
   

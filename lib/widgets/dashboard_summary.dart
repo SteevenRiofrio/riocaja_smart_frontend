@@ -1,4 +1,4 @@
-// lib/widgets/dashboard_summary.dart
+// lib/widgets/dashboard_summary.dart - ACTUALIZADO
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
@@ -7,6 +7,7 @@ import 'package:riocaja_smart/providers/admin_provider.dart';
 import 'package:riocaja_smart/providers/message_provider.dart';
 import 'package:riocaja_smart/screens/pending_users_screen.dart';
 import 'package:riocaja_smart/screens/messages_screen.dart';
+import 'package:riocaja_smart/widgets/admin_stats_widget.dart';  // NUEVA IMPORTACIÓN
 import 'package:intl/intl.dart';
 
 class DashboardSummary extends StatefulWidget {
@@ -103,6 +104,10 @@ class _DashboardSummaryState extends State<DashboardSummary> {
     
     return Column(
       children: [
+        // NUEVO: Widget de estadísticas para administradores
+        if (isAdmin || isOperador)
+          AdminStatsWidget(),
+          
         // Sección de alertas para usuarios pendientes (solo para admin/operador)
         if (isAdmin || isOperador)
           _buildPendingUsersAlert(),
@@ -222,7 +227,7 @@ class _DashboardSummaryState extends State<DashboardSummary> {
     );
   }
   
-  // Widget para mostrar alerta de usuarios pendientes
+  // Widget para mostrar alerta de usuarios pendientes (simplificado)
   Widget _buildPendingUsersAlert() {
     return Consumer<AdminProvider>(
       builder: (context, adminProvider, child) {

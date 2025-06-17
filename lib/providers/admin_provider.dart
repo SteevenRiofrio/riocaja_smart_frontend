@@ -1,4 +1,4 @@
-// lib/providers/admin_provider.dart
+// lib/providers/admin_provider.dart - VERSIÓN EXTENDIDA
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/services/admin_service.dart';
 
@@ -6,9 +6,11 @@ class AdminProvider with ChangeNotifier {
   final AdminService _adminService = AdminService();
   
   List<Map<String, dynamic>> _pendingUsers = [];
+  List<Map<String, dynamic>> _allUsers = [];  // NUEVA: Lista de todos los usuarios
   bool _isLoading = false;
   
   List<Map<String, dynamic>> get pendingUsers => _pendingUsers;
+  List<Map<String, dynamic>> get allUsers => _allUsers;  // NUEVO getter
   bool get isLoading => _isLoading;
   
   // Método para establecer el contexto
@@ -21,7 +23,7 @@ class AdminProvider with ChangeNotifier {
     _adminService.setAuthToken(token);
   }
   
-  // Cargar usuarios pendientes
+  // Cargar usuarios pendientes (existente)
   Future<void> loadPendingUsers() async {
     _isLoading = true;
     notifyListeners();
@@ -36,7 +38,22 @@ class AdminProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  // Aprobar usuario
+  // NUEVO: Cargar todos los usuarios
+  Future<void> loadAllUsers() async {
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      _allUsers = await _adminService.getAllUsers();
+    } catch (e) {
+      print('Error al cargar todos los usuarios: $e');
+    }
+    
+    _isLoading = false;
+    notifyListeners();
+  }
+  
+  // Aprobar usuario (existente, mejorado)
   Future<bool> approveUser(String userId) async {
     _isLoading = true;
     notifyListeners();
@@ -45,8 +62,9 @@ class AdminProvider with ChangeNotifier {
       final success = await _adminService.approveUser(userId);
       
       if (success) {
-        // Actualizar la lista local
+        // Actualizar ambas listas
         _pendingUsers.removeWhere((user) => user['_id'] == userId);
+        await loadAllUsers(); // Recargar todos los usuarios para mostrar el cambio
       }
       
       _isLoading = false;
@@ -60,7 +78,32 @@ class AdminProvider with ChangeNotifier {
     }
   }
   
-  // Rechazar usuario
+  // NUEVO: Aprobar usuario con código
+  Future<bool> approveUserWithCode(String userId, String codigoCorresponsal) async {
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      final success = await _adminService.approveUserWithCode(userId, codigoCorresponsal);
+      
+      if (success) {
+        // Actualizar ambas listas
+        _pendingUsers.removeWhere((user) => user['_id'] == userId);
+        await loadAllUsers();
+      }
+      
+      _isLoading = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      print('Error al aprobar usuario con código: $e');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+  
+  // Rechazar usuario (existente, mejorado)
   Future<bool> rejectUser(String userId) async {
     _isLoading = true;
     notifyListeners();
@@ -69,8 +112,9 @@ class AdminProvider with ChangeNotifier {
       final success = await _adminService.rejectUser(userId);
       
       if (success) {
-        // Actualizar la lista local
+        // Actualizar ambas listas
         _pendingUsers.removeWhere((user) => user['_id'] == userId);
+        await loadAllUsers();
       }
       
       _isLoading = false;
@@ -84,14 +128,22 @@ class AdminProvider with ChangeNotifier {
     }
   }
   
-  // Cambiar rol de usuario
+  // Cambiar rol de usuario (existente, mejorado)
   Future<bool> changeUserRole(String userId, String newRole) async {
     try {
       final success = await _adminService.changeUserRole(userId, newRole);
       
       if (success) {
-        // Podríamos actualizar localmente pero necesitaríamos una lista de todos los usuarios
-        // no solo los pendientes
+        // Actualizar la lista local de todos los usuarios
+        final userIndex = _allUsers.indexWhere((user) => user['_id'] == userId);
+        if (userIndex >= 0) {
+          _allUsers[userIndex]['rol'] = newRole;
+          // Si es admin u operador, marcar perfil como completo
+          if (newRole == 'admin' || newRole == 'operador') {
+            _allUsers[userIndex]['perfil_completo'] = true;
+          }
+          notifyListeners();
+        }
       }
       
       return success;
@@ -99,5 +151,141 @@ class AdminProvider with ChangeNotifier {
       print('Error al cambiar rol de usuario: $e');
       return false;
     }
+  }
+  
+  // NUEVO: Cambiar estado del usuario
+  Future<bool> changeUserState(String userId, String newState) async {
+    try {
+      final success = await _adminService.changeUserState(userId, newState);
+      
+      if (success) {
+        // Actualizar la lista local
+        final userIndex = _allUsers.indexWhere((user) => user['_id'] == userId);
+        if (userIndex >= 0) {
+          _allUsers[userIndex]['estado'] = newState;
+          notifyListeners();
+        }
+      }
+      
+      return success;
+    } catch (e) {
+      print('Error al cambiar estado de usuario: $e');
+      return false;
+    }
+  }
+  
+  // NUEVO: Obtener estadísticas de usuarios
+  Map<String, int> getUserStats() {
+    if (_allUsers.isEmpty) {
+      return {
+        'total': 0,
+        'activos': 0,
+        'pendientes': 0,
+        'suspendidos': 0,
+        'inactivos': 0,
+        'admins': 0,
+        'operadores': 0,
+        'lectores': 0,
+      };
+    }
+    
+    int activos = 0, pendientes = 0, suspendidos = 0, inactivos = 0;
+    int admins = 0, operadores = 0, lectores = 0;
+    
+    for (var user in _allUsers) {
+      // Contar por estado
+      switch (user['estado']?.toLowerCase()) {
+        case 'activo':
+          activos++;
+          break;
+        case 'pendiente':
+          pendientes++;
+          break;
+        case 'suspendido':
+          suspendidos++;
+          break;
+        case 'inactivo':
+          inactivos++;
+          break;
+      }
+      
+      // Contar por rol
+      switch (user['rol']?.toLowerCase()) {
+        case 'admin':
+          admins++;
+          break;
+        case 'operador':
+          operadores++;
+          break;
+        case 'lector':
+        default:
+          lectores++;
+          break;
+      }
+    }
+    
+    return {
+      'total': _allUsers.length,
+      'activos': activos,
+      'pendientes': pendientes,
+      'suspendidos': suspendidos,
+      'inactivos': inactivos,
+      'admins': admins,
+      'operadores': operadores,
+      'lectores': lectores,
+    };
+  }
+  
+  // NUEVO: Buscar usuarios por término
+  List<Map<String, dynamic>> searchUsers(String searchTerm) {
+    if (searchTerm.isEmpty) return _allUsers;
+    
+    final term = searchTerm.toLowerCase();
+    return _allUsers.where((user) {
+      final nombre = (user['nombre'] ?? '').toLowerCase();
+      final email = (user['email'] ?? '').toLowerCase();
+      final codigoCorresponsal = (user['codigo_corresponsal'] ?? '').toLowerCase();
+      final nombreLocal = (user['nombre_local'] ?? '').toLowerCase();
+      
+      return nombre.contains(term) ||
+             email.contains(term) ||
+             codigoCorresponsal.contains(term) ||
+             nombreLocal.contains(term);
+    }).toList();
+  }
+  
+  // NUEVO: Filtrar usuarios por estado
+  List<Map<String, dynamic>> filterUsersByState(String state) {
+    if (state == 'todos') return _allUsers;
+    
+    return _allUsers.where((user) {
+      return (user['estado'] ?? '').toLowerCase() == state.toLowerCase();
+    }).toList();
+  }
+  
+  // NUEVO: Filtrar usuarios por rol
+  List<Map<String, dynamic>> filterUsersByRole(String role) {
+    if (role == 'todos') return _allUsers;
+    
+    return _allUsers.where((user) {
+      return (user['rol'] ?? '').toLowerCase() == role.toLowerCase();
+    }).toList();
+  }
+  
+  // NUEVO: Obtener usuario específico por ID
+  Map<String, dynamic>? getUserById(String userId) {
+    try {
+      return _allUsers.firstWhere((user) => user['_id'] == userId);
+    } catch (e) {
+      return null;
+    }
+  }
+  
+  // NUEVO: Recargar todos los datos
+  Future<void> refreshAllData() async {
+    await Future.wait([
+      loadPendingUsers(),
+      loadAllUsers(),
+    ]);
   }
 }
