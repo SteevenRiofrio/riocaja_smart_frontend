@@ -910,4 +910,112 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                   ],
                   onChanged: (value) {
                     if (value != null) {
+                      setState(() {
+                        newRole = value;
+                      });
+                    }
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text('Cancelar'),
+              ),
+              ElevatedButton(
+                onPressed: newRole == currentRole ? null : () async {
+                  Navigator.of(context).pop();
+                  
+                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+                  final success = await adminProvider.changeUserRole(user['_id'], newRole);
+                  
+                  if (success) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Rol cambiado a ${_getRoleName(newRole)}'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                    await adminProvider.loadAllUsers();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error al cambiar rol'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                child: Text('Cambiar Rol'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Métodos auxiliares para obtener información de roles y estados
+  Color _getRoleColor(String rol) {
+    switch (rol.toLowerCase()) {
+      case 'admin':
+        return Colors.red.shade700;
+      case 'operador':
+        return Colors.orange.shade700;
+      default:
+        return Colors.blue.shade700;
+    }
+  }
+
+  String _getRoleName(String rol) {
+    switch (rol.toLowerCase()) {
+      case 'admin':
+        return 'Administrador';
+      case 'operador':
+        return 'Operador';
+      default:
+        return 'Lector';
+    }
+  }
+
+  IconData _getStateActionIcon(String estado) {
+    switch (estado.toLowerCase()) {
+      case 'activo':
+        return Icons.pause_circle;
+      case 'suspendido':
+        return Icons.play_circle;
+      case 'inactivo':
+        return Icons.play_circle;
+      default:
+        return Icons.settings;
+    }
+  }
+
+  String _getStateActionText(String estado) {
+    switch (estado.toLowerCase()) {
+      case 'activo':
+        return 'Suspender';
+      case 'suspendido':
+        return 'Activar';
+      case 'inactivo':
+        return 'Activar';
+      default:
+        return 'Cambiar Estado';
+    }
+  }
+
+  Color _getStateActionColor(String estado) {
+    switch (estado.toLowerCase()) {
+      case 'activo':
+        return Colors.orange.shade700;
+      case 'suspendido':
+        return Colors.green.shade700;
+      case 'inactivo':
+        return Colors.green.shade700;
+      default:
+        return Colors.blue.shade700;
+    }
+  }
+}
                       

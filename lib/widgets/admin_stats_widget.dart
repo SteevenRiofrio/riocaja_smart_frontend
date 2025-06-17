@@ -1,4 +1,4 @@
-// lib/widgets/admin_stats_widget.dart
+// lib/widgets/admin_stats_widget.dart - CORREGIDO
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/admin_provider.dart';
@@ -155,8 +155,8 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                   ],
                 ),
                 
-                // Alertas si hay problemas
-                if (stats['pendientes'] > 0) ...[
+                // Alertas si hay problemas - CORREGIDO
+                if ((stats['pendientes'] as int) > 0) ...[
                   SizedBox(height: 16),
                   Container(
                     padding: EdgeInsets.all(12),
@@ -171,8 +171,7 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '${stats['pendientes']} usuario${stats['pendientes'] > 1 ? 's' : ''} esperando aprobación',
-                            style: TextStyle(
+                                   '${stats['pendientes']} usuario${((stats['pendientes'] as int) > 1) ? 's' : ''} esperando aprobación',                            style: TextStyle(
                               color: Colors.orange.shade800,
                               fontWeight: FontWeight.w500,
                             ),
@@ -194,7 +193,7 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                   ),
                 ],
                 
-                if (stats['suspendidos'] > 0) ...[
+                if ((stats['suspendidos'] as int) > 0) ...[
                   SizedBox(height: 8),
                   Container(
                     padding: EdgeInsets.all(12),
@@ -209,7 +208,7 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            '${stats['suspendidos']} usuario${stats['suspendidos'] > 1 ? 's' : ''} suspendido${stats['suspendidos'] > 1 ? 's' : ''}',
+                            '${stats['suspendidos']} usuario${((stats['suspendidos'] as int) > 1) ? 's' : ''} suspendido${((stats['suspendidos'] as int) > 1) ? 's' : ''}',
                             style: TextStyle(
                               color: Colors.red.shade800,
                               fontWeight: FontWeight.w500,
