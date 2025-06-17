@@ -1,4 +1,3 @@
-// lib/widgets/admin_stats_widget.dart - CORREGIDO
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/admin_provider.dart';
