@@ -1,3 +1,4 @@
+// lib/models/receipt.dart - ACTUALIZADO CON CÓDIGO CORRESPONSAL
 class Receipt {
   final String fecha;           // dd/MM/yyyy
   final String hora;            // HH:mm:ss
@@ -5,6 +6,11 @@ class Receipt {
   final String nroTransaccion;  // Número de transacción
   final double valorTotal;      // Valor del comprobante
   final String fullText;        // Texto completo escaneado
+  
+  // NUEVOS CAMPOS PARA ADMIN
+  final String? codigoCorresponsal;  // Código del corresponsal que escaneó
+  final String? nombreCorresponsal;  // Nombre del corresponsal (opcional)
+  final String? usuarioId;           // ID del usuario que escaneó
 
   Receipt({
     required this.fecha,
@@ -13,6 +19,9 @@ class Receipt {
     required this.nroTransaccion,
     required this.valorTotal,
     required this.fullText,
+    this.codigoCorresponsal,        // NUEVO
+    this.nombreCorresponsal,        // NUEVO
+    this.usuarioId,                 // NUEVO
   });
 
   // Convertir a Map para envío al backend
@@ -24,6 +33,7 @@ class Receipt {
       'nro_transaccion': nroTransaccion,
       'valor_total': valorTotal,
       'full_text': fullText,
+      // Los campos de corresponsal se asignan automáticamente en el backend
     };
   }
 
@@ -44,6 +54,11 @@ class Receipt {
           ? json['valor_total'].toDouble() 
           : 0.0,
       fullText: json['full_text'] ?? '',
+      
+      // NUEVOS CAMPOS DEL BACKEND
+      codigoCorresponsal: json['codigo_corresponsal'],
+      nombreCorresponsal: json['nombre_corresponsal'],
+      usuarioId: json['usuario_id'],
     );
   }
 
@@ -63,6 +78,9 @@ class Receipt {
         return 'send';
       case 'PAGO GIRO':
         return 'receipt';
+      case 'RECARGA CLARO':
+      case 'RECARGA':
+        return 'phone_android';
       default: // Pago de Servicio y otros
         return 'payment';
     }
@@ -84,6 +102,9 @@ class Receipt {
         return 'indigo';
       case 'PAGO GIRO':
         return 'teal';
+      case 'RECARGA CLARO':
+      case 'RECARGA':
+        return 'red';
       default: // Pago de Servicio y otros
         return 'blue';
     }

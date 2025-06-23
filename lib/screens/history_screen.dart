@@ -1,4 +1,3 @@
-// lib/screens/history_screen.dart - VERSIÓN COMPLETA SIMPLIFICADA
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -17,11 +16,15 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   bool _isLoading = true;
   Set<String> _selectedFilters = {}; // vacío significa "Todos"
+  String _selectedCorresponsal = 'todos'; // NUEVO: Filtro por corresponsal
   DateTime? _selectedDate; // Filtro por fecha
   bool _sortDescending = true; // Ordenar de mayor a menor hora (descendente)
   
   // Lista de tipos disponibles que se actualiza dinámicamente
   Set<String> _availableTypes = {};
+  
+  // NUEVO: Lista de corresponsales disponibles
+  Set<String> _availableCorresponsales = {};
 
   @override
   void initState() {
@@ -66,8 +69,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final receipts = receiptsProvider.receipts;
       print('HistoryScreen: Se cargaron ${receipts.length} comprobantes');
 
-      // ACTUALIZAR TIPOS DISPONIBLES DINÁMICAMENTE
-      _updateAvailableTypes(receipts);
+      // ACTUALIZAR TIPOS Y CORRESPONSALES DISPONIBLES DINÁMICAMENTE
+      _updateAvailableFilters(receipts);
 
       if (receipts.isEmpty) {
         print('HistoryScreen: La lista de comprobantes está vacía');
@@ -102,24 +105,39 @@ class _HistoryScreenState extends State<HistoryScreen> {
     setState(() => _isLoading = false);
   }
 
-  // Método para actualizar tipos disponibles dinámicamente
-  void _updateAvailableTypes(List<Receipt> receipts) {
+  // MEJORADO: Método para actualizar tipos y corresponsales disponibles dinámicamente
+  void _updateAvailableFilters(List<Receipt> receipts) {
     Set<String> types = {};
+    Set<String> corresponsales = {};
+    
     for (var receipt in receipts) {
       if (receipt.tipo.isNotEmpty) {
         types.add(receipt.tipo);
       }
+      
+      // NUEVO: Recopilar corresponsales disponibles
+      if (receipt.codigoCorresponsal != null && receipt.codigoCorresponsal!.isNotEmpty) {
+        corresponsales.add(receipt.codigoCorresponsal!);
+      }
     }
     
     // CLAVE: Solo actualizar si realmente cambió algo
-    if (!_setEquals(_availableTypes, types)) {
+    if (!_setEquals(_availableTypes, types) || !_setEquals(_availableCorresponsales, corresponsales)) {
       setState(() {
         _availableTypes = types;
+        _availableCorresponsales = corresponsales;
+        
         // Limpiar filtros que ya no existen en los datos
         _selectedFilters.removeWhere((filter) => !_availableTypes.contains(filter));
+        
+        // Limpiar filtro de corresponsal si ya no existe
+        if (_selectedCorresponsal != 'todos' && !_availableCorresponsales.contains(_selectedCorresponsal)) {
+          _selectedCorresponsal = 'todos';
+        }
       });
       
       print('Tipos de comprobantes actualizados: $_availableTypes');
+      print('Corresponsales disponibles: $_availableCorresponsales');
     }
   }
 
@@ -139,7 +157,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         // CORREGIDO: Solo actualizar si NO está cargando y hay datos
         if (!_isProviderLoading && _allReceipts.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            _updateAvailableTypes(_allReceipts);
+            _updateAvailableFilters(_allReceipts);
           });
         }
 
@@ -155,6 +173,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 onPressed: _availableTypes.isNotEmpty ? _showFilterOptions : null,
                 tooltip: _availableTypes.isEmpty ? 'Sin tipos disponibles' : 'Filtrar por tipo',
               ),
+              
+              // NUEVO: Botón para filtro de corresponsal (solo para admin)
+              Consumer<AuthProvider>(
+                builder: (context, authProvider, child) {
+                  if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+                    return IconButton(
+                      icon: Icon(Icons.person_search),
+                      onPressed: _availableCorresponsales.isNotEmpty ? _showCorresponsalFilter : null,
+                      tooltip: 'Filtrar por corresponsal',
+                    );
+                  }
+                  return SizedBox.shrink();
+                },
+              ),
+              
               IconButton(
                 icon: Icon(Icons.calendar_today),
                 onPressed: _selectDate,
@@ -194,7 +227,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Método para mostrar los filtros activos
+  // MEJORADO: Método para mostrar los filtros activos
   Widget _buildActiveFilters() {
     List<Widget> filterChips = [];
 
@@ -227,6 +260,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ),
         );
       }
+    }
+
+    // NUEVO: Filtro por corresponsal
+    if (_selectedCorresponsal != 'todos') {
+      filterChips.add(
+        Chip(
+          label: Text('Corresponsal: $_selectedCorresponsal'),
+          avatar: Icon(Icons.person, size: 16),
+          onDeleted: () {
+            setState(() {
+              _selectedCorresponsal = 'todos';
+            });
+          },
+        ),
+      );
     }
 
     // Filtro por fecha EN ESPAÑOL
@@ -271,6 +319,142 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
+  // NUEVO: Método para mostrar filtro de corresponsal
+  void _showCorresponsalFilter() {
+    if (_availableCorresponsales.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('No hay corresponsales disponibles para filtrar'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    Icon(Icons.person_search, color: Colors.blue.shade700),
+                    SizedBox(width: 8),
+                    Text(
+                      'Filtrar por Corresponsal',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Spacer(),
+                    TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _selectedCorresponsal = 'todos';
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: Text('Todos'),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(),
+              
+              // Mostrar información sobre corresponsales disponibles
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Text(
+                  'Corresponsales con comprobantes (${_availableCorresponsales.length}):',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              
+              Expanded(
+                child: ListView(
+                  children: [
+                    // Opción "Todos"
+                    ListTile(
+                      leading: Icon(Icons.all_inclusive, color: Colors.green.shade700),
+                      title: Text('Todos los corresponsales'),
+                      trailing: _selectedCorresponsal == 'todos' 
+                          ? Icon(Icons.check, color: Colors.green) 
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedCorresponsal = 'todos';
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                    Divider(),
+                    
+                    // MOSTRAR CORRESPONSALES DISPONIBLES DINÁMICAMENTE
+                    ..._availableCorresponsales.map((codigo) {
+                      // Contar comprobantes para este corresponsal
+                      final receiptsProvider = Provider.of<ReceiptsProvider>(context, listen: false);
+                      final count = receiptsProvider.receipts
+                          .where((r) => r.codigoCorresponsal == codigo)
+                          .length;
+                      
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: Colors.blue.shade100,
+                          child: Text(
+                            codigo.substring(0, 1).toUpperCase(),
+                            style: TextStyle(
+                              color: Colors.blue.shade700,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        title: Text('Corresponsal $codigo'),
+                        subtitle: Text('$count comprobante${count != 1 ? 's' : ''}'),
+                        trailing: _selectedCorresponsal == codigo 
+                            ? Icon(Icons.check, color: Colors.green) 
+                            : null,
+                        onTap: () {
+                          setState(() {
+                            _selectedCorresponsal = codigo;
+                          });
+                          Navigator.pop(context);
+                        },
+                      );
+                    }).toList(),
+                    
+                    // Mensaje si no hay corresponsales disponibles
+                    if (_availableCorresponsales.isEmpty)
+                      Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(
+                          child: Text(
+                            'No hay corresponsales para filtrar',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // NUEVO: Método para formatear fecha en español
   String _formatDateInSpanish(DateTime date) {
     final formatter = DateFormat('dd \'de\' MMMM \'de\' yyyy', 'es_ES');
@@ -299,13 +483,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  // Método para filtrar comprobantes (sin cambios)
+  // MEJORADO: Método para filtrar comprobantes incluyendo corresponsal
   List<Receipt> _filterReceipts(List<Receipt> receipts) {
     List<Receipt> filteredReceipts = List.from(receipts);
 
     // Filtrar por tipos - ahora soportamos múltiples tipos
     if (_selectedFilters.isNotEmpty) {
       filteredReceipts = filteredReceipts.where((receipt) => _selectedFilters.contains(receipt.tipo)).toList();
+    }
+
+    // NUEVO: Filtrar por corresponsal
+    if (_selectedCorresponsal != 'todos') {
+      filteredReceipts = filteredReceipts.where((receipt) => 
+          receipt.codigoCorresponsal == _selectedCorresponsal).toList();
     }
 
     // Filtrar por fecha
@@ -513,6 +703,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       },
     );
   }
+  
   // Widget para checkbox de filtros (sin cambios)
   Widget _buildFilterCheckbox(
     String tipo,
@@ -545,19 +736,20 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Icon(Icons.history, size: 80, color: Colors.grey.shade400),
           SizedBox(height: 16),
           Text(
-            _selectedFilters.isNotEmpty || _selectedDate != null 
+            _selectedFilters.isNotEmpty || _selectedDate != null || _selectedCorresponsal != 'todos'
               ? 'No hay comprobantes que coincidan con los filtros seleccionados'
               : 'No hay comprobantes escaneados',
             style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 24),
-          if (_selectedFilters.isNotEmpty || _selectedDate != null)
+  if (_selectedFilters.isNotEmpty || _selectedDate != null || _selectedCorresponsal != 'todos')
             ElevatedButton.icon(
               onPressed: () {
                 setState(() {
                   _selectedFilters.clear();
                   _selectedDate = null;
+                  _selectedCorresponsal = 'todos';
                 });
               },
               icon: Icon(Icons.clear_all),
@@ -576,7 +768,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Card de comprobante (sin cambios)
+// CORREGIDO: Card de comprobante - SOLO ADMIN VE INFORMACIÓN DEL CORRESPONSAL
   Widget _buildReceiptCard(Receipt receipt) {
     IconData typeIcon = _getIconForType(receipt.tipo);
     Color headerColor = _getColorForType(receipt.tipo);
@@ -601,11 +793,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 children: [
                   Icon(typeIcon),
                   SizedBox(width: 8),
-                  Text(
-                    receipt.tipo,
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  Expanded(
+                    child: Text(
+                      receipt.tipo,
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                   ),
-                  Spacer(),
+                  // SOLO ADMIN: Mostrar código del corresponsal en el header
+                  Consumer<AuthProvider>(
+                    builder: (context, authProvider, child) {
+                      if ((authProvider.hasRole('admin') || authProvider.hasRole('operador')) && 
+                          receipt.codigoCorresponsal != null && receipt.codigoCorresponsal!.isNotEmpty) {
+                        return Container(
+                          margin: EdgeInsets.only(right: 8),
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.9),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.person,
+                                size: 12,
+                                color: Colors.grey.shade700,
+                              ),
+                              SizedBox(width: 4),
+                              Text(
+                                receipt.codigoCorresponsal!,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 11,
+                                  color: Colors.grey.shade800,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return SizedBox.shrink();
+                    },
+                  ),
                   Text(
                     '${receipt.fecha} ${receipt.hora}',
                     style: TextStyle(color: Colors.grey.shade700, fontSize: 12),
@@ -614,35 +843,123 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
 
-            // Contenido SIMPLIFICADO - Solo lo esencial
+            // Contenido principal
             Padding(
               padding: EdgeInsets.all(16),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Transacción #${receipt.nroTransaccion}',
-                          style: TextStyle(fontWeight: FontWeight.w500),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Transacción #${receipt.nroTransaccion}',
+                              style: TextStyle(fontWeight: FontWeight.w500),
+                            ),
+                            if (receipt.hora.isNotEmpty)
+                              Text(
+                                'Hora: ${receipt.hora}',
+                                style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                              ),
+                          ],
                         ),
-                        if (receipt.hora.isNotEmpty)
-                          Text(
-                            'Hora: ${receipt.hora}',
-                            style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
-                          ),
-                      ],
-                    ),
+                      ),
+                      Text(
+                        '\$${receipt.valorTotal.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
                   ),
-                  Text(
-                    '\$${receipt.valorTotal.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: Colors.green.shade700,
-                    ),
+                  
+                  // SOLO ADMIN/OPERADOR: Mostrar información del corresponsal
+                  Consumer<AuthProvider>(
+                    builder: (context, authProvider, child) {
+                      if ((authProvider.hasRole('admin') || authProvider.hasRole('operador')) && 
+                          receipt.codigoCorresponsal != null && receipt.codigoCorresponsal!.isNotEmpty) {
+                        return Container(
+                          margin: EdgeInsets.only(top: 12),
+                          padding: EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.indigo.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.indigo.shade200),
+                          ),
+                          child: Row(
+                            children: [
+                              // Icono del corresponsal
+                              CircleAvatar(
+                                radius: 16,
+                                backgroundColor: Colors.indigo.shade100,
+                                child: Text(
+                                  receipt.codigoCorresponsal!.substring(0, 1).toUpperCase(),
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.indigo.shade700,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    // Código del corresponsal
+                                    Text(
+                                      'Corresponsal: ${receipt.codigoCorresponsal}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.indigo.shade700,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                    // Nombre del corresponsal (si está disponible)
+                                    if (receipt.nombreCorresponsal != null && receipt.nombreCorresponsal!.isNotEmpty)
+                                      Text(
+                                        'Escaneado por: ${receipt.nombreCorresponsal}',
+                                        style: TextStyle(
+                                          color: Colors.indigo.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      )
+                                    else if (receipt.usuarioId != null && receipt.usuarioId!.isNotEmpty)
+                                      Text(
+                                        'Escaneado por: ${receipt.usuarioId}',
+                                        style: TextStyle(
+                                          color: Colors.indigo.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      )
+                                    else if (receipt.usuarioId != null)
+                                      Text(
+                                        'Usuario ID: ${receipt.usuarioId}',
+                                        style: TextStyle(
+                                          color: Colors.indigo.shade600,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              // Icono indicador
+                              Icon(
+                                Icons.admin_panel_settings,
+                                color: Colors.indigo.shade400,
+                                size: 18,
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return SizedBox.shrink(); // No mostrar nada para usuarios normales
+                    },
                   ),
                 ],
               ),
@@ -672,7 +989,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
   }
 
-  // Detalles del comprobante (sin cambios)
+  // CORREGIDO: Detalles del comprobante - SOLO ADMIN VE INFORMACIÓN DEL CORRESPONSAL
   void _showReceiptDetails(Receipt receipt) {
     showModalBottomSheet(
       context: context,
@@ -705,22 +1022,54 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       ),
                     ),
                     SizedBox(height: 16),
+                    
+                    // Header con icono del tipo
                     Row(
                       children: [
-                        Icon(Icons.receipt_long, size: 24),
-                        SizedBox(width: 8),
-                        Text(
-                          'Detalles del Comprobante',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: _getColorForType(receipt.tipo),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(_getIconForType(receipt.tipo), size: 24),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Detalles del Comprobante',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                receipt.tipo,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
                     Divider(height: 24),
 
-                    // SOLO LOS CAMPOS BÁSICOS - SIMPLIFICADO!
+                    // INFORMACIÓN DEL COMPROBANTE
+                    Text(
+                      'Información de la Transacción',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                    SizedBox(height: 8),
                     _buildDetailRow('Fecha', receipt.fecha),
                     _buildDetailRow('Hora', receipt.hora),
                     _buildDetailRow('Tipo', receipt.tipo),
@@ -730,10 +1079,150 @@ class _HistoryScreenState extends State<HistoryScreen> {
                       '\$${receipt.valorTotal.toStringAsFixed(2)}',
                     ),
 
+                    // SOLO ADMIN/OPERADOR: INFORMACIÓN DEL CORRESPONSAL
+                    Consumer<AuthProvider>(
+                      builder: (context, authProvider, child) {
+                        if ((authProvider.hasRole('admin') || authProvider.hasRole('operador')) && 
+                            receipt.codigoCorresponsal != null && receipt.codigoCorresponsal!.isNotEmpty) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              SizedBox(height: 16),
+                              Divider(),
+                              
+                              // Badge de "Solo Admin"
+                              Row(
+                                children: [
+                                  Icon(Icons.admin_panel_settings, 
+                                       color: Colors.indigo.shade700, 
+                                       size: 20),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Información del Corresponsal',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.indigo.shade700,
+                                    ),
+                                  ),
+                                  Spacer(),
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.indigo.shade100,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Text(
+                                      'Solo Admin',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.indigo.shade700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              SizedBox(height: 8),
+                              
+                              // Card especial para el corresponsal
+                              Container(
+                                padding: EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.indigo.shade50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: Colors.indigo.shade200),
+                                ),
+                                child: Column(
+                                  children: [
+                                    Row(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundColor: Colors.indigo.shade100,
+                                          child: Text(
+                                            receipt.codigoCorresponsal!.substring(0, 1).toUpperCase(),
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.bold,
+                                              color: Colors.indigo.shade700,
+                                            ),
+                                          ),
+                                        ),
+                                        SizedBox(width: 12),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                'Código: ${receipt.codigoCorresponsal}',
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 16,
+                                                  color: Colors.indigo.shade700,
+                                                ),
+                                              ),
+                                              if (receipt.nombreCorresponsal != null && receipt.nombreCorresponsal!.isNotEmpty)
+                                                Text(
+                                                  'Nombre: ${receipt.nombreCorresponsal}',
+                                                  style: TextStyle(
+                                                    color: Colors.indigo.shade600,
+                                                    fontSize: 14,
+                                                  ),
+                                                )
+                                              else if (receipt.usuarioId != null && receipt.usuarioId!.isNotEmpty)
+                                                Text(
+                                                  'Usuario ID: ${receipt.usuarioId}',
+                                                  style: TextStyle(
+                                                    color: Colors.indigo.shade600,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        Icon(
+                                          Icons.verified_user,
+                                          color: Colors.indigo.shade400,
+                                          size: 24,
+                                        ),
+                                      ],
+                                    ),
+                                    if (receipt.usuarioId != null) ...[
+                                      SizedBox(height: 8),
+                                      Divider(color: Colors.indigo.shade200),
+                                      SizedBox(height: 8),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.fingerprint, 
+                                               color: Colors.indigo.shade600, 
+                                               size: 16),
+                                          SizedBox(width: 8),
+                                          Text(
+                                            'ID de Usuario: ${receipt.usuarioId}',
+                                            style: TextStyle(
+                                              color: Colors.indigo.shade600,
+                                              fontSize: 12,
+                                              fontFamily: 'monospace',
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                            ],
+                          );
+                        }
+                        return SizedBox.shrink(); // No mostrar nada para usuarios normales
+                      },
+                    ),
+
                     SizedBox(height: 16),
                     ExpansionTile(
                       title: Text(
-                        'Texto Completo Escaneado',
+                        'Ver texto completo escaneado',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -783,6 +1272,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       },
     );
   }
+
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(
@@ -892,8 +1382,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       case 'DEPOSITO':
       case 'DEPÓSITO':
         return Icons.savings;
-      case 'RECARGA CLARO':          // ✅ ASEGURADO
-      case 'RECARGA':                // ✅ VARIACIÓN
+      case 'RECARGA CLARO':
+      case 'RECARGA':
         return Icons.phone_android;
       case 'ENVÍO GIRO':
       case 'ENVIO GIRO':
@@ -915,8 +1405,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       case 'DEPOSITO':
       case 'DEPÓSITO':
         return Colors.green.shade100;
-      case 'RECARGA CLARO':          // ✅ ASEGURADO
-      case 'RECARGA':                // ✅ VARIACIÓN
+      case 'RECARGA CLARO':
+      case 'RECARGA':
         return Colors.red.shade100;
       case 'ENVÍO GIRO':
       case 'ENVIO GIRO':
@@ -939,8 +1429,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
       case 'DEPOSITO':
       case 'DEPÓSITO':
         return Colors.green;
-      case 'RECARGA CLARO':          // ✅ ASEGURADO
-      case 'RECARGA':                // ✅ VARIACIÓN
+      case 'RECARGA CLARO':
+      case 'RECARGA':
         return Colors.red;
       case 'ENVÍO GIRO':
       case 'ENVIO GIRO':

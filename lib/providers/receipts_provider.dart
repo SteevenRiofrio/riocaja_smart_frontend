@@ -1,6 +1,3 @@
-// lib/providers/receipts_provider.dart
-// MODIFICADO: Actualizado método getReceiptsByDate para usar fechas con guiones
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/models/receipt.dart';

@@ -1,4 +1,4 @@
-// lib/services/api_service.dart
+// lib/services/api_service.dart - ACTUALIZADO PARA ENVIAR INFORMACIÓN DE CORRESPONSAL
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
@@ -11,7 +11,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 
 class ApiService {
   // URL con dirección IP directa
-  String baseUrl = 'http://34.63.192.239:8080/api/v1';
+  String baseUrl = 'http://34.41.113.55:8080/api/v1';
 
   // Token de autenticación
   String? _authToken;
@@ -46,11 +46,6 @@ class ApiService {
   void setAuthToken(String? token) {
     _authToken = token;
     print('ApiService: Token establecido manualmente: ${token != null ? token.substring(0, min(10, token.length)) : "null"}...');
-  }
-
-  // Método para convertir formato de fecha de dd/mm/aaaa a dd-mm-aaaa
-  String _convertDateFormat(String dateStr) {
-    return dateStr.replaceAll('/', '-');
   }
 
   // Crear los headers HTTP con o sin token de autenticación (método público)
@@ -244,7 +239,7 @@ class ApiService {
     }
   }
 
-  // Guardar un nuevo comprobante
+  // MEJORADO: Guardar un nuevo comprobante con información del usuario
   Future<bool> saveReceipt(Receipt receipt) async {
     try {
       final url = '$baseUrl/receipts/';
@@ -252,6 +247,9 @@ class ApiService {
 
       // Convertir el objeto Receipt a JSON con el formato correcto
       final Map<String, dynamic> receiptJson = receipt.toJson();
+      
+      // NUEVO: El backend automáticamente asociará el comprobante con el usuario autenticado
+      // a través del token JWT, por lo que no necesitamos enviar información adicional
       
       final String jsonBody = jsonEncode(receiptJson);
 
@@ -304,6 +302,57 @@ class ApiService {
       }
 
       throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // NUEVO: Obtener comprobantes filtrados por corresponsal (solo para admin)
+  Future<List<Receipt>> getReceiptsByCorresponsal(String codigoCorresponsal) async {
+    try {
+      final url = '$baseUrl/receipts/corresponsal/$codigoCorresponsal';
+      print('Obteniendo comprobantes por corresponsal: $url');
+
+      final response = await _retryableRequest('GET', url);
+
+      print('Código de respuesta: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData.containsKey('data')) {
+          final List<dynamic> receiptsJson = responseData['data'];
+          print('Comprobantes del corresponsal $codigoCorresponsal: ${receiptsJson.length}');
+          return receiptsJson.map((json) => Receipt.fromJson(json)).toList();
+        }
+      }
+      
+      return [];
+    } catch (e) {
+      print('Error al obtener comprobantes por corresponsal: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // NUEVO: Obtener lista de corresponsales disponibles (solo para admin)
+  Future<List<String>> getAvailableCorresponsales() async {
+    try {
+      final url = '$baseUrl/receipts/corresponsales';
+      print('Obteniendo corresponsales disponibles: $url');
+
+      final response = await _retryableRequest('GET', url);
+
+      print('Código de respuesta: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData.containsKey('corresponsales')) {
+          final List<dynamic> corresponsalesJson = responseData['corresponsales'];
+          return corresponsalesJson.map((item) => item.toString()).toList();
+        }
+      }
+      
+      return [];
+    } catch (e) {
+      print('Error al obtener corresponsales: $e');
+      return [];
     }
   }
 
@@ -406,6 +455,57 @@ class ApiService {
         'total': 0.0,
         'date': date.toString(),
         'count': 0,
+        'error': 'Error de conexión: $e',
+      };
+    }
+  }
+
+  // NUEVO: Obtener reporte de cierre por corresponsal (solo para admin)
+  Future<Map<String, dynamic>> getClosingReportByCorresponsal(
+    DateTime date, 
+    String codigoCorresponsal
+  ) async {
+    try {
+      // Formato de fecha con guiones: dd-MM-yyyy
+      String dateStr =
+          '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+
+      final String url = '$baseUrl/receipts/report/$dateStr/corresponsal/$codigoCorresponsal';
+      print('URL del reporte por corresponsal: $url');
+
+      final response = await _retryableRequest('GET', url);
+
+      print('Código de respuesta: ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        print('Datos del reporte por corresponsal recibidos: $jsonResponse');
+        return jsonResponse;
+      } else {
+        if (response.statusCode == 404) {
+          return {
+            'summary': {},
+            'total': 0.0,
+            'date': date.toString(),
+            'count': 0,
+            'corresponsal': codigoCorresponsal,
+            'error': 'No se encontraron datos para el corresponsal en esta fecha',
+          };
+        } else {
+          throw Exception(
+            'Error en la respuesta del servidor: ${response.statusCode} - ${response.body}',
+          );
+        }
+      }
+    } catch (e) {
+      print('Error en getClosingReportByCorresponsal: $e');
+
+      return {
+        'summary': {},
+        'total': 0.0,
+        'date': date.toString(),
+        'count': 0,
+        'corresponsal': codigoCorresponsal,
         'error': 'Error de conexión: $e',
       };
     }

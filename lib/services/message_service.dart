@@ -9,7 +9,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 
 class MessageService {
   // Misma base URL que usamos para el API
-  String baseUrl = 'http://34.63.192.239:8080/api/v1/messages';
+  String baseUrl = 'http://34.41.113.55:8080/api/v1/messages';
   String? _authToken;
   BuildContext? _context;
   
