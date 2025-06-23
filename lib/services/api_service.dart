@@ -11,7 +11,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 
 class ApiService {
   // URL con dirección IP directa
-  String baseUrl = 'http://34.41.113.55:8080/api/v1';
+  String baseUrl = 'http://34.61.195.206:8080/api/v1';
 
   // Token de autenticación
   String? _authToken;
@@ -239,7 +239,6 @@ class ApiService {
     }
   }
 
-  // MEJORADO: Guardar un nuevo comprobante con información del usuario
   Future<bool> saveReceipt(Receipt receipt) async {
     try {
       final url = '$baseUrl/receipts/';
