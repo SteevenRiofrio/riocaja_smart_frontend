@@ -23,6 +23,8 @@ dependencies:
   pdf: ^3.10.1                # Para generar PDF
   share_plus: ^7.0.2          # Para compartir archivos
   intl: 0.19.0               # Para formateo de fechas y números
+  excel: ^4.0.1              # Para crear archivos Excel
+  share_plus: ^7.2.1         # Para compartir archivos
 
 dev_dependencies:
   flutter_test:

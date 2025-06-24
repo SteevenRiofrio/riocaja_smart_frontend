@@ -1,15 +1,16 @@
-// lib/widgets/app_drawer.dart - ACTUALIZADO CON NUEVA PANTALLA
+// lib/widgets/app_drawer.dart - ACTUALIZADO CON REPORTES EXCEL
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
 import 'package:riocaja_smart/screens/history_screen.dart';
 import 'package:riocaja_smart/screens/report_screen.dart';
+import 'package:riocaja_smart/screens/excel_reports_screen.dart';  
 import 'package:riocaja_smart/screens/debug_screen.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/screens/messages_screen.dart';
 import 'package:riocaja_smart/screens/pending_users_screen.dart';
-import 'package:riocaja_smart/screens/user_management_screen.dart';  // NUEVA IMPORTACIÓN
+import 'package:riocaja_smart/screens/user_management_screen.dart';
 
 class AppDrawer extends StatelessWidget {
   @override
@@ -92,9 +93,25 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 
+                Divider(),
+                
+                // Sección de Reportes
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Text(
+                    'Reportes',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                
                 ListTile(
-                  leading: Icon(Icons.summarize),
+                  leading: Icon(Icons.summarize, color: Colors.blue.shade700),
                   title: Text('Reportes de Cierre'),
+                  subtitle: Text('Ver y compartir como texto/PDF'),
                   onTap: () {
                     Navigator.pop(context); // Cerrar drawer
                     Navigator.push(
@@ -103,6 +120,22 @@ class AppDrawer extends StatelessWidget {
                     );
                   },
                 ),
+                
+                // NUEVA OPCIÓN: Reportes Excel
+                ListTile(
+                  leading: Icon(Icons.table_chart, color: Colors.green.shade700),
+                  title: Text('Reportes Excel'),
+                  subtitle: Text('Exportar datos a Excel'),
+                  onTap: () {
+                    Navigator.pop(context); // Cerrar drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ExcelReportsScreen()),
+                    );
+                  },
+                ),
+                
+                Divider(),
                 
                 // Mensajes para todos los usuarios
                 ListTile(
@@ -236,7 +269,7 @@ class AppDrawer extends StatelessWidget {
                 
                 // Versión
                 Text(
-                  'RíoCaja Smart v1.0.0',
+                  'RíoCaja Smart v1.2.0',
                   style: TextStyle(
                     color: Colors.grey.shade600,
                     fontSize: 10,

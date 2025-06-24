@@ -1,4 +1,3 @@
-// lib/widgets/dashboard_summary.dart - ACTUALIZADO
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
@@ -7,7 +6,8 @@ import 'package:riocaja_smart/providers/admin_provider.dart';
 import 'package:riocaja_smart/providers/message_provider.dart';
 import 'package:riocaja_smart/screens/pending_users_screen.dart';
 import 'package:riocaja_smart/screens/messages_screen.dart';
-import 'package:riocaja_smart/widgets/admin_stats_widget.dart';  // NUEVA IMPORTACIÓN
+import 'package:riocaja_smart/widgets/admin_stats_widget.dart';
+import 'package:riocaja_smart/widgets/excel_reports_widget.dart';  // NUEVA IMPORTACIÓN
 import 'package:intl/intl.dart';
 
 class DashboardSummary extends StatefulWidget {
@@ -104,7 +104,7 @@ class _DashboardSummaryState extends State<DashboardSummary> {
     
     return Column(
       children: [
-        // NUEVO: Widget de estadísticas para administradores
+        // Widget de estadísticas para administradores
         if (isAdmin || isOperador)
           AdminStatsWidget(),
           
@@ -114,6 +114,9 @@ class _DashboardSummaryState extends State<DashboardSummary> {
           
         // Mensajes para todos los usuarios
         _buildMessagesAlert(),
+        
+        // NUEVO: Widget de Reportes Excel para todos los usuarios
+        ExcelReportsWidget(),
         
         // Resumen del día
         if (_isLoading) 
@@ -157,9 +160,19 @@ class _DashboardSummaryState extends State<DashboardSummary> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Resumen del día',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            Row(
+              children: [
+                Icon(Icons.analytics, color: Colors.indigo.shade700),
+                SizedBox(width: 8),
+                Text(
+                  'Resumen del día',
+                  style: TextStyle(
+                    fontSize: 16, 
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo.shade700,
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 12),
             Row(
@@ -180,7 +193,19 @@ class _DashboardSummaryState extends State<DashboardSummary> {
               ],
             ),
             SizedBox(height: 16),
-            Text('Distribución', style: TextStyle(fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Icon(Icons.pie_chart, size: 16, color: Colors.indigo.shade700),
+                SizedBox(width: 4),
+                Text(
+                  'Distribución por tipo', 
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo.shade700,
+                  ),
+                ),
+              ],
+            ),
             SizedBox(height: 8),
             ...summary.entries.map((entry) {
               IconData icon;
