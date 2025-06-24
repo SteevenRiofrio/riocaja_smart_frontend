@@ -116,9 +116,7 @@ class _DashboardSummaryState extends State<DashboardSummary> {
         // Mensajes para todos los usuarios
         _buildMessagesAlert(),
         
-        // Widget de Reportes Excel SOLO para lectores
-        if (!isAdmin && !isOperador)
-          ExcelReportsWidget(),
+
         
         // Resumen del día - SOLO SI HAY DATOS
         if (_isLoading) 

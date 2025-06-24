@@ -9,6 +9,7 @@ import 'package:riocaja_smart/providers/receipts_provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/widgets/app_drawer.dart';
+import 'package:riocaja_smart/screens/excel_reports_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   @override
@@ -21,17 +22,18 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // Verificar que el usuario está autenticado
     _checkAuthentication();
-    
+
     // Cargar comprobantes al iniciar
-    Future.microtask(() => 
-      Provider.of<ReceiptsProvider>(context, listen: false).loadReceipts()
+    Future.microtask(
+      () =>
+          Provider.of<ReceiptsProvider>(context, listen: false).loadReceipts(),
     );
   }
-  
+
   // Método para verificar la autenticación
   void _checkAuthentication() {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
+
     // Si no está autenticado, redirigir a login
     if (!authProvider.isAuthenticated) {
       Future.microtask(() {
@@ -48,12 +50,16 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, authProvider, child) {
         return Scaffold(
           appBar: AppBar(
-            title: Text('RíoCaja Smart'),
+            title: Text('RíoCaja Smart',style: TextStyle(color: Colors.white),),
+            
             actions: [
               IconButton(
                 icon: Icon(Icons.refresh),
                 onPressed: () {
-                  Provider.of<ReceiptsProvider>(context, listen: false).loadReceipts();
+                  Provider.of<ReceiptsProvider>(
+                    context,
+                    listen: false,
+                  ).loadReceipts();
                 },
               ),
             ],
@@ -61,7 +67,10 @@ class _HomeScreenState extends State<HomeScreen> {
           drawer: AppDrawer(),
           body: RefreshIndicator(
             onRefresh: () async {
-              await Provider.of<ReceiptsProvider>(context, listen: false).loadReceipts();
+              await Provider.of<ReceiptsProvider>(
+                context,
+                listen: false,
+              ).loadReceipts();
             },
             child: SingleChildScrollView(
               physics: AlwaysScrollableScrollPhysics(),
@@ -72,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // Resumen del dashboard (sin saludos)
                   DashboardSummary(),
                   SizedBox(height: 20),
-                  
+
                   // Botones de acción solo para lectores
                   if (authProvider.hasRole('lector')) ...[
                     Text(
@@ -89,7 +98,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icons.document_scanner,
                       () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => ScannerScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => ScannerScreen(),
+                        ),
                       ),
                     ),
                     SizedBox(height: 12),
@@ -99,7 +110,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icons.history,
                       () => Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (context) => HistoryScreen()),
+                        MaterialPageRoute(
+                          builder: (context) => HistoryScreen(),
+                        ),
                       ),
                     ),
                     SizedBox(height: 12),
@@ -112,30 +125,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         MaterialPageRoute(builder: (context) => ReportScreen()),
                       ),
                     ),
+                    SizedBox(height: 12),
+                    // NUEVO BOTÓN AGREGADO AQUÍ
+                    _buildActionButton(
+                      context,
+                      'Generar Reportes en Excel',
+                      Icons.table_chart,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => ExcelReportsScreen(),
+                        ),
+                      ),
+                    ),
                     SizedBox(height: 20),
                   ],
+
                   SizedBox(height: 20),
-                  
-                  // Información del corresponsal
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Corresponsal No Bancario:',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text('Banco del Barrio - Banco Guayaquil'),
-                        SizedBox(height: 4),
-                        Text('Última sincronización: Hoy, 5:30 PM'),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),
@@ -146,21 +152,23 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildActionButton(
-      BuildContext context, String title, IconData icon, VoidCallback onPressed) {
+    BuildContext context,
+    String title,
+    IconData icon,
+    VoidCallback onPressed,
+  ) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
         padding: EdgeInsets.symmetric(vertical: 16),
+        foregroundColor: Colors.white,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon),
           SizedBox(width: 12),
-          Text(
-            title,
-            style: TextStyle(fontSize: 16),
-          ),
+          Text(title, style: TextStyle(fontSize: 16,color: Colors.white,)),
         ],
       ),
     );
