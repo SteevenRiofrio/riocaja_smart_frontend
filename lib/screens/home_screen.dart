@@ -1,4 +1,4 @@
-// lib/screens/home_screen.dart
+// lib/screens/home_screen.dart - VERSIÓN SIN SALUDOS NI BIENVENIDAS
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/screens/scanner_screen.dart';
 import 'package:riocaja_smart/screens/history_screen.dart';
@@ -58,7 +58,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          drawer: AppDrawer(), // Agregar el drawer
+          drawer: AppDrawer(),
           body: RefreshIndicator(
             onRefresh: () async {
               await Provider.of<ReceiptsProvider>(context, listen: false).loadReceipts();
@@ -69,127 +69,51 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Información del usuario actual
-                  if (authProvider.user != null)
-                    Card(
-                      color: Colors.green.shade50,
-                      child: Padding(
-                        padding: const EdgeInsets.all(12.0),
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Colors.green.shade700,
-                              child: Text(
-                                authProvider.user!.nombre.isNotEmpty
-                                    ? authProvider.user!.nombre[0].toUpperCase()
-                                    : 'U',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Hola, ${authProvider.user!.nombre}',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                  Text(
-                                    'Rol: ${authProvider.user!.rol}',
-                                    style: TextStyle(
-                                      color: Colors.grey.shade700,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  SizedBox(height: 16),
-                  
-                  // Banner o logo
-                  Container(
-                    height: 120,
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                      image: DecorationImage(
-                        image: AssetImage('assets/images/banner.png'),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'Bienvenido a RíoCaja Smart',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          shadows: [
-                            Shadow(
-                              blurRadius: 10.0,
-                              color: Colors.black54,
-                              offset: Offset(2.0, 2.0),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 20),
-                  
-                  // Resumen del dashboard
+                  // Resumen del dashboard (sin saludos)
                   DashboardSummary(),
                   SizedBox(height: 20),
                   
-                  // Botones de acción principales
-                  Text(
-                    'Acciones Rápidas',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                  // Botones de acción solo para lectores
+                  if (authProvider.hasRole('lector')) ...[
+                    Text(
+                      'Acciones Rápidas',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 12),
-                  _buildActionButton(
-                    context,
-                    'Escanear Comprobante',
-                    Icons.document_scanner,
-                    () => Navigator.push(
+                    SizedBox(height: 12),
+                    _buildActionButton(
                       context,
-                      MaterialPageRoute(builder: (context) => ScannerScreen()),
+                      'Escanear Comprobante',
+                      Icons.document_scanner,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ScannerScreen()),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 12),
-                  _buildActionButton(
-                    context,
-                    'Historial de Escaneos',
-                    Icons.history,
-                    () => Navigator.push(
+                    SizedBox(height: 12),
+                    _buildActionButton(
                       context,
-                      MaterialPageRoute(builder: (context) => HistoryScreen()),
+                      'Historial de Comprobantes',
+                      Icons.history,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => HistoryScreen()),
+                      ),
                     ),
-                  ),
-                  SizedBox(height: 12),
-                  _buildActionButton(
-                    context,
-                    'Generar Reporte de Cierre',
-                    Icons.summarize,
-                    () => Navigator.push(
+                    SizedBox(height: 12),
+                    _buildActionButton(
                       context,
-                      MaterialPageRoute(builder: (context) => ReportScreen()),
+                      'Generar Reporte de Cierre',
+                      Icons.summarize,
+                      () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ReportScreen()),
+                      ),
                     ),
-                  ),
+                    SizedBox(height: 20),
+                  ],
                   SizedBox(height: 20),
                   
                   // Información del corresponsal

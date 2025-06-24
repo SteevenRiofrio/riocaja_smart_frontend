@@ -1,8 +1,9 @@
-// lib/widgets/app_drawer.dart - ACTUALIZADO CON REPORTES EXCEL
+// lib/widgets/app_drawer.dart - ACTUALIZADO CON ESCANEO EN MENÚ
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
+import 'package:riocaja_smart/screens/scanner_screen.dart';
 import 'package:riocaja_smart/screens/history_screen.dart';
 import 'package:riocaja_smart/screens/report_screen.dart';
 import 'package:riocaja_smart/screens/excel_reports_screen.dart';  
@@ -81,6 +82,19 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 
+                // NUEVO: Escanear Comprobante para todos los roles
+                ListTile(
+                  leading: Icon(Icons.document_scanner, color: Colors.green.shade700),
+                  title: Text('Escanear Comprobante'),
+                  onTap: () {
+                    Navigator.pop(context); // Cerrar drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => ScannerScreen()),
+                    );
+                  },
+                ),
+                
                 ListTile(
                   leading: Icon(Icons.history),
                   title: Text('Historial de Comprobantes'),
@@ -121,7 +135,6 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 
-                // NUEVA OPCIÓN: Reportes Excel
                 ListTile(
                   leading: Icon(Icons.table_chart, color: Colors.green.shade700),
                   title: Text('Reportes Excel'),
@@ -166,7 +179,6 @@ class AppDrawer extends StatelessWidget {
                     ),
                   ),
                   
-                  // NUEVA OPCIÓN: Gestión Completa de Usuarios
                   ListTile(
                     leading: Icon(Icons.people_alt, color: Colors.green.shade700),
                     title: Text('Gestión de Usuarios'),
@@ -180,7 +192,6 @@ class AppDrawer extends StatelessWidget {
                     },
                   ),
                   
-                  // Mantener la opción original para compatibilidad
                   ListTile(
                     leading: Icon(Icons.person_add, color: Colors.orange.shade700),
                     title: Text('Usuarios Pendientes'),

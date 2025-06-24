@@ -1,3 +1,4 @@
+// lib/widgets/dashboard_summary.dart - VERSIÓN SIN "NO HAY DATOS PARA MOSTRAR HOY"
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
@@ -7,7 +8,7 @@ import 'package:riocaja_smart/providers/message_provider.dart';
 import 'package:riocaja_smart/screens/pending_users_screen.dart';
 import 'package:riocaja_smart/screens/messages_screen.dart';
 import 'package:riocaja_smart/widgets/admin_stats_widget.dart';
-import 'package:riocaja_smart/widgets/excel_reports_widget.dart';  // NUEVA IMPORTACIÓN
+import 'package:riocaja_smart/widgets/excel_reports_widget.dart';
 import 'package:intl/intl.dart';
 
 class DashboardSummary extends StatefulWidget {
@@ -115,10 +116,11 @@ class _DashboardSummaryState extends State<DashboardSummary> {
         // Mensajes para todos los usuarios
         _buildMessagesAlert(),
         
-        // NUEVO: Widget de Reportes Excel para todos los usuarios
-        ExcelReportsWidget(),
+        // Widget de Reportes Excel SOLO para lectores
+        if (!isAdmin && !isOperador)
+          ExcelReportsWidget(),
         
-        // Resumen del día
+        // Resumen del día - SOLO SI HAY DATOS
         if (_isLoading) 
           Card(
             child: Padding(
@@ -126,24 +128,9 @@ class _DashboardSummaryState extends State<DashboardSummary> {
               child: Center(child: CircularProgressIndicator()),
             ),
           )
-        else if (_reportData.isEmpty || (_reportData['count'] as int) == 0) 
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                children: [
-                  Icon(Icons.insert_chart, size: 48, color: Colors.grey.shade400),
-                  SizedBox(height: 8),
-                  Text(
-                    'No hay datos para mostrar hoy',
-                    style: TextStyle(color: Colors.grey.shade600),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else 
+        else if (_reportData.isNotEmpty && (_reportData['count'] as int) > 0) 
           _buildSummaryCard(),
+        // ELIMINADO: El else que mostraba "No hay datos para mostrar hoy"
       ],
     );
   }
