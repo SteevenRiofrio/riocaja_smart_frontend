@@ -207,44 +207,44 @@ class _ExcelReportsWidgetState extends State<ExcelReportsWidget> {
     );
   }
 
-  Widget _buildQuickActionButton(
-    String label,
-    IconData icon,
-    Color color,
-    VoidCallback onPressed,
-  ) {
-    return SizedBox(
-      height: 70,
-      child: ElevatedButton(
-        onPressed: _isGenerating ? null : onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color.shade100,
-          foregroundColor: color.shade700,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: color.shade200),
-          ),
-          padding: EdgeInsets.all(8),
+Widget _buildQuickActionButton(
+  String label,
+  IconData icon,
+  Color color,
+  VoidCallback onPressed,
+) {
+  return SizedBox(
+    height: 70,
+    child: ElevatedButton(
+      onPressed: _isGenerating ? null : onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        foregroundColor: color,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: color),
         ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 20),
-            SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+        padding: EdgeInsets.all(8),
       ),
-    );
-  }
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 20),
+          SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    ),
+  );
+}
 
   // Métodos para generar reportes rápidos
   Future<void> _generateTodayReport() async {

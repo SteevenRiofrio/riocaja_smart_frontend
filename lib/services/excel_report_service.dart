@@ -566,22 +566,18 @@ class ExcelReportService {
     
     // Aplicar formato de header
     cell.cellStyle = CellStyle(
-      backgroundColorHex: isTitle ? ExcelColor.blue : ExcelColor.grey25,
+      backgroundColorHex: isTitle ? ExcelColor.blue : ExcelColor.grey,
       fontColorHex: isTitle ? ExcelColor.white : ExcelColor.black,
       bold: true,
       fontSize: isTitle ? 14 : 12,
     );
   }
 
-  void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
-    final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-    cell.value = DoubleCellValue(value);
-    
-    // Formato de moneda
-    cell.cellStyle = CellStyle(
-      numberFormat: NumFormat.currency(),
-    );
-  }
+void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
+  final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+  // Formatear como texto con símbolo de moneda
+  cell.value = TextCellValue('\$${value.toStringAsFixed(2)}');
+}
 
   // Guardar y compartir Excel
   Future<bool> _saveAndShareExcel(Excel excel, String fileName) async {
