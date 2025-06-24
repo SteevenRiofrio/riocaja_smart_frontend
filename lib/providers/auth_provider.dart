@@ -93,56 +93,65 @@ class AuthProvider with ChangeNotifier {
     }
   }
   
-  // Login de usuario - CORREGIDO PARA ADMIN
+  // Login de usuario 
   Future<bool> login(String email, String password) async {
-    try {
-      _isLoading = true;
-      _errorMessage = '';
-      notifyListeners();
+  try {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
+    
+    await logout();
+    
+    final result = await _authService.login(email, password);
+    
+    _isLoading = false;
+    
+    if (result['success']) {
+      _user = User.fromJson(result['user']);
+      _perfilCompleto = result['perfil_completo'] ?? false;
+      _codigoCorresponsal = result['codigo_corresponsal']; // ESTE ES EL CÓDIGO ASIGNADO
       
-      await logout();
-      
-      final result = await _authService.login(email, password);
-      
-      _isLoading = false;
-      
-      if (result['success']) {
-        _user = User.fromJson(result['user']);
-        _perfilCompleto = result['perfil_completo'] ?? false;
-        _codigoCorresponsal = result['codigo_corresponsal'];
-        
-        // LÓGICA CORREGIDA: Admin y operador siempre van directamente
-        if (_user!.rol == 'admin' || _user!.rol == 'operador') {
-          _authStatus = AuthStatus.authenticated;
-          print('AuthProvider: Admin/Operador - acceso directo');
-        } else {
-          // Solo usuarios normales necesitan completar perfil
-          if (_perfilCompleto) {
-            _authStatus = AuthStatus.authenticated;
-          } else {
-            _authStatus = AuthStatus.needsProfileCompletion;
-          }
-          print('AuthProvider: Usuario normal - perfil completo: $_perfilCompleto');
-        }
-        
-        await _authService.setRememberMe(_rememberMe);
-        
-        notifyListeners();
-        return true;
+      // Admin y operador siempre van directamente
+      if (_user!.rol == 'admin' || _user!.rol == 'operador') {
+        _authStatus = AuthStatus.authenticated;
+        print('AuthProvider: Admin/Operador - acceso directo');
       } else {
-        _errorMessage = result['message'];
-        _authStatus = AuthStatus.unauthenticated;
-        notifyListeners();
-        return false;
+        // Solo usuarios normales necesitan completar perfil
+        if (_perfilCompleto) {
+          _authStatus = AuthStatus.authenticated;
+        } else {
+          // VERIFICAR QUE TIENE CÓDIGO ASIGNADO ANTES DE COMPLETAR PERFIL
+          if (_codigoCorresponsal != null && _codigoCorresponsal!.isNotEmpty) {
+            _authStatus = AuthStatus.needsProfileCompletion;
+          } else {
+            // Si no tiene código, mostrar mensaje apropiado
+            _errorMessage = 'Su cuenta está aprobada pero aún no tiene código de corresponsal asignado. Contacte al administrador.';
+            _authStatus = AuthStatus.unauthenticated;
+            notifyListeners();
+            return false;
+          }
+        }
+        print('AuthProvider: Usuario normal - perfil completo: $_perfilCompleto, código: $_codigoCorresponsal');
       }
-    } catch (e) {
-      _isLoading = false;
-      _errorMessage = 'Error: $e';
+      
+      await _authService.setRememberMe(_rememberMe);
+      
+      notifyListeners();
+      return true;
+    } else {
+      _errorMessage = result['message'];
       _authStatus = AuthStatus.unauthenticated;
       notifyListeners();
       return false;
     }
+  } catch (e) {
+    _isLoading = false;
+    _errorMessage = 'Error: $e';
+    _authStatus = AuthStatus.unauthenticated;
+    notifyListeners();
+    return false;
   }
+}
 
   // Completar perfil (solo para usuarios normales)
   Future<bool> completeProfile({

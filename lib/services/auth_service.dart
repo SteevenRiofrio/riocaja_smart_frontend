@@ -253,52 +253,52 @@ class AuthService {
       };
     }
   }
-  
-  // NUEVO: Completar perfil de usuario
-  Future<bool> completeProfile({
-    required String codigoCorresponsal,
-    required String nombreLocal,
-    required String nombreCompleto,
-    required String password,
-  }) async {
-    try {
-      if (_token == null) {
-        print('Error: No hay token de autenticación');
-        return false;
-      }
-      
-      final url = '$baseUrl/auth/complete-profile';
-      print('Completando perfil en: $url');
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $_token',
-        },
-        body: jsonEncode({
-          'codigo_corresponsal': codigoCorresponsal,
-          'nombre_local': nombreLocal,
-          'nombre_completo': nombreCompleto,
-          'password': password,
-        }),
-      ).timeout(Duration(seconds: 60));
-      
-      print('Respuesta completar perfil: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        print('Perfil completado exitosamente');
-        return true;
-      } else {
-        final errorData = jsonDecode(response.body);
-        print('Error al completar perfil: $errorData');
-        return false;
-      }
-    } catch (e) {
-      print('Error en completeProfile: $e');
+
+  // Completar perfil de usuario
+ Future<bool> completeProfile({
+  required String codigoCorresponsal,
+  required String nombreLocal,
+  required String nombreCompleto, // No se usa, pero se mantiene para compatibilidad
+  required String password, // No se usa, pero se mantiene para compatibilidad
+}) async {
+  try {
+    if (_token == null) {
+      print('Error: No hay token de autenticación');
       return false;
     }
+    
+    final url = '$baseUrl/auth/complete-profile';
+    print('Completando perfil en: $url');
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_token',
+      },
+      body: jsonEncode({
+        'codigo_corresponsal': codigoCorresponsal, // Para verificación
+        'nombre_local': nombreLocal, // Único campo que se actualiza
+        // NO enviamos nombre_completo ni password
+      }),
+    ).timeout(Duration(seconds: 60));
+    
+    print('Respuesta completar perfil: ${response.statusCode}');
+    print('Cuerpo de respuesta: ${response.body}');
+    
+    if (response.statusCode == 200) {
+      print('Perfil completado exitosamente');
+      return true;
+    } else {
+      final errorData = jsonDecode(response.body);
+      print('Error al completar perfil: $errorData');
+      return false;
+    }
+  } catch (e) {
+    print('Error en completeProfile: $e');
+    return false;
   }
+}
   
   // NUEVO: Verificar código de corresponsal
   Future<bool> verifyCorresponsalCode(String codigo) async {
