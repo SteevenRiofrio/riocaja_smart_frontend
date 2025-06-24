@@ -1,4 +1,4 @@
-// lib/services/message_service.dart
+// lib/services/message_service.dart - CORREGIDO
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
@@ -8,15 +8,14 @@ import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
 
 class MessageService {
-  // Misma base URL que usamos para el API
-  String baseUrl = 'http://34.61.195.206:8080/api/v1/messages';
+  // CORREGIDO: URL base con barra final
+  String baseUrl = 'http://34.61.195.206:8080/api/v1/messages/';
   String? _authToken;
   BuildContext? _context;
   
   // Método para establecer el contexto
   void setContext(BuildContext context) {
     _context = context;
-    // Obtener el token del AuthProvider si está disponible
     if (_context != null) {
       final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
       if (authProvider.isAuthenticated) {
@@ -31,7 +30,8 @@ class MessageService {
   
   // Método para actualizar la URL base
   void updateBaseUrl(String apiBaseUrl) {
-    baseUrl = '$apiBaseUrl/messages';
+    // CORREGIDO: Asegurar barra final
+    baseUrl = apiBaseUrl.endsWith('/') ? '${apiBaseUrl}messages/' : '${apiBaseUrl}/messages/';
   }
   
   // Método para establecer el token de autenticación
@@ -82,11 +82,21 @@ class MessageService {
   // Método para realizar peticiones HTTP con reintentos
   Future<http.Response> _retryableRequest(
     String method, 
-    String url, 
+    String endpoint,  // CAMBIADO: ahora recibe solo el endpoint
     {Map<String, dynamic>? body, int maxRetries = 3}
   ) async {
     int retryCount = 0;
     Duration retryDelay = Duration(seconds: 2);
+    
+    // CORREGIDO: Construir URL correctamente
+    String url = baseUrl;
+    if (endpoint.isNotEmpty) {
+      // Remover barra inicial del endpoint si existe, ya que baseUrl termina en /
+      final cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+      url = baseUrl + cleanEndpoint;
+    }
+    
+    print('MessageService: Petición $method a: $url');
     
     while (true) {
       try {
@@ -97,7 +107,7 @@ class MessageService {
             response = await http.get(
               Uri.parse(url),
               headers: _getHeaders(),
-            ).timeout(Duration(seconds: 60));  // Aumentamos el timeout
+            ).timeout(Duration(seconds: 60));
             break;
           case 'POST':
             response = await http.post(
@@ -116,11 +126,12 @@ class MessageService {
             throw Exception('Método HTTP no soportado: $method');
         }
         
+        print('MessageService: Respuesta ${response.statusCode} de $url');
+        
         // Verificar si el token ha expirado
         if (response.statusCode == 401) {
           print('Error 401: Token inválido o expirado en MessageService');
           
-          // Cerrar sesión y redirigir a login
           if (_context != null) {
             final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
             await authProvider.logout();
@@ -134,30 +145,26 @@ class MessageService {
         retryCount++;
         print('Error en petición HTTP ($retryCount/$maxRetries): $e');
         
-        // Si es un error de autenticación, no reintentar
         if (e.toString().contains('Token inválido') || e.toString().contains('401')) {
           throw e;
         }
         
-        // Si hemos alcanzado el número máximo de reintentos, lanzar excepción
         if (retryCount >= maxRetries) {
           throw e;
         }
         
-        // Esperar antes de reintentar
         await Future.delayed(retryDelay);
-        
-        // Incrementar el tiempo de espera para el próximo reintento
         retryDelay *= 2;
       }
     }
   }
   
-  // Obtener mensajes para el usuario actual
+  // CORREGIDO: Obtener mensajes para el usuario actual
   Future<List<Message>> getMessages() async {
     try {
       print('Obteniendo mensajes...');
-      final response = await _retryableRequest('GET', baseUrl);
+      // CORREGIDO: Usar endpoint vacío ya que baseUrl ya incluye la ruta completa
+      final response = await _retryableRequest('GET', '');
       
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
@@ -177,13 +184,13 @@ class MessageService {
     }
   }
   
-  // Marcar un mensaje como leído
+  // CORREGIDO: Marcar un mensaje como leído
   Future<bool> markMessageAsRead(String messageId) async {
     try {
       print('Marcando mensaje $messageId como leído...');
       final response = await _retryableRequest(
         'POST',
-        '$baseUrl/mark-read',
+        'mark-read',  // CORREGIDO: endpoint relativo
         body: {'message_id': messageId},
       );
       
@@ -199,7 +206,7 @@ class MessageService {
     }
   }
   
-  // Crear un nuevo mensaje (solo para admin/operador)
+  // CORREGIDO: Crear un nuevo mensaje (solo para admin/operador)
   Future<bool> createMessage(String titulo, String contenido, String tipo, 
                            {DateTime? visibleHasta, List<String>? destinatarios}) async {
     try {
@@ -220,7 +227,7 @@ class MessageService {
       
       final response = await _retryableRequest(
         'POST',
-        '$baseUrl/create',
+        'create',  // CORREGIDO: endpoint relativo
         body: body,
       );
       
@@ -232,13 +239,13 @@ class MessageService {
     }
   }
   
-  // Eliminar un mensaje (solo para admin/operador)
+  // CORREGIDO: Eliminar un mensaje (solo para admin/operador)
   Future<bool> deleteMessage(String messageId) async {
     try {
       print('Eliminando mensaje: $messageId');
       final response = await _retryableRequest(
         'DELETE',
-        '$baseUrl/$messageId',
+        messageId,  // CORREGIDO: endpoint relativo
       );
       
       return response.statusCode == 200;
