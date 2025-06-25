@@ -11,7 +11,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 
 class ApiService {
   // URL con dirección IP directa
-  String baseUrl = 'http://34.61.195.206:8080/api/v1';
+  String baseUrl = 'http://34.71.113.185:8080/api/v1';
 
   // Token de autenticación
   String? _authToken;

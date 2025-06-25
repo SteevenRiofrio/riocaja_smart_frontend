@@ -6,7 +6,7 @@ import 'package:riocaja_smart/models/user.dart';
 
 class AuthService {
   // Usar la misma URL base que el ApiService
-  String baseUrl = 'http://34.61.195.206:8080/api/v1';
+  String baseUrl = 'http://34.71.113.185:8080/api/v1';
   
   // Token almacenado en memoria
   String? _token;
