@@ -45,18 +45,34 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
 if (success) {
-  // MOSTRAR NOTIFICACIÓN VERDE
+  // NOTIFICACIÓN MEJORADA
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
-      content: Row(
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.check_circle, color: Colors.white),
-          SizedBox(width: 8),
-          Text('¡Bienvenido! Sesión iniciada'),
+          Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.white),
+              SizedBox(width: 8),
+              Text('¡Bienvenido! Sesión iniciada'),
+            ],
+          ),
+          SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.email, color: Colors.white70, size: 16),
+              SizedBox(width: 8),
+              Text(
+                'Se envió notificación a tu correo',
+                style: TextStyle(fontSize: 12, color: Colors.white70),
+              ),
+            ],
+          ),
         ],
       ),
       backgroundColor: Colors.green,
-      duration: Duration(seconds: 2),
+      duration: Duration(seconds: 3),
     ),
   );
 
