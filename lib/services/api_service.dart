@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/services/auth_service.dart';
+import 'dart:convert';
 
 class ApiService {
   // URL base de la API
@@ -483,4 +484,41 @@ class ApiService {
   int min(int a, int b) {
     return a < b ? a : b;
   }
+
+
+  // Método para decodificar respuestas UTF-8 correctamente
+  Map<String, dynamic> _decodeUtf8Response(String responseBody) {
+    try {
+      // Intentar decodificar directamente
+      return jsonDecode(responseBody);
+    } catch (e) {
+      try {
+        // Si falla, intentar con codificación UTF-8 explícita
+        final utf8Bytes = utf8.encode(responseBody);
+        final decodedString = utf8.decode(utf8Bytes);
+        return jsonDecode(decodedString);
+      } catch (e2) {
+        print('Error decodificando UTF-8: $e2');
+        return {};
+      }
+    }
+  }
+  
+  // Método para limpiar texto con caracteres malformados
+  String _cleanText(String text) {
+    return text
+        .replaceAll('Ã³', 'ó')
+        .replaceAll('Ã¡', 'á')
+        .replaceAll('Ã©', 'é')
+        .replaceAll('Ã­', 'í')
+        .replaceAll('Ãº', 'ú')
+        .replaceAll('Ã±', 'ñ')
+        .replaceAll('Ã"', 'Ó')
+        .replaceAll('Ã', 'Á')
+        .replaceAll('Ã‰', 'É')
+        .replaceAll('Ã', 'Í')
+        .replaceAll('Ãš', 'Ú')
+        .replaceAll('Ã', 'Ñ');
+  }
+
 }

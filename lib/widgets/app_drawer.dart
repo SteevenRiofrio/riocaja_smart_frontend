@@ -1,4 +1,4 @@
-// lib/widgets/app_drawer.dart - ACTUALIZADO CON ESCANEO EN MENÚ
+// lib/widgets/app_drawer.dart - ACTUALIZADO CON TEXT CONSTANTS
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -12,6 +12,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/screens/messages_screen.dart';
 import 'package:riocaja_smart/screens/pending_users_screen.dart';
 import 'package:riocaja_smart/screens/user_management_screen.dart';
+import 'package:riocaja_smart/utils/text_constants.dart';
 
 class AppDrawer extends StatelessWidget {
   @override
@@ -73,7 +74,7 @@ class AppDrawer extends StatelessWidget {
               children: [
                 ListTile(
                   leading: Icon(Icons.home),
-                  title: Text('Inicio'),
+                  title: Text(TextConstants.inicio),
                   onTap: () {
                     Navigator.of(context).pop(); // Cerrar drawer
                     Navigator.of(context).pushReplacement(
@@ -82,10 +83,10 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 
-                // NUEVO: Escanear Comprobante para todos los roles
+                // Escanear Comprobante para todos los roles
                 ListTile(
                   leading: Icon(Icons.document_scanner, color: Colors.green.shade700),
-                  title: Text('Escanear Comprobante'),
+                  title: Text(TextConstants.escanearComprobante),
                   onTap: () {
                     Navigator.pop(context); // Cerrar drawer
                     Navigator.push(
@@ -97,7 +98,7 @@ class AppDrawer extends StatelessWidget {
                 
                 ListTile(
                   leading: Icon(Icons.history),
-                  title: Text('Historial de Comprobantes'),
+                  title: Text(TextConstants.historialComprobantes),
                   onTap: () {
                     Navigator.pop(context); // Cerrar drawer
                     Navigator.push(
@@ -113,7 +114,7 @@ class AppDrawer extends StatelessWidget {
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Text(
-                    'Reportes',
+                    TextConstants.reportes,
                     style: TextStyle(
                       color: Colors.grey.shade600,
                       fontWeight: FontWeight.bold,
@@ -124,8 +125,8 @@ class AppDrawer extends StatelessWidget {
                 
                 ListTile(
                   leading: Icon(Icons.summarize, color: Colors.blue.shade700),
-                  title: Text('Reportes de Cierre'),
-                  subtitle: Text('Ver y compartir como texto/PDF'),
+                  title: Text(TextConstants.reportesCierre),
+                  subtitle: Text(TextConstants.verCompartir),
                   onTap: () {
                     Navigator.pop(context); // Cerrar drawer
                     Navigator.push(
@@ -137,8 +138,8 @@ class AppDrawer extends StatelessWidget {
                 
                 ListTile(
                   leading: Icon(Icons.table_chart, color: Colors.green.shade700),
-                  title: Text('Reportes Excel'),
-                  subtitle: Text('Exportar datos a Excel'),
+                  title: Text(TextConstants.reportesExcel),
+                  subtitle: Text(TextConstants.exportarDatos),
                   onTap: () {
                     Navigator.pop(context); // Cerrar drawer
                     Navigator.push(
@@ -153,7 +154,7 @@ class AppDrawer extends StatelessWidget {
                 // Mensajes para todos los usuarios
                 ListTile(
                   leading: Icon(Icons.mail),
-                  title: Text('Mensajes'),
+                  title: Text(TextConstants.mensajes),
                   onTap: () {
                     Navigator.pop(context); // Cerrar drawer
                     Navigator.push(
@@ -170,7 +171,7 @@ class AppDrawer extends StatelessWidget {
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
-                      'Administración',
+                      TextConstants.administracion,
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontWeight: FontWeight.bold,
@@ -181,8 +182,8 @@ class AppDrawer extends StatelessWidget {
                   
                   ListTile(
                     leading: Icon(Icons.people_alt, color: Colors.green.shade700),
-                    title: Text('Gestión de Usuarios'),
-                    subtitle: Text('Administrar todos los usuarios'),
+                    title: Text(TextConstants.gestionUsuarios),
+                    subtitle: Text(TextConstants.administrarTodosLosUsuarios),
                     onTap: () {
                       Navigator.pop(context); // Cerrar drawer
                       Navigator.push(
@@ -194,8 +195,8 @@ class AppDrawer extends StatelessWidget {
                   
                   ListTile(
                     leading: Icon(Icons.person_add, color: Colors.orange.shade700),
-                    title: Text('Usuarios Pendientes'),
-                    subtitle: Text('Solo pendientes de aprobación'),
+                    title: Text(TextConstants.usuariosPendientes),
+                    subtitle: Text(TextConstants.soloPendientesAprobacion),
                     onTap: () {
                       Navigator.pop(context); // Cerrar drawer
                       Navigator.push(
@@ -207,7 +208,7 @@ class AppDrawer extends StatelessWidget {
                   
                   ListTile(
                     leading: Icon(Icons.bug_report, color: Colors.red.shade700),
-                    title: Text('Diagnóstico'),
+                    title: Text(TextConstants.diagnostico),
                     onTap: () {
                       Navigator.pop(context); // Cerrar drawer
                       Navigator.push(
@@ -243,17 +244,16 @@ class AppDrawer extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Rol: ${_getRoleName(authProvider.user?.rol ?? 'lector')}',
+                              'Rol: ${TextConstants.getRoleName(authProvider.user?.rol ?? 'lector')}',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            if (authProvider.user?.nombreLocal != null)
-                              Text(
-                                'Local: ${authProvider.user!.nombreLocal}',
-                                style: TextStyle(fontSize: 11),
-                              ),
+                            Text(
+                              'Local: ${authProvider.user?.nombreLocal ?? TextConstants.administracion}',
+                              style: TextStyle(fontSize: 10),
+                            ),
                           ],
                         ),
                       ),
@@ -263,28 +263,13 @@ class AppDrawer extends StatelessWidget {
                 SizedBox(height: 8),
                 
                 // Botón de cerrar sesión
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _showLogoutDialog(context, authProvider),
-                    icon: Icon(Icons.logout, size: 18),
-                    label: Text('Cerrar Sesión'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      foregroundColor: Colors.white,
-                      padding: EdgeInsets.symmetric(vertical: 12),
-                    ),
+                ElevatedButton(
+                  onPressed: () => _showLogoutDialog(context, authProvider),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
                   ),
-                ),
-                SizedBox(height: 8),
-                
-                // Versión
-                Text(
-                  'RíoCaja Smart v1.2.0',
-                  style: TextStyle(
-                    color: Colors.grey.shade600,
-                    fontSize: 10,
-                  ),
+                  child: Text(TextConstants.cerrarSesion),
                 ),
               ],
             ),
@@ -294,20 +279,20 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  // Método para mostrar diálogo de confirmación de logout
+  // Mostrar diálogo de confirmación para cerrar sesión
   void _showLogoutDialog(BuildContext context, AuthProvider authProvider) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text('Cerrar Sesión'),
-          content: Text('¿Está seguro de que desea cerrar la sesión?'),
+          title: Text(TextConstants.confirmarCierreSesion),
+          content: Text(TextConstants.estaSeguroCerrarSesion),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.of(dialogContext).pop(); // Cerrar diálogo
               },
-              child: Text('Cancelar'),
+              child: Text(TextConstants.cancelar),
             ),
             ElevatedButton(
               onPressed: () async {
@@ -327,7 +312,7 @@ class AppDrawer extends StatelessWidget {
                           children: [
                             CircularProgressIndicator(),
                             SizedBox(height: 16),
-                            Text('Cerrando sesión...'),
+                            Text(TextConstants.cerrandoSesion),
                           ],
                         ),
                       ),
@@ -348,7 +333,7 @@ class AppDrawer extends StatelessWidget {
                   // Mostrar mensaje de confirmación
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Sesión cerrada correctamente'),
+                      content: Text(TextConstants.sesionCerradaCorrectamente),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 2),
                     ),
@@ -358,7 +343,7 @@ class AppDrawer extends StatelessWidget {
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('Error al cerrar sesión: $e'),
+                      content: Text('${TextConstants.errorCerrarSesion}: $e'),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -368,7 +353,7 @@ class AppDrawer extends StatelessWidget {
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: Text('Cerrar Sesión'),
+              child: Text(TextConstants.cerrarSesion),
             ),
           ],
         );
@@ -397,18 +382,6 @@ class AppDrawer extends StatelessWidget {
         return 'O';
       default:
         return 'L';
-    }
-  }
-
-  // Obtener nombre del rol
-  String _getRoleName(String rol) {
-    switch (rol) {
-      case 'admin':
-        return 'Administrador';
-      case 'operador':
-        return 'Operador';
-      default:
-        return 'Lector';
     }
   }
 }
