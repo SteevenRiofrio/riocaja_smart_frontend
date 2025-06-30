@@ -1,53 +1,56 @@
-// lib/services/auth_service.dart - ACTUALIZADO CON NUEVOS MÉTODOS
+// lib/services/auth_service.dart - COMPLETO CON REFRESH TOKENS
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:riocaja_smart/models/user.dart';
 
 class AuthService {
-  // Usar la misma URL base que el ApiService
-  String baseUrl = 'https://riocajasmartbackend-production.up.railway.app/api/v1';
-  
-  // Token almacenado en memoria
-  String? _token;
-  
-  // Usuario actual
-  User? _currentUser;
-  
-  // Getter para el usuario actual
-  User? get currentUser => _currentUser;
-  
-  // Getter para el token
-  String? get token => _token;
-  
-  // Claves para SharedPreferences
+  static const String baseUrl = 'https://riocajasmartbackend-production.up.railway.app/api/v1';
   static const String USER_DATA_KEY = 'user_data';
+  static const String REFRESH_TOKEN_KEY = 'refresh_token';
   static const String REMEMBER_ME_KEY = 'remember_me';
   static const String TOKEN_EXPIRY_KEY = 'token_expiry';
-  
-  // Método para actualizar la URL base
-  void updateBaseUrl(String newUrl) {
-    baseUrl = newUrl;
-    print('URL de API para autenticación actualizada a: $baseUrl');
-  }
-  
-  /// Inicializar el servicio (cargar token almacenado)
+
+  String? _token;
+  String? _refreshToken;
+  User? _currentUser;
+
+  // Getters
+  String? get token => _token;
+  String? get refreshToken => _refreshToken;
+  User? get currentUser => _currentUser;
+
+  // Inicializar servicio (cargar sesión guardada)
   Future<bool> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userData = prefs.getString(USER_DATA_KEY);
+      final refreshTokenStored = prefs.getString(REFRESH_TOKEN_KEY);
       final rememberMe = prefs.getBool(REMEMBER_ME_KEY) ?? false;
       final tokenExpiry = prefs.getInt(TOKEN_EXPIRY_KEY) ?? 0;
       
       print('AuthService.init - RememberMe: $rememberMe, UserData existe: ${userData != null}');
+      print('AuthService.init - Refresh token existe: ${refreshTokenStored != null}');
       
       // Verificar si el token ha expirado
       final now = DateTime.now().millisecondsSinceEpoch;
       if (tokenExpiry > 0 && now > tokenExpiry) {
-        print('Token expirado. Se requiere nuevo inicio de sesión.');
-        await prefs.remove(USER_DATA_KEY);
-        await prefs.remove(TOKEN_EXPIRY_KEY);
-        return false;
+        print('Access token expirado. Intentando renovar con refresh token...');
+        
+        if (refreshTokenStored != null && refreshTokenStored.isNotEmpty) {
+          _refreshToken = refreshTokenStored;
+          final refreshSuccess = await refreshAccessToken();
+          
+          if (!refreshSuccess) {
+            print('Refresh token expirado o inválido. Cerrando sesión.');
+            await logout();
+            return false;
+          }
+        } else {
+          print('No hay refresh token. Cerrando sesión.');
+          await logout();
+          return false;
+        }
       }
       
       if (userData != null && rememberMe) {
@@ -55,6 +58,7 @@ class AuthService {
           final userMap = jsonDecode(userData);
           _currentUser = User.fromJson(userMap);
           _token = _currentUser!.token;
+          _refreshToken = refreshTokenStored ?? _currentUser!.refreshToken;
           
           if (_token == null || _token!.isEmpty) {
             print('Error: Token cargado es nulo o vacío');
@@ -68,14 +72,25 @@ class AuthService {
           try {
             final validationResult = await getUserData();
             if (!validationResult['success']) {
-              print('Token no válido o expirado');
-              await prefs.remove(USER_DATA_KEY);
-              await prefs.remove(TOKEN_EXPIRY_KEY);
-              return false;
+              print('Token no válido. Intentando renovar...');
+              
+              if (_refreshToken != null) {
+                final refreshSuccess = await refreshAccessToken();
+                if (!refreshSuccess) {
+                  print('No se pudo renovar el token. Cerrando sesión.');
+                  await logout();
+                  return false;
+                }
+              } else {
+                print('No hay refresh token para renovar');
+                await logout();
+                return false;
+              }
             }
             print('Token validado correctamente');
           } catch (e) {
             print('Error al validar token: $e');
+            // Si hay error de conexión, asumir que el token es válido
             return true;
           }
           
@@ -167,6 +182,7 @@ class AuthService {
         print('Login exitoso con datos: $responseData');
         
         _token = responseData['access_token'];
+        _refreshToken = responseData['refresh_token']; // ← NUEVO: Obtener refresh token
         
         if (_token == null || _token!.isEmpty) {
           print('ERROR: Token recibido es nulo o vacío');
@@ -177,49 +193,57 @@ class AuthService {
         }
         
         print('Token recibido: ${_token!.substring(0, min(10, _token!.length))}...');
+        print('Refresh token recibido: ${_refreshToken != null ? "SÍ" : "NO"}');
         
         // Verificar si el perfil está completo
         final perfilCompleto = responseData['perfil_completo'] ?? false;
         final codigoCorresponsal = responseData['codigo_corresponsal'];
         
-        // Crear datos de usuario básicos con el token
-        final basicUser = User(
-          id: 'temp_id',
-          nombre: email.split('@')[0],
-          email: email,
-          rol: 'lector',
-          token: _token!,
-        );
-        
-        // Guardar inmediatamente en SharedPreferences
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(USER_DATA_KEY, jsonEncode(basicUser.toJson()));
-        await prefs.setBool(REMEMBER_ME_KEY, true);
-        
-        // Calcular y guardar la fecha de expiración del token
-        final expiryTime = DateTime.now().millisecondsSinceEpoch + (24 * 60 * 60 * 1000);
-        await prefs.setInt(TOKEN_EXPIRY_KEY, expiryTime);
-        
-        // Intentar obtener datos adicionales del usuario
+        // Intentar obtener datos completos del usuario
         try {
           final userData = await getUserData();
           if (userData['success']) {
             _currentUser = User(
-              id: userData['data']['sub'] ?? basicUser.id,
-              nombre: userData['data']['nombre'] ?? basicUser.nombre,
-              email: userData['data']['email'] ?? basicUser.email,
-              rol: userData['data']['rol'] ?? basicUser.rol,
+              id: userData['data']['data']['_id'],
+              nombre: userData['data']['data']['nombre'],
+              email: userData['data']['data']['email'],
+              rol: userData['data']['data']['rol'],
               token: _token!,
+              refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
+              estado: userData['data']['data']['estado'] ?? 'activo',
+              perfilCompleto: userData['data']['data']['perfil_completo'] ?? false,
+              codigoCorresponsal: userData['data']['data']['codigo_corresponsal'],
+              nombreLocal: userData['data']['data']['nombre_local'],
             );
             
-            await prefs.setString(USER_DATA_KEY, jsonEncode(_currentUser!.toJson()));
+            await _saveUserData();
             print('Datos completos del usuario guardados');
           } else {
-            _currentUser = basicUser;
+            // Crear usuario básico si no se pueden obtener datos completos
+            _currentUser = User(
+              id: 'temp_id',
+              nombre: email.split('@')[0],
+              email: email,
+              rol: 'lector',
+              token: _token!,
+              refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
+            );
+            
+            await _saveUserData();
             print('No se pudieron obtener datos adicionales. Usando datos básicos.');
           }
         } catch (e) {
-          _currentUser = basicUser;
+          // Crear usuario básico en caso de error
+          _currentUser = User(
+            id: 'temp_id',
+            nombre: email.split('@')[0],
+            email: email,
+            rol: 'lector',
+            token: _token!,
+            refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
+          );
+          
+          await _saveUserData();
           print('Error al obtener datos adicionales: $e. Usando datos básicos.');
         }
         
@@ -254,53 +278,100 @@ class AuthService {
     }
   }
 
-  // Completar perfil de usuario
- Future<bool> completeProfile({
-  required String codigoCorresponsal,
-  required String nombreLocal,
-  required String nombreCompleto, // No se usa, pero se mantiene para compatibilidad
-  required String password, // No se usa, pero se mantiene para compatibilidad
-}) async {
-  try {
-    if (_token == null) {
-      print('Error: No hay token de autenticación');
+  // ← NUEVO: Método para renovar access token usando refresh token
+  Future<bool> refreshAccessToken() async {
+    try {
+      if (_refreshToken == null || _refreshToken!.isEmpty) {
+        print('No hay refresh token disponible');
+        return false;
+      }
+      
+      final url = '$baseUrl/auth/refresh';
+      print('Renovando token en: $url');
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'refresh_token': _refreshToken,
+        }),
+      ).timeout(Duration(seconds: 30));
+      
+      print('Respuesta refresh token: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        _token = responseData['access_token'];
+        
+        // Actualizar usuario con nuevo token
+        if (_currentUser != null) {
+          _currentUser = _currentUser!.copyWith(
+            token: _token!,
+            refreshToken: _refreshToken, // Mantener el mismo refresh token
+          );
+          
+          await _saveUserData();
+        }
+        
+        print('Token renovado exitosamente');
+        return true;
+      } else {
+        print('Error renovando token: ${response.statusCode}');
+        final errorData = jsonDecode(response.body);
+        print('Detalles del error: $errorData');
+        return false;
+      }
+    } catch (e) {
+      print('Error en refreshAccessToken: $e');
       return false;
     }
-    
-    final url = '$baseUrl/auth/complete-profile';
-    print('Completando perfil en: $url');
-    
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_token',
-      },
-      body: jsonEncode({
-        'codigo_corresponsal': codigoCorresponsal, // Para verificación
-        'nombre_local': nombreLocal, // Único campo que se actualiza
-        // NO enviamos nombre_completo ni password
-      }),
-    ).timeout(Duration(seconds: 60));
-    
-    print('Respuesta completar perfil: ${response.statusCode}');
-    print('Cuerpo de respuesta: ${response.body}');
-    
-    if (response.statusCode == 200) {
-      print('Perfil completado exitosamente');
-      return true;
-    } else {
-      final errorData = jsonDecode(response.body);
-      print('Error al completar perfil: $errorData');
-      return false;
-    }
-  } catch (e) {
-    print('Error en completeProfile: $e');
-    return false;
   }
-}
+
+  // Completar perfil de usuario
+  Future<bool> completeProfile({
+    required String codigoCorresponsal,
+    required String nombreLocal,
+    required String nombreCompleto, // Mantenido para compatibilidad
+    required String password, // Mantenido para compatibilidad
+  }) async {
+    try {
+      if (_token == null) {
+        print('Error: No hay token de autenticación');
+        return false;
+      }
+      
+      final url = '$baseUrl/auth/complete-profile';
+      print('Completando perfil en: $url');
+      
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_token',
+        },
+        body: jsonEncode({
+          'codigo_corresponsal': codigoCorresponsal,
+          'nombre_local': nombreLocal,
+        }),
+      ).timeout(Duration(seconds: 60));
+      
+      print('Respuesta completar perfil: ${response.statusCode}');
+      
+      if (response.statusCode == 200) {
+        print('Perfil completado exitosamente');
+        return true;
+      } else {
+        final errorData = jsonDecode(response.body);
+        print('Error al completar perfil: $errorData');
+        return false;
+      }
+    } catch (e) {
+      print('Error en completeProfile: $e');
+      return false;
+    }
+  }
   
-  // NUEVO: Verificar código de corresponsal
+  // Verificar código de corresponsal
   Future<bool> verifyCorresponsalCode(String codigo) async {
     try {
       if (_token == null) {
@@ -355,15 +426,32 @@ class AuthService {
         },
       ).timeout(Duration(seconds: 30));
       
-      print('Respuesta del servidor: ${response.statusCode}');
+      print('Respuesta del servidor getUserData: ${response.statusCode}');
       
       if (response.statusCode == 200) {
         final userData = jsonDecode(response.body);
-        print('Datos del usuario: $userData');
+        print('Datos del usuario obtenidos correctamente');
         
         return {
           'success': true,
           'data': userData,
+        };
+      } else if (response.statusCode == 401) {
+        // Token expirado, intentar renovar automáticamente
+        print('Token expirado en getUserData, intentando renovar...');
+        
+        if (_refreshToken != null) {
+          final refreshSuccess = await refreshAccessToken();
+          if (refreshSuccess) {
+            // Reintentar la petición con el nuevo token
+            return await getUserData();
+          }
+        }
+        
+        return {
+          'success': false,
+          'message': 'Token expirado y no se pudo renovar',
+          'statusCode': response.statusCode,
         };
       } else {
         print('Error al obtener datos del usuario: ${response.statusCode}');
@@ -382,15 +470,44 @@ class AuthService {
     }
   }
   
+  // ← NUEVO: Guardar datos de usuario incluyendo refresh token
+  Future<void> _saveUserData() async {
+    try {
+      if (_currentUser != null) {
+        final prefs = await SharedPreferences.getInstance();
+        
+        // Guardar datos del usuario
+        await prefs.setString(USER_DATA_KEY, jsonEncode(_currentUser!.toJson()));
+        await prefs.setBool(REMEMBER_ME_KEY, true);
+        
+        // Guardar refresh token por separado para mayor seguridad
+        if (_refreshToken != null) {
+          await prefs.setString(REFRESH_TOKEN_KEY, _refreshToken!);
+        }
+        
+        // Calcular y guardar la fecha de expiración del access token (24 horas)
+        final expiryTime = DateTime.now().millisecondsSinceEpoch + (24 * 60 * 60 * 1000);
+        await prefs.setInt(TOKEN_EXPIRY_KEY, expiryTime);
+        
+        print('Datos de usuario guardados con refresh token');
+      }
+    } catch (e) {
+      print('Error guardando datos de usuario: $e');
+    }
+  }
+  
   // Cerrar sesión
   Future<bool> logout() async {
     try {
       _token = null;
+      _refreshToken = null; // ← NUEVO: Limpiar refresh token
       _currentUser = null;
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(USER_DATA_KEY);
+      await prefs.remove(REFRESH_TOKEN_KEY); // ← NUEVO: Remover refresh token
       await prefs.remove(TOKEN_EXPIRY_KEY);
+      await prefs.remove(REMEMBER_ME_KEY);
       
       print('Sesión cerrada exitosamente');
       return true;
@@ -418,11 +535,7 @@ class AuthService {
     return _token != null && _currentUser != null;
   }
   
-  // Renovar token
-  Future<bool> refreshToken() async {
-    return false;
-  }
-  
+
   // Función auxiliar para mínimo
   int min(int a, int b) {
     return a < b ? a : b;

@@ -1,4 +1,4 @@
-// lib/services/api_service.dart - ACTUALIZADO PARA ENVIAR INFORMACIÓN DE CORRESPONSAL
+// lib/services/api_service.dart - COMPLETO Y CORREGIDO - FINAL
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
@@ -8,9 +8,10 @@ import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
+import 'package:riocaja_smart/services/auth_service.dart';
 
 class ApiService {
-  // URL con dirección IP directa
+  // URL base de la API
   String baseUrl = 'https://riocajasmartbackend-production.up.railway.app/api/v1';
 
   // Token de autenticación
@@ -18,6 +19,9 @@ class ApiService {
 
   // Contexto para acceder a los providers
   BuildContext? _context;
+
+  // Referencia al AuthService para refresh automático
+  AuthService? _authService;
 
   // Método para establecer el contexto
   void setContext(BuildContext context) {
@@ -30,13 +34,17 @@ class ApiService {
         print('ApiService: Token configurado desde setContext: ${_authToken != null ? _authToken!.substring(0, min(10, _authToken!.length)) : "null"}...');
       } else {
         print('ApiService: AuthProvider no está autenticado');
-        // Si no está autenticado, redirigir a login
-        _redirectToLogin();
       }
     }
   }
 
-  // Método para permitir cambiar la URL dinámicamente (útil para pruebas/desarrollo)
+  // Método para establecer AuthService (para refresh automático)
+  void setAuthService(AuthService authService) {
+    _authService = authService;
+    print('ApiService: AuthService configurado para refresh automático');
+  }
+
+  // Método para permitir cambiar la URL dinámicamente
   void updateBaseUrl(String newUrl) {
     baseUrl = newUrl;
     print('URL de API actualizada a: $baseUrl');
@@ -48,7 +56,7 @@ class ApiService {
     print('ApiService: Token establecido manualmente: ${token != null ? token.substring(0, min(10, token.length)) : "null"}...');
   }
 
-  // Crear los headers HTTP con o sin token de autenticación (método público)
+  // Crear los headers HTTP con o sin token de autenticación
   Map<String, String> getHeaders() {
     Map<String, String> headers = {
       'Content-Type': 'application/json',
@@ -60,257 +68,225 @@ class ApiService {
       print('ApiService: Incluyendo token en los headers');
     } else {
       print('ApiService: ATENCIÓN - No hay token disponible para los headers');
-      // Si no hay token y estamos en un contexto, redirigir a login
-      if (_context != null) {
-        _redirectToLogin();
-      }
     }
 
     return headers;
   }
 
-  // Método auxiliar para redirigir a login
-  void _redirectToLogin() {
-    // Solo redirigir si tenemos un contexto y está montado
-    if (_context != null && Navigator.canPop(_context!)) {
-      // Usar Future.microtask para evitar problemas durante la construcción
-      Future.microtask(() {
-        ScaffoldMessenger.of(_context!).showSnackBar(
-          SnackBar(
-            content: Text('Sesión expirada. Por favor inicie sesión nuevamente.'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
-        
-        Navigator.of(_context!).pushReplacement(
-          MaterialPageRoute(builder: (context) => LoginScreen()),
-        );
-      });
-    }
-  }
-
-  // Método para realizar una petición HTTP con manejo de errores y reintentos
-  Future<http.Response> _retryableRequest(
+  // Método para hacer peticiones HTTP con interceptor de refresh automático
+  Future<http.Response> _makeRequestWithRetry(
     String method,
-    String url,
-    {Map<String, String>? headers, String? body, int maxRetries = 3}
-  ) async {
-    int retryCount = 0;
-    Duration retryDelay = Duration(seconds: 2);
+    String url, {
+    Map<String, dynamic>? body,
+    Map<String, String>? customHeaders,
+    int maxRetries = 3,
+  }) async {
     
-    while (true) {
-      try {
-        http.Response response;
+    // Primera petición
+    http.Response response = await _makeRawRequest(method, url, body: body, customHeaders: customHeaders);
+    
+    // Si es 401 (token expirado), intentar refresh automático
+    if (response.statusCode == 401 && _authService != null) {
+      print('Token expirado (401), intentando renovar automáticamente...');
+      
+      bool refreshSuccess = await _authService!.refreshAccessToken();
+      
+      if (refreshSuccess) {
+        print('Token renovado exitosamente, reintentando petición...');
         
-        switch (method.toUpperCase()) {
-          case 'GET':
-            response = await http.get(
-              Uri.parse(url),
-              headers: headers ?? getHeaders(),
-            ).timeout(Duration(seconds: 60));
-            break;
-          case 'POST':
-            response = await http.post(
-              Uri.parse(url),
-              headers: headers ?? getHeaders(),
-              body: body,
-            ).timeout(Duration(seconds: 60));
-            break;
-          case 'DELETE':
-            response = await http.delete(
-              Uri.parse(url),
-              headers: headers ?? getHeaders(),
-            ).timeout(Duration(seconds: 60));
-            break;
-          default:
-            throw Exception('Método HTTP no soportado: $method');
+        // Actualizar token en ApiService
+        _authToken = _authService!.token;
+        
+        // Actualizar token en AuthProvider si está disponible
+        if (_context != null) {
+          final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+          authProvider.syncTokensAfterRefresh();
         }
         
-        // Verificar estado de autenticación
-        if (response.statusCode == 401) {
-          // Token inválido o expirado
-          print('Error 401: Token inválido o expirado');
-          
-          // Intentar cerrar sesión y redirigir a login
-          if (_context != null) {
-            final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-            await authProvider.logout();
-            _redirectToLogin();
-          }
-          
-          throw Exception('Token inválido o expirado');
+        // Reintentar la petición original con el nuevo token
+        response = await _makeRawRequest(method, url, body: body, customHeaders: customHeaders);
+        
+        if (response.statusCode != 401) {
+          print('Petición exitosa después de renovar token');
+          return response;
         }
-        
-        return response;
-      } catch (e) {
-        retryCount++;
-        print('Error en petición HTTP ($retryCount/$maxRetries): $e');
-        
-        // Si es un error de autenticación, no reintentar
-        if (e.toString().contains('Token inválido') || e.toString().contains('401')) {
-          throw e;
-        }
-        
-        // Si hemos alcanzado el número máximo de reintentos, lanzar excepción
-        if (retryCount >= maxRetries) {
-          throw e;
-        }
-        
-        // Esperar antes de reintentar
-        await Future.delayed(retryDelay);
-        
-        // Incrementar el tiempo de espera para el próximo reintento
-        retryDelay *= 2;
       }
+      
+      // Si el refresh falló o sigue dando 401, cerrar sesión
+      print('No se pudo renovar el token, cerrando sesión...');
+      await _handleLogout();
+    }
+    
+    return response;
+  }
+
+  // Método auxiliar para hacer peticiones HTTP básicas (sin interceptor)
+  Future<http.Response> _makeRawRequest(
+    String method,
+    String url, {
+    Map<String, dynamic>? body,
+    Map<String, String>? customHeaders,
+  }) async {
+    
+    final headers = customHeaders ?? getHeaders();
+    final uri = Uri.parse(url);
+    
+    print('Haciendo petición $method a: $url');
+    
+    try {
+      switch (method.toUpperCase()) {
+        case 'GET':
+          return await http.get(uri, headers: headers).timeout(Duration(seconds: 60));
+        case 'POST':
+          return await http.post(
+            uri,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          ).timeout(Duration(seconds: 60));
+        case 'PUT':
+          return await http.put(
+            uri,
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          ).timeout(Duration(seconds: 60));
+        case 'DELETE':
+          return await http.delete(uri, headers: headers).timeout(Duration(seconds: 60));
+        default:
+          throw Exception('Método HTTP no soportado: $method');
+      }
+    } catch (e) {
+      print('Error en petición HTTP: $e');
+      throw e;
     }
   }
 
-  // Obtener todos los comprobantes
+  // Método auxiliar para manejar logout
+  Future<void> _handleLogout() async {
+    try {
+      if (_authService != null) {
+        await _authService!.logout();
+      }
+      
+      if (_context != null) {
+        final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+        await authProvider.logout();
+        
+        Future.microtask(() {
+          Navigator.of(_context!).pushReplacement(
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+          );
+        });
+      }
+    } catch (e) {
+      print('Error durante logout: $e');
+    }
+  }
+
+  // Obtener todos los comprobantes (con interceptor)
   Future<List<Receipt>> getAllReceipts() async {
     try {
       final url = '$baseUrl/receipts/';
       print('Obteniendo comprobantes de: $url');
 
-      // Mejorar el registro de la petición HTTP
-      print('Enviando petición GET a: $url');
-      print('Headers: ${getHeaders()}');
-
-      final response = await _retryableRequest('GET', url);
+      final response = await _makeRequestWithRetry('GET', url);
 
       print('Código de respuesta: ${response.statusCode}');
 
       if (response.body.isNotEmpty) {
-        try {
-          print(
-            'Primeros 200 caracteres del cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
-          );
-
-          if (response.statusCode == 200) {
-            final Map<String, dynamic> responseData = jsonDecode(response.body);
-            if (responseData.containsKey('data')) {
-              final List<dynamic> receiptsJson = responseData['data'];
-              print('Comprobantes obtenidos: ${receiptsJson.length}');
-              return receiptsJson
-                  .map((json) => Receipt.fromJson(json))
-                  .toList();
-            } else {
-              print('La respuesta no contiene la clave "data"');
-              print('Respuesta completa: ${response.body}');
-              return [];
-            }
+        if (response.statusCode == 200) {
+          final Map<String, dynamic> responseData = jsonDecode(response.body);
+          if (responseData.containsKey('data')) {
+            final List<dynamic> receiptsJson = responseData['data'];
+            print('Comprobantes obtenidos: ${receiptsJson.length}');
+            return receiptsJson.map((json) => Receipt.fromJson(json)).toList();
           } else {
-            print('Error HTTP: ${response.statusCode}');
-            print('Detalles: ${response.body}');
-            throw Exception(
-              'Error al obtener comprobantes: ${response.statusCode} - ${response.body}',
-            );
+            print('La respuesta no contiene la clave "data"');
+            return [];
           }
-        } catch (e) {
-          print('Error al procesar el cuerpo de la respuesta: $e');
-          print('Cuerpo de respuesta original: ${response.body}');
-          throw Exception('Error al procesar respuesta: $e');
+        } else {
+          print('Error HTTP: ${response.statusCode}');
+          throw Exception('Error al obtener comprobantes: ${response.statusCode}');
         }
       } else {
         print('El cuerpo de la respuesta está vacío');
-        throw Exception('Respuesta vacía del servidor');
+        return [];
       }
     } catch (e) {
       print('Error en getAllReceipts: $e');
-
-      // Mejor diagnóstico de errores de red
+      
       if (e is SocketException) {
         print('Error de socket: No se pudo conectar al servidor');
-        print('Detalles: ${e.message}');
       } else if (e.toString().contains('TimeoutException')) {
-        print(
-          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
-        );
-        print(
-          'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
-        );
-      } else if (e is FormatException) {
-        print(
-          'Error de formato: La respuesta no tiene el formato JSON esperado',
-        );
+        print('La conexión al servidor agotó el tiempo de espera');
       }
-
+      
       throw Exception('Error de conexión: $e');
     }
   }
 
+  // Guardar comprobante (con interceptor) - CORREGIDO
   Future<bool> saveReceipt(Receipt receipt) async {
     try {
       final url = '$baseUrl/receipts/';
       print('Guardando comprobante en: $url');
 
-      // Convertir el objeto Receipt a JSON con el formato correcto
-      final Map<String, dynamic> receiptJson = receipt.toJson();
-      
-      // NUEVO: El backend automáticamente asociará el comprobante con el usuario autenticado
-      // a través del token JWT, por lo que no necesitamos enviar información adicional
-      
-      final String jsonBody = jsonEncode(receiptJson);
+      // CORREGIDO: Usar toJson() del modelo Receipt
+      final Map<String, dynamic> receiptData = receipt.toJson();
 
-      print('Datos a enviar: $jsonBody');
+      print('Datos del comprobante a enviar: ${receiptData.keys.toList()}');
 
-      final response = await _retryableRequest('POST', url, body: jsonBody);
+      final response = await _makeRequestWithRetry('POST', url, body: receiptData);
 
-      print('Respuesta del servidor: ${response.statusCode}');
-      if (response.body.isNotEmpty) {
-        print(
-          'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
-        );
-      }
+      print('Código de respuesta guardar: ${response.statusCode}');
+      print('Respuesta del servidor: ${response.body}');
 
-      // Revisar códigos de estado adicionales
       if (response.statusCode == 200 || response.statusCode == 201) {
+        print('Comprobante guardado exitosamente');
         return true;
-      } else if (response.statusCode == 400) {
-        print('Error 400: Solicitud incorrecta');
-        print('Detalles: ${response.body}');
-        throw Exception('Error 400: ${response.body}');
-      } else if (response.statusCode == 500) {
-        print('Error 500: Error interno del servidor');
-        print('Detalles: ${response.body}');
-        throw Exception('Error 500: ${response.body}');
       } else {
-        print('Error HTTP no esperado: ${response.statusCode}');
-        print('Detalles: ${response.body}');
-        throw Exception(
-          'Error al guardar comprobante: ${response.statusCode} - ${response.body}',
-        );
+        print('Error al guardar comprobante: ${response.statusCode}');
+        return false;
       }
     } catch (e) {
       print('Error en saveReceipt: $e');
-
-      if (e is SocketException) {
-        print('Error de socket: No se pudo conectar al servidor');
-        print('Detalles: ${e.message}');
-      } else if (e.toString().contains('TimeoutException')) {
-        print(
-          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
-        );
-        print(
-          'Nota: Los servicios en servidores en la nube pueden tener "cold starts" que tardan más en responder la primera vez',
-        );
-      } else if (e is FormatException) {
-        print(
-          'Error de formato: La respuesta no tiene el formato JSON esperado',
-        );
-      }
-
       throw Exception('Error de conexión: $e');
     }
   }
 
-  // NUEVO: Obtener comprobantes filtrados por corresponsal (solo para admin)
+  // Eliminar comprobante (con interceptor)
+  Future<bool> deleteReceipt(String transactionNumber) async {
+    if (transactionNumber.isEmpty) {
+      throw Exception('El número de transacción no puede estar vacío.');
+    }
+
+    try {
+      final url = '$baseUrl/receipts/$transactionNumber';
+      print('Eliminando comprobante: $url');
+
+      final response = await _makeRequestWithRetry('DELETE', url);
+
+      print('Código de respuesta eliminar: ${response.statusCode}');
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        print('Comprobante eliminado exitosamente');
+        return true;
+      } else {
+        print('Error al eliminar comprobante: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('Error en deleteReceipt: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Obtener comprobantes filtrados por corresponsal (con interceptor)
   Future<List<Receipt>> getReceiptsByCorresponsal(String codigoCorresponsal) async {
     try {
       final url = '$baseUrl/receipts/corresponsal/$codigoCorresponsal';
       print('Obteniendo comprobantes por corresponsal: $url');
 
-      final response = await _retryableRequest('GET', url);
+      final response = await _makeRequestWithRetry('GET', url);
 
       print('Código de respuesta: ${response.statusCode}');
 
@@ -330,13 +306,13 @@ class ApiService {
     }
   }
 
-  // NUEVO: Obtener lista de corresponsales disponibles (solo para admin)
+  // Obtener lista de corresponsales disponibles (con interceptor)
   Future<List<String>> getAvailableCorresponsales() async {
     try {
       final url = '$baseUrl/receipts/corresponsales';
       print('Obteniendo corresponsales disponibles: $url');
 
-      final response = await _retryableRequest('GET', url);
+      final response = await _makeRequestWithRetry('GET', url);
 
       print('Código de respuesta: ${response.statusCode}');
 
@@ -355,163 +331,156 @@ class ApiService {
     }
   }
 
-  // Eliminar un comprobante por número de transacción
-  Future<bool> deleteReceipt(String transactionNumber) async {
-    if (transactionNumber.isEmpty) {
-      throw Exception('El número de transacción no puede estar vacío.');
-    }
-
+  // NUEVO: Obtener reporte de cierre por fecha (con interceptor)
+  Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
     try {
-      print(
-        'Eliminando comprobante con número de transacción: $transactionNumber',
-      );
-      
-      final response = await _retryableRequest(
-        'DELETE', 
-        '$baseUrl/receipts/$transactionNumber'
-      );
+      final dateStr = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      final url = '$baseUrl/receipts/closing-report/$dateStr';
+      print('Obteniendo reporte de cierre: $url');
 
-      print('Respuesta del servidor: ${response.statusCode}');
-      if (response.body.isNotEmpty) {
-        print(
-          'Cuerpo: ${response.body.substring(0, min(200, response.body.length))}...',
-        );
-      }
+      final response = await _makeRequestWithRetry('GET', url);
 
-      if (response.statusCode == 200) {
-        return true;
+      print('Código de respuesta reporte: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        return responseData;
       } else {
-        throw Exception(
-          'Error al eliminar comprobante: ${response.statusCode} - ${response.body}',
-        );
+        // Generar reporte local si el endpoint no existe
+        return await getClosingReportLocal(date);
       }
     } catch (e) {
-      print('Error en deleteReceipt: $e');
+      print('Error al obtener reporte de cierre: $e');
+      // Fallback a reporte local
+      return await getClosingReportLocal(date);
+    }
+  }
 
-      if (e is SocketException) {
-        print('Error de socket: No se pudo conectar al servidor');
-      } else if (e.toString().contains('TimeoutException')) {
-        print(
-          'La conexión al servidor agotó el tiempo de espera (60 segundos)',
-        );
+  // Método alternativo para generar reporte localmente
+  Future<Map<String, dynamic>> getClosingReportLocal(DateTime date) async {
+    try {
+      // Obtener todos los comprobantes
+      final allReceipts = await getAllReceipts();
+      
+      // Filtrar por fecha
+      final dateStr = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+      final receiptsForDate = allReceipts.where((receipt) => receipt.fecha == dateStr).toList();
+      
+      // Calcular totales
+      double total = receiptsForDate.fold(0.0, (sum, receipt) => sum + receipt.valorTotal);
+      
+      // Agrupar por tipo
+      Map<String, dynamic> summary = {};
+      for (var receipt in receiptsForDate) {
+        if (summary[receipt.tipo] == null) {
+          summary[receipt.tipo] = {'count': 0, 'total': 0.0};
+        }
+        summary[receipt.tipo]['count']++;
+        summary[receipt.tipo]['total'] += receipt.valorTotal;
+      }
+      
+      return {
+        'summary': summary,
+        'total': total,
+        'count': receiptsForDate.length,
+        'receipts': receiptsForDate.map((r) => r.toJson()).toList(),
+        'date': dateStr,
+      };
+    } catch (e) {
+      print('Error generando reporte local: $e');
+      return {
+        'summary': {},
+        'total': 0.0,
+        'count': 0,
+        'receipts': [],
+        'date': "${date.day}/${date.month}/${date.year}",
+      };
+    }
+  }
+
+  // Obtener mensajes del usuario (con interceptor)
+  Future<List<Map<String, dynamic>>> getMessages() async {
+    try {
+      final url = '$baseUrl/messages/';
+      print('Obteniendo mensajes: $url');
+
+      final response = await _makeRequestWithRetry('GET', url);
+
+      print('Código de respuesta mensajes: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final Map<String, dynamic> responseData = jsonDecode(response.body);
+        if (responseData.containsKey('data')) {
+          final List<dynamic> messagesJson = responseData['data'];
+          return messagesJson.cast<Map<String, dynamic>>();
+        }
       }
 
+      return [];
+    } catch (e) {
+      print('Error al obtener mensajes: $e');
       throw Exception('Error de conexión: $e');
     }
   }
 
-  // Obtener reporte de cierre
-  Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
+  // Marcar mensaje como leído (con interceptor)
+  Future<bool> markMessageAsRead(String messageId) async {
     try {
-      // Formato de fecha con guiones: dd-MM-yyyy
-      String dateStr =
-          '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+      final url = '$baseUrl/messages/mark-read';
+      print('Marcando mensaje como leído: $url');
 
-      // Imprimir el formato de fecha para verificar
-      print('Formato de fecha enviado: $dateStr');
+      final response = await _makeRequestWithRetry('POST', url, body: {
+        'message_id': messageId,
+      });
 
-      // Revisar la ruta completa
-      final String url = '$baseUrl/receipts/report/$dateStr';
-      print('URL del reporte: $url');
+      print('Código de respuesta marcar leído: ${response.statusCode}');
 
-      // Añadir logs detallados
-      print('Enviando solicitud GET a: $url');
-      print('Headers: ${getHeaders()}');
-
-      final response = await _retryableRequest('GET', url);
-
-      print('Código de respuesta: ${response.statusCode}');
-      print('Cuerpo de respuesta: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        print('Datos del reporte recibidos: $jsonResponse');
-        return jsonResponse;
-      } else {
-        // Manejar específicamente el error 404
-        if (response.statusCode == 404) {
-          print(
-            'Error 404: No se encontró la ruta o no hay datos para la fecha $dateStr',
-          );
-          return {
-            'summary': {},
-            'total': 0.0,
-            'date': date.toString(),
-            'count': 0,
-            'error': 'No se encontraron datos para la fecha especificada',
-          };
-        } else {
-          throw Exception(
-            'Error en la respuesta del servidor: ${response.statusCode} - ${response.body}',
-          );
-        }
-      }
+      return response.statusCode == 200;
     } catch (e) {
-      print('Error en getClosingReport: $e');
-
-      return {
-        'summary': {},
-        'total': 0.0,
-        'date': date.toString(),
-        'count': 0,
-        'error': 'Error de conexión: $e',
-      };
+      print('Error al marcar mensaje como leído: $e');
+      return false;
     }
   }
 
-  // NUEVO: Obtener reporte de cierre por corresponsal (solo para admin)
-  Future<Map<String, dynamic>> getClosingReportByCorresponsal(
-    DateTime date, 
-    String codigoCorresponsal
-  ) async {
+  // Obtener datos de usuario (con interceptor)
+  Future<Map<String, dynamic>> getUserData() async {
     try {
-      // Formato de fecha con guiones: dd-MM-yyyy
-      String dateStr =
-          '${date.day.toString().padLeft(2, '0')}-${date.month.toString().padLeft(2, '0')}-${date.year}';
+      final url = '$baseUrl/auth/me';
+      print('Obteniendo datos de usuario: $url');
 
-      final String url = '$baseUrl/receipts/report/$dateStr/corresponsal/$codigoCorresponsal';
-      print('URL del reporte por corresponsal: $url');
+      final response = await _makeRequestWithRetry('GET', url);
 
-      final response = await _retryableRequest('GET', url);
-
-      print('Código de respuesta: ${response.statusCode}');
+      print('Código de respuesta getUserData: ${response.statusCode}');
 
       if (response.statusCode == 200) {
-        final jsonResponse = jsonDecode(response.body);
-        print('Datos del reporte por corresponsal recibidos: $jsonResponse');
-        return jsonResponse;
+        return jsonDecode(response.body);
       } else {
-        if (response.statusCode == 404) {
-          return {
-            'summary': {},
-            'total': 0.0,
-            'date': date.toString(),
-            'count': 0,
-            'corresponsal': codigoCorresponsal,
-            'error': 'No se encontraron datos para el corresponsal en esta fecha',
-          };
-        } else {
-          throw Exception(
-            'Error en la respuesta del servidor: ${response.statusCode} - ${response.body}',
-          );
-        }
+        throw Exception('Error al obtener datos de usuario: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error en getClosingReportByCorresponsal: $e');
-
-      return {
-        'summary': {},
-        'total': 0.0,
-        'date': date.toString(),
-        'count': 0,
-        'corresponsal': codigoCorresponsal,
-        'error': 'Error de conexión: $e',
-      };
+      print('Error en getUserData: $e');
+      throw Exception('Error de conexión: $e');
     }
   }
 
-  // Helper function for min (used in truncating logs)
+  // Verificar conectividad básica
+  Future<bool> checkConnectivity() async {
+    try {
+      final url = '$baseUrl/auth/me';
+      final response = await http.get(
+        Uri.parse(url),
+        headers: getHeaders(),
+      ).timeout(Duration(seconds: 10));
+      
+      return response.statusCode != 500; // Cualquier cosa menos error de servidor
+    } catch (e) {
+      print('Error de conectividad: $e');
+      return false;
+    }
+  }
+
+  // Función auxiliar para mínimo
   int min(int a, int b) {
-    return (a < b) ? a : b;
+    return a < b ? a : b;
   }
 }
