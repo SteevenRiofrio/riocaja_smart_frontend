@@ -9,7 +9,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 
 class MessageService {
   // CORREGIDO: URL base con barra final
-  String baseUrl = 'http://34.71.113.185:8080/api/v1/messages/';
+  String baseUrl = 'http://34.57.174.38:8080/api/v1/messages/';
   String? _authToken;
   BuildContext? _context;
   

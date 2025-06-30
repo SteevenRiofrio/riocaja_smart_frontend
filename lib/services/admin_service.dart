@@ -8,7 +8,7 @@ import 'package:riocaja_smart/screens/login_screen.dart';
 
 class AdminService {
   // Misma base URL que usamos para el API
-  String baseUrl = 'http://34.71.113.185:8080/api/v1/auth';
+  String baseUrl = 'http://34.57.174.38:8080/api/v1/auth';
   String? _authToken;
   BuildContext? _context;
   
