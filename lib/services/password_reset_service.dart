@@ -50,7 +50,8 @@ class PasswordResetService {
   // Verificar código de recuperación
   Future<Map<String, dynamic>> verifyResetCode(String email, String code) async {
     try {
-      final url = '${_apiService.baseUrl}/auth/verify-reset-code';
+      final url = '${_apiService.baseUrl}/password-reset/verify-reset-code';
+
       
       final response = await http.post(
         Uri.parse(url),
@@ -97,7 +98,8 @@ class PasswordResetService {
     String newPassword
   ) async {
     try {
-      final url = '${_apiService.baseUrl}/auth/reset-password';
+      final url = '${_apiService.baseUrl}/password-reset/reset-password';
+
       
       final response = await http.post(
         Uri.parse(url),
@@ -140,7 +142,7 @@ class PasswordResetService {
   // Obtener estadísticas de reset
   Future<Map<String, dynamic>> getResetStats(String email) async {
     try {
-      final url = '${_apiService.baseUrl}/auth/reset-stats/${Uri.encodeComponent(email)}';
+      final url = '${_apiService.baseUrl}/password-reset/reset-stats/${Uri.encodeComponent(email)}';
       
       final response = await http.get(
         Uri.parse(url),
