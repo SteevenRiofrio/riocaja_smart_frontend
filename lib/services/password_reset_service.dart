@@ -9,7 +9,7 @@ class PasswordResetService {
   // Solicitar código de recuperación
   Future<Map<String, dynamic>> requestPasswordReset(String email) async {
     try {
-      final url = '${_apiService.baseUrl}/auth/forgot-password';
+      final url = '${_apiService.baseUrl}/password-reset/forgot-password';
       
       final response = await http.post(
         Uri.parse(url),
