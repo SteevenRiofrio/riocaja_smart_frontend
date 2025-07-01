@@ -1,4 +1,4 @@
-// lib/screens/home_screen.dart - VERSIÓN SIN SALUDOS NI BIENVENIDAS
+// lib/screens/home_screen.dart - VERSIÓN CON INTERFAZ MODERNA GRID 2x2
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/screens/scanner_screen.dart';
 import 'package:riocaja_smart/screens/history_screen.dart';
@@ -50,8 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context, authProvider, child) {
         return Scaffold(
           appBar: AppBar(
-            title: Text('RíoCaja Smart',style: TextStyle(color: Colors.white),),
-            
+            title: Text('RíoCaja Smart', style: TextStyle(color: Colors.white)),
             actions: [
               IconButton(
                 icon: Icon(Icons.refresh),
@@ -82,61 +81,87 @@ class _HomeScreenState extends State<HomeScreen> {
                   DashboardSummary(),
                   SizedBox(height: 20),
 
-                  // Botones de acción solo para lectores
+                  // Interfaz moderna para usuarios lector - Grid 2x2
                   if (authProvider.hasRole('lector')) ...[
                     Text(
                       'Acciones Rápidas',
                       style: TextStyle(
-                        fontSize: 16,
+                        fontSize: 18,
                         fontWeight: FontWeight.bold,
+                        color: Colors.grey.shade800,
                       ),
                     ),
-                    SizedBox(height: 12),
-                    _buildActionButton(
-                      context,
-                      'Escanear Comprobante',
-                      Icons.document_scanner,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ScannerScreen(),
+                    SizedBox(height: 16),
+                    
+                    // Grid 2x2 con tarjetas modernas
+                    GridView.count(
+                      shrinkWrap: true,
+                      physics: NeverScrollableScrollPhysics(),
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.1,
+                      children: [
+                        // Escanear Ahora
+                        _buildModernActionCard(
+                          context: context,
+                          title: 'ESCANEAR',
+                          subtitle: 'AHORA',
+                          icon: Icons.document_scanner,
+                          iconSecondary: Icons.flash_on,
+                          color: Colors.green.shade600,
+                          gradientColors: [Colors.green.shade400, Colors.green.shade700],
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ScannerScreen()),
+                          ),
                         ),
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    _buildActionButton(
-                      context,
-                      'Historial de Comprobantes',
-                      Icons.history,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => HistoryScreen(),
+                        
+                        // Historial Completo
+                        _buildModernActionCard(
+                          context: context,
+                          title: 'HISTORIAL',
+                          subtitle: 'COMPLETO',
+                          icon: Icons.history,
+                          iconSecondary: Icons.list_alt,
+                          color: Colors.blue.shade600,
+                          gradientColors: [Colors.blue.shade400, Colors.blue.shade700],
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => HistoryScreen()),
+                          ),
                         ),
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    _buildActionButton(
-                      context,
-                      'Generar Reporte de Cierre',
-                      Icons.summarize,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => ReportScreen()),
-                      ),
-                    ),
-                    SizedBox(height: 12),
-                    // NUEVO BOTÓN AGREGADO AQUÍ
-                    _buildActionButton(
-                      context,
-                      'Generar Reportes en Excel',
-                      Icons.table_chart,
-                      () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => ExcelReportsScreen(),
+                        
+                        // Reportes PDF
+                        _buildModernActionCard(
+                          context: context,
+                          title: 'REPORTE',
+                          subtitle: 'PDF',
+                          icon: Icons.picture_as_pdf,
+                          iconSecondary: Icons.file_present,
+                          color: Colors.red.shade600,
+                          gradientColors: [Colors.red.shade400, Colors.red.shade700],
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ReportScreen()),
+                          ),
                         ),
-                      ),
+                        
+                        // Reportes Excel
+                        _buildModernActionCard(
+                          context: context,
+                          title: 'REPORTES',
+                          subtitle: 'EXCEL',
+                          icon: Icons.table_chart,
+                          iconSecondary: Icons.analytics,
+                          color: Colors.orange.shade600,
+                          gradientColors: [Colors.orange.shade400, Colors.orange.shade700],
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ExcelReportsScreen()),
+                          ),
+                        ),
+                      ],
                     ),
                     SizedBox(height: 20),
                   ],
@@ -151,6 +176,114 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Método para crear tarjetas modernas de acción
+  Widget _buildModernActionCard({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required IconData iconSecondary,
+    required Color color,
+    required List<Color> gradientColors,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: Duration(milliseconds: 200),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.3),
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: onTap,
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Iconos apilados con efecto
+                    Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Icono de fondo con opacidad
+                        Icon(
+                          iconSecondary,
+                          size: 45,
+                          color: Colors.white.withOpacity(0.3),
+                        ),
+                        // Icono principal
+                        Icon(
+                          icon,
+                          size: 32,
+                          color: Colors.white,
+                        ),
+                      ],
+                    ),
+                    
+                    SizedBox(height: 12),
+                    
+                    // Título principal
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    
+                    // Subtítulo
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.9),
+                        letterSpacing: 0.3,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    
+                    SizedBox(height: 8),
+                    
+                    // Indicador de acción
+                    Container(
+                      width: 30,
+                      height: 3,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Método legacy mantenido para compatibilidad (puede eliminarse)
   Widget _buildActionButton(
     BuildContext context,
     String title,
@@ -168,7 +301,7 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           Icon(icon),
           SizedBox(width: 12),
-          Text(title, style: TextStyle(fontSize: 16,color: Colors.white,)),
+          Text(title, style: TextStyle(fontSize: 16, color: Colors.white)),
         ],
       ),
     );
