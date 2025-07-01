@@ -199,7 +199,7 @@ class AdminService {
       print('Aprobando usuario $userId con código: $codigoCorresponsal');
       final response = await _retryableRequest(
         'POST',
-        '$baseUrl/approve-user-with-code',
+        '$baseUrl/approve-user',
         body: {
           'user_id': userId,
           'codigo_corresponsal': codigoCorresponsal,
