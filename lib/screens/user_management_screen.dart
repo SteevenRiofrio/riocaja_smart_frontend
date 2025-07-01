@@ -801,57 +801,62 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
   }
 
   void _showChangeStateDialog(BuildContext context, Map<String, dynamic> user) {
-    final currentState = user['estado'] ?? 'activo';
-    String newState = currentState;
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('Cambiar Estado del Usuario'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Usuario: ${user['nombre']}'),
-                Text('Estado actual: ${currentState.toUpperCase()}'),
-                SizedBox(height: 16),
-                Text('Nuevo estado:', style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: newState,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.admin_panel_settings),
-                  ),
-                  items: [
-                    DropdownMenuItem(value: 'activo', child: Text('Activo')),
-                    DropdownMenuItem(value: 'suspendido', child: Text('Suspendido')),
-                    DropdownMenuItem(value: 'inactivo', child: Text('Inactivo')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        newState = value;
-                      });
-                    }
-                  },
+  final currentState = user['estado'] ?? 'pendiente';
+  String newState = currentState;
+  
+  showDialog(
+    context: context,
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (context, setState) {
+        return AlertDialog(
+          title: Text('Cambiar Estado del Usuario'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Usuario: ${user['nombre']}'),
+              Text('Estado actual: ${currentState.toUpperCase()}'),
+              SizedBox(height: 16),
+              Text('Nuevo estado:', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: newState,
+                decoration: InputDecoration(
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.toggle_on),
                 ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('Cancelar'),
+                items: [
+                  DropdownMenuItem(value: 'activo', child: Text('Activo')),
+                  DropdownMenuItem(value: 'suspendido', child: Text('Suspendido')),
+                  DropdownMenuItem(value: 'inactivo', child: Text('Inactivo')),
+                  DropdownMenuItem(value: 'pendiente', child: Text('Pendiente')),
+                ],
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      newState = value;
+                    });
+                  }
+                },
               ),
-              ElevatedButton(
-                onPressed: newState == currentState ? null : () async {
-                  Navigator.of(context).pop();
-                  
-                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-                  final success = await adminProvider.changeUserState(user['_id'], newState);
-                  
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: newState == currentState ? null : () async {
+                // Cerrar diálogo primero
+                Navigator.of(dialogContext).pop();
+                
+                // Usar el context original, no el del diálogo
+                final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+                final success = await adminProvider.changeUserState(user['_id'], newState);
+                
+                // Verificar que el widget aún esté montado antes de mostrar SnackBar
+                if (mounted) {
                   if (success) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -868,15 +873,16 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                       ),
                     );
                   }
-                },
-                child: Text('Cambiar Estado'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
+                }
+              },
+              child: Text('Cambiar Estado'),
+            ),
+          ],
+        );
+      },
+    ),
+  );
+}
 
   void _showChangeRoleDialog(BuildContext context, Map<String, dynamic> user) {
     final currentRole = user['rol'] ?? 'lector';
