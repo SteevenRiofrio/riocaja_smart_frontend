@@ -1,4 +1,3 @@
-// lib/providers/auth_provider.dart - COMPLETO CON REFRESH TOKENS
 import 'package:flutter/foundation.dart';
 import 'package:riocaja_smart/models/user.dart';
 import 'package:riocaja_smart/services/auth_service.dart';
@@ -358,7 +357,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
   
-  // ← NUEVO: Método para verificar si el token está próximo a expirar
 Future<bool> isTokenNearExpiration() async {
   // Verificar si el token expira en los próximos 5 minutos
   try {
@@ -381,7 +379,6 @@ Future<bool> isTokenNearExpiration() async {
     }
   }
   
-  // ← NUEVO: Método para obtener información del usuario actualizada
   Future<Map<String, dynamic>?> getCurrentUserData() async {
     try {
       final userData = await _authService.getUserData();
@@ -394,8 +391,7 @@ Future<bool> isTokenNearExpiration() async {
       return null;
     }
   }
-  
-  // ← NUEVO: Método para verificar conectividad con el servidor
+
   Future<bool> checkServerConnectivity() async {
     try {
       return await _apiService.checkConnectivity();
@@ -404,4 +400,114 @@ Future<bool> isTokenNearExpiration() async {
       return false;
     }
   }
+
+  // Agregar este método en lib/providers/auth_provider.dart
+
+// NUEVO: Método para verificar el estado del usuario periódicamente
+Future<bool> checkUserStatus() async {
+  if (_user == null || _user!.token.isEmpty) {
+    return false;
+  }
+  
+  try {
+    final userData = await _authService.getUserData();
+    
+    if (userData['success']) {
+      final userInfo = userData['data']['data'];
+      final currentState = userInfo['estado'] ?? 'pendiente';
+      
+      // Si el usuario no está activo, cerrar sesión automáticamente
+      if (currentState != 'activo') {
+        print('AuthProvider: Usuario con estado $currentState detectado - cerrando sesión');
+        
+        // Mostrar mensaje específico
+        String message = _getStateMessage(currentState);
+        
+        // Cerrar sesión
+        await logout();
+        
+        // Mostrar notificación
+        _errorMessage = message;
+        notifyListeners();
+        
+        return false;
+      }
+      
+      // Actualizar información del usuario si está activo
+      _user = _user!.copyWith(
+        nombre: userInfo['nombre'] ?? _user!.nombre,
+        rol: userInfo['rol'] ?? _user!.rol,
+        perfilCompleto: userInfo['perfil_completo'] ?? _user!.perfilCompleto,
+        codigoCorresponsal: userInfo['codigo_corresponsal'],
+        nombreLocal: userInfo['nombre_local'],
+      );
+      
+      return true;
+    }
+    
+    return false;
+  } catch (e) {
+    print('Error al verificar estado del usuario: $e');
+    return false;
+  }
+}
+
+// NUEVO: Obtener mensaje según el estado
+String _getStateMessage(String state) {
+  switch (state.toLowerCase()) {
+    case 'pendiente':
+      return 'Su cuenta está pendiente de aprobación. Contacte al administrador.';
+    case 'suspendido':
+      return 'Su cuenta ha sido suspendida. Contacte al administrador.';
+    case 'inactivo':
+      return 'Su cuenta está inactiva. Contacte al administrador.';
+    case 'rechazado':
+      return 'Su cuenta ha sido rechazada. Contacte al administrador.';
+    default:
+      return 'Su cuenta no está disponible. Contacte al administrador.';
+  }
+}
+
+Future<bool> checkAndRefreshToken() async {
+  if (_user == null || _user!.token.isEmpty) {
+    return false;
+  }
+  
+  try {
+    // Verificar estado del usuario
+    final isActive = await checkUserStatus();
+    if (!isActive) {
+      return false;
+    }
+    
+    // Resto del código existente...
+    final userData = await _authService.getUserData();
+    
+    if (userData['success']) {
+      final userInfo = userData['data']['data'];
+      
+      // Solo verificar perfil completo para usuarios normales
+      if (_user!.rol != 'admin' && _user!.rol != 'operador') {
+        _perfilCompleto = userInfo['perfil_completo'] ?? false;
+        _codigoCorresponsal = userInfo['codigo_corresponsal'];
+        
+        if (!_perfilCompleto && _authStatus == AuthStatus.authenticated) {
+          _authStatus = AuthStatus.needsProfileCompletion;
+          notifyListeners();
+        } else if (_perfilCompleto && _authStatus == AuthStatus.needsProfileCompletion) {
+          _authStatus = AuthStatus.authenticated;
+          notifyListeners();
+        }
+      }
+      
+      return true;
+    }
+    
+    return false;
+  } catch (e) {
+    print('Error al verificar token: $e');
+    return true; // En caso de error de red, asumir que el token es válido
+  }
+}
+
 }

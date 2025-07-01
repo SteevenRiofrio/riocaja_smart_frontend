@@ -74,52 +74,133 @@ class ApiService {
     return headers;
   }
 
-  // Método para hacer peticiones HTTP con interceptor de refresh automático
   Future<http.Response> _makeRequestWithRetry(
-    String method,
-    String url, {
-    Map<String, dynamic>? body,
-    Map<String, String>? customHeaders,
-    int maxRetries = 3,
-  }) async {
-    
-    // Primera petición
-    http.Response response = await _makeRawRequest(method, url, body: body, customHeaders: customHeaders);
-    
-    // Si es 401 (token expirado), intentar refresh automático
-    if (response.statusCode == 401 && _authService != null) {
-      print('Token expirado (401), intentando renovar automáticamente...');
-      
-      bool refreshSuccess = await _authService!.refreshAccessToken();
-      
-      if (refreshSuccess) {
-        print('Token renovado exitosamente, reintentando petición...');
+  String method,
+  String url, {
+  Map<String, dynamic>? body,
+  Map<String, String>? customHeaders,
+  int maxRetries = 3,
+}) async {
+  int retryCount = 0;
+  Duration retryDelay = Duration(seconds: 2);
+
+  while (true) {
+    try {
+      http.Response response;
+      final headers = customHeaders ?? getHeaders();
+
+      switch (method.toUpperCase()) {
+        case 'GET':
+          response = await http.get(Uri.parse(url), headers: headers)
+              .timeout(Duration(seconds: 60));
+          break;
+        case 'POST':
+          response = await http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          ).timeout(Duration(seconds: 60));
+          break;
+        case 'PUT':
+          response = await http.put(
+            Uri.parse(url),
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          ).timeout(Duration(seconds: 60));
+          break;
+        case 'DELETE':
+          response = await http.delete(Uri.parse(url), headers: headers)
+              .timeout(Duration(seconds: 60));
+          break;
+        default:
+          throw Exception('Método HTTP no soportado: $method');
+      }
+
+      print('ApiService: Respuesta ${response.statusCode} de $url');
+
+      // NUEVO: Verificar errores específicos de estado de cuenta
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        print('Error ${response.statusCode}: ${response.body}');
         
-        // Actualizar token en ApiService
-        _authToken = _authService!.token;
-        
-        // Actualizar token en AuthProvider si está disponible
-        if (_context != null) {
-          final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-          authProvider.syncTokensAfterRefresh();
-        }
-        
-        // Reintentar la petición original con el nuevo token
-        response = await _makeRawRequest(method, url, body: body, customHeaders: customHeaders);
-        
-        if (response.statusCode != 401) {
-          print('Petición exitosa después de renovar token');
-          return response;
+        try {
+          final errorData = jsonDecode(response.body);
+          final errorMessage = errorData['detail'] ?? 'Error de autenticación';
+          
+          // Verificar si es un error de estado de cuenta
+          if (errorMessage.contains('pendiente') || 
+              errorMessage.contains('suspendido') || 
+              errorMessage.contains('inactivo') ||
+              errorMessage.contains('rechazado')) {
+            
+            print('ApiService: Usuario con cuenta no activa detectado');
+            
+            // Forzar logout en el AuthProvider
+            if (_context != null) {
+              final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+              await authProvider.logout();
+              
+              // Redirigir a login con mensaje
+              Future.microtask(() {
+                if (_context != null) {
+                  ScaffoldMessenger.of(_context!).showSnackBar(
+                    SnackBar(
+                      content: Text(errorMessage),
+                      backgroundColor: Colors.red,
+                      duration: Duration(seconds: 5),
+                    ),
+                  );
+                  
+                  Navigator.of(_context!).pushAndRemoveUntil(
+                    MaterialPageRoute(builder: (context) => LoginScreen()),
+                    (route) => false,
+                  );
+                }
+              });
+            }
+          }
+        } catch (e) {
+          print('Error al procesar respuesta de error: $e');
         }
       }
+
+      // Manejar refresh automático para otros errores 401
+      if (response.statusCode == 401 && !url.contains('/login') && !url.contains('/refresh')) {
+        print('Error 401: Intentando refresh automático');
+        
+        if (_authService != null) {
+          final refreshSuccess = await _authService!.refreshAccessToken();
+          if (refreshSuccess) {
+            print('ApiService: Token renovado automáticamente, reintentando petición');
+            _authToken = _authService!.currentUser?.token;
+            continue; // Reintentar la petición con el nuevo token
+          }
+        }
+        
+        print('ApiService: No se pudo renovar token, cerrando sesión');
+        if (_context != null) {
+          final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+          await authProvider.logout();
+          _redirectToLogin('Sesión expirada. Por favor inicie sesión nuevamente.');
+        }
+      }
+
+      return response;
       
-      // Si el refresh falló o sigue dando 401, cerrar sesión
-      print('No se pudo renovar el token, cerrando sesión...');
-      await _handleLogout();
+    } catch (e) {
+      retryCount++;
+      print('ApiService: Error en petición (intento $retryCount): $e');
+      
+      if (retryCount >= maxRetries) {
+        print('ApiService: Máximo de reintentos alcanzado para $url');
+        rethrow;
+      }
+      
+      print('ApiService: Reintentando en ${retryDelay.inSeconds} segundos...');
+      await Future.delayed(retryDelay);
+      retryDelay *= 2; // Backoff exponencial
     }
-    
-    return response;
   }
+}
 
   // Método auxiliar para hacer peticiones HTTP básicas (sin interceptor)
   Future<http.Response> _makeRawRequest(
