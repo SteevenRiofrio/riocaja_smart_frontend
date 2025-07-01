@@ -14,7 +14,7 @@ enum AuthStatus {
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
   final ApiService _apiService = ApiService(); // ← Para sincronización
-  
+
   AuthStatus _authStatus = AuthStatus.uninitialized;
   User? _user;
   String _errorMessage = '';
@@ -22,7 +22,7 @@ class AuthProvider with ChangeNotifier {
   bool _rememberMe = true;
   bool _perfilCompleto = false;
   String? _codigoCorresponsal;
-  
+
   // Getters
   AuthStatus get authStatus => _authStatus;
   User? get user => _user;
@@ -32,34 +32,35 @@ class AuthProvider with ChangeNotifier {
   bool get rememberMe => _rememberMe;
   bool get perfilCompleto => _perfilCompleto;
   String? get codigoCorresponsal => _codigoCorresponsal;
-  bool get needsProfileCompletion => _authStatus == AuthStatus.needsProfileCompletion;
-  
+  bool get needsProfileCompletion =>
+      _authStatus == AuthStatus.needsProfileCompletion;
+
   // Getter para ApiService
   ApiService get apiService => _apiService;
-  
+
   // Constructor
   AuthProvider() {
     print('Inicializando AuthProvider...');
     _initializeAuth();
   }
-  
+
   Future<void> _initializeAuth() async {
     _isLoading = true;
     notifyListeners();
-    
+
     try {
       final prefs = await SharedPreferences.getInstance();
       _rememberMe = prefs.getBool(AuthService.REMEMBER_ME_KEY) ?? true;
-      
+
       final success = await _authService.init();
-      
+
       if (success) {
         _user = _authService.currentUser;
         _authStatus = AuthStatus.authenticated;
-        
+
         // Sincronizar tokens con ApiService
         _syncTokensWithApiService();
-        
+
         print('AuthProvider: Usuario autenticado: ${_user!.nombre}');
       } else {
         _authStatus = AuthStatus.unauthenticated;
@@ -69,11 +70,11 @@ class AuthProvider with ChangeNotifier {
       print('Error al inicializar AuthProvider: $e');
       _authStatus = AuthStatus.unauthenticated;
     }
-    
+
     _isLoading = false;
     notifyListeners();
   }
-  
+
   // Método para sincronizar tokens con ApiService
   void _syncTokensWithApiService() {
     if (_user != null && _user!.token.isNotEmpty) {
@@ -82,7 +83,7 @@ class AuthProvider with ChangeNotifier {
       print('AuthProvider: Tokens sincronizados con ApiService');
     }
   }
-  
+
   // Método para sincronizar después de refresh automático
   void syncTokensAfterRefresh() {
     if (_authService.isAuthenticated() && _authService.currentUser != null) {
@@ -92,18 +93,28 @@ class AuthProvider with ChangeNotifier {
       print('AuthProvider: Tokens sincronizados después de refresh automático');
     }
   }
-  
+
   // Registro de usuario
-  Future<bool> register(String nombre, String email, String password, {String rol = 'lector'}) async {
+  Future<bool> register(
+    String nombre,
+    String email,
+    String password, {
+    String rol = 'lector',
+  }) async {
     try {
       _isLoading = true;
       _errorMessage = '';
       notifyListeners();
-      
-      final result = await _authService.register(nombre, email, password, rol: rol);
-      
+
+      final result = await _authService.register(
+        nombre,
+        email,
+        password,
+        rol: rol,
+      );
+
       _isLoading = false;
-      
+
       if (result['success']) {
         notifyListeners();
         return true;
@@ -119,26 +130,26 @@ class AuthProvider with ChangeNotifier {
       return false;
     }
   }
-  
+
   // Login de usuario con refresh tokens
   Future<bool> login(String email, String password) async {
     try {
       _isLoading = true;
       _errorMessage = '';
       notifyListeners();
-      
+
       // Cerrar sesión anterior si existe
       await logout();
-      
+
       final result = await _authService.login(email, password);
-      
+
       _isLoading = false;
-      
+
       if (result['success']) {
         _user = User.fromJson(result['user']);
         _perfilCompleto = result['perfil_completo'] ?? false;
         _codigoCorresponsal = result['codigo_corresponsal'];
-        
+
         // Determinar estado de autenticación basado en el rol
         if (_user!.rol == 'admin' || _user!.rol == 'operador') {
           // Admin y operadores van directo al dashboard
@@ -154,12 +165,12 @@ class AuthProvider with ChangeNotifier {
             print('AuthProvider: Usuario normal - necesita completar perfil');
           }
         }
-        
+
         // Sincronizar tokens con ApiService
         _syncTokensWithApiService();
-        
+
         await _authService.setRememberMe(_rememberMe);
-        
+
         notifyListeners();
         return true;
       } else {
@@ -188,19 +199,19 @@ class AuthProvider with ChangeNotifier {
       _isLoading = true;
       _errorMessage = '';
       notifyListeners();
-      
+
       final success = await _authService.completeProfile(
         codigoCorresponsal: codigoCorresponsal,
         nombreLocal: nombreLocal,
         nombreCompleto: nombreCompleto,
         password: password,
       );
-      
+
       if (success) {
         _perfilCompleto = true;
         _authStatus = AuthStatus.authenticated;
         _codigoCorresponsal = codigoCorresponsal;
-        
+
         // Actualizar usuario con datos completos
         if (_user != null) {
           _user = _user!.copyWith(
@@ -210,12 +221,12 @@ class AuthProvider with ChangeNotifier {
             nombreLocal: nombreLocal,
           );
         }
-        
+
         print('AuthProvider: Perfil completado exitosamente');
       } else {
         _errorMessage = 'Error al completar perfil';
       }
-      
+
       _isLoading = false;
       notifyListeners();
       return success;
@@ -242,31 +253,33 @@ class AuthProvider with ChangeNotifier {
     if (_user == null || _user!.token.isEmpty) {
       return false;
     }
-    
+
     try {
       final userData = await _authService.getUserData();
-      
+
       if (userData['success']) {
         final userInfo = userData['data']['data'];
         final currentState = userInfo['estado'] ?? 'pendiente';
-        
+
         // Si el usuario no está activo, cerrar sesión automáticamente
         if (currentState != 'activo') {
-          print('AuthProvider: Usuario con estado $currentState detectado - cerrando sesión');
-          
+          print(
+            'AuthProvider: Usuario con estado $currentState detectado - cerrando sesión',
+          );
+
           // Mostrar mensaje específico
           String message = _getStateMessage(currentState);
-          
+
           // Cerrar sesión
           await logout();
-          
+
           // Mostrar notificación
           _errorMessage = message;
           notifyListeners();
-          
+
           return false;
         }
-        
+
         // Actualizar información del usuario si está activo
         _user = _user!.copyWith(
           nombre: userInfo['nombre'] ?? _user!.nombre,
@@ -275,10 +288,10 @@ class AuthProvider with ChangeNotifier {
           codigoCorresponsal: userInfo['codigo_corresponsal'],
           nombreLocal: userInfo['nombre_local'],
         );
-        
+
         return true;
       }
-      
+
       return false;
     } catch (e) {
       print('Error al verificar estado del usuario: $e');
@@ -302,62 +315,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // CORREGIDO: Verificar y renovar token con validación de estado
-  Future<bool> checkAndRefreshToken() async {
-    if (_user == null || _user!.token.isEmpty) {
-      return false;
-    }
-    
-    try {
-      // PRIMERO: Verificar estado del usuario
-      final isActive = await checkUserStatus();
-      if (!isActive) {
-        return false;
-      }
-      
-      // SEGUNDO: Verificar datos del usuario y perfil
-      final userData = await _authService.getUserData();
-      
-      if (userData['success']) {
-        final userInfo = userData['data']['data'];
-        
-        // Solo verificar perfil completo para usuarios normales
-        if (_user!.rol != 'admin' && _user!.rol != 'operador') {
-          _perfilCompleto = userInfo['perfil_completo'] ?? false;
-          _codigoCorresponsal = userInfo['codigo_corresponsal'];
-          
-          if (!_perfilCompleto && _authStatus == AuthStatus.authenticated) {
-            _authStatus = AuthStatus.needsProfileCompletion;
-            notifyListeners();
-          } else if (_perfilCompleto && _authStatus == AuthStatus.needsProfileCompletion) {
-            _authStatus = AuthStatus.authenticated;
-            notifyListeners();
-          }
-        }
-        
-        // Actualizar usuario con datos más recientes
-        _user = _user!.copyWith(
-          nombre: userInfo['nombre'] ?? _user!.nombre,
-          perfilCompleto: _perfilCompleto,
-          codigoCorresponsal: _codigoCorresponsal,
-          nombreLocal: userInfo['nombre_local'],
-        );
-        
-        return true;
-      }
-      
-      // Si getUserData falló, el AuthService automáticamente intentó el refresh
-      // Si estamos aquí, significa que el refresh también falló
-      print('No se pudo verificar token ni hacer refresh - cerrando sesión');
-      await logout();
-      return false;
-    } catch (e) {
-      print('Error al verificar token: $e');
-      // En caso de error de red, asumir que el token es válido
-      return true;
-    }
-  }
-  
   // Método para forzar refresh de token manualmente
   Future<bool> refreshToken() async {
     try {
@@ -374,25 +331,25 @@ class AuthProvider with ChangeNotifier {
       return false;
     }
   }
-  
+
   // Establecer preferencia de recordar sesión
   Future<void> setRememberMe(bool value) async {
     _rememberMe = value;
     await _authService.setRememberMe(value);
     notifyListeners();
   }
-  
+
   // Logout con limpieza completa
   Future<void> logout() async {
     _isLoading = true;
     notifyListeners();
-    
+
     // Limpiar AuthService
     await _authService.logout();
-    
+
     // Limpiar ApiService
     _apiService.setAuthToken(null);
-    
+
     // Limpiar estado local
     _user = null;
     _authStatus = AuthStatus.unauthenticated;
@@ -400,34 +357,36 @@ class AuthProvider with ChangeNotifier {
     _codigoCorresponsal = null;
     _errorMessage = '';
     _isLoading = false;
-    
+
     print('AuthProvider: Logout completo - todos los tokens eliminados');
     notifyListeners();
   }
-  
+
   // Actualizar URL base
   void updateBaseUrl(String newUrl) {
     _apiService.updateBaseUrl(newUrl);
   }
-  
+
   // Verificar si el usuario tiene un rol específico
   bool hasRole(String role) {
     if (_user == null) return false;
     return _user!.rol == role;
   }
-  
+
   // Método para manejar errores de autenticación global
   void handleAuthError(String error) {
     _errorMessage = error;
     notifyListeners();
-    
+
     // Si es un error de token, intentar logout
-    if (error.contains('token') || error.contains('401') || error.contains('unauthorized')) {
+    if (error.contains('token') ||
+        error.contains('401') ||
+        error.contains('unauthorized')) {
       print('AuthProvider: Error de autenticación detectado - cerrando sesión');
       logout();
     }
   }
-  
+
   // Verificar si el token está próximo a expirar
   Future<bool> isTokenNearExpiration() async {
     try {
@@ -435,14 +394,14 @@ class AuthProvider with ChangeNotifier {
       final expiryTime = prefs.getInt(AuthService.TOKEN_EXPIRY_KEY) ?? 0;
       final now = DateTime.now().millisecondsSinceEpoch;
       final fiveMinutesFromNow = now + (5 * 60 * 1000); // 5 minutos
-      
+
       return expiryTime > 0 && expiryTime <= fiveMinutesFromNow;
     } catch (e) {
       print('Error verificando expiración de token: $e');
       return false;
     }
   }
-  
+
   // Método para renovación proactiva de token
   Future<void> proactiveTokenRefresh() async {
     if (await isTokenNearExpiration()) {
@@ -450,7 +409,7 @@ class AuthProvider with ChangeNotifier {
       await refreshToken();
     }
   }
-  
+
   Future<Map<String, dynamic>?> getCurrentUserData() async {
     try {
       final userData = await _authService.getUserData();
@@ -470,6 +429,122 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       print('Error verificando conectividad: $e');
       return false;
+    }
+  }
+
+  Future<bool> checkSessionValidity() async {
+    if (_user == null || _user!.token.isEmpty) {
+      return false;
+    }
+
+    try {
+      final userData = await _authService.getUserData();
+
+      if (userData['success']) {
+        final userInfo = userData['data']['data'];
+        final currentState = userInfo['estado'] ?? 'pendiente';
+
+        // Si el usuario no está activo, cerrar sesión automáticamente
+        if (currentState != 'activo') {
+          print(
+            'AuthProvider: Usuario con estado $currentState detectado - cerrando sesión',
+          );
+
+          String message = _getStateMessage(currentState);
+          await logout();
+          _errorMessage = message;
+          notifyListeners();
+
+          return false;
+        }
+
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      print('Error al verificar validez de sesión: $e');
+
+      // Si el error contiene mensaje de sesión cerrada
+      if (e.toString().contains('sesión fue cerrada') ||
+          e.toString().contains('otro dispositivo')) {
+        print('AuthProvider: Sesión cerrada en otro dispositivo');
+        await logout();
+        _errorMessage =
+            'Tu sesión fue cerrada porque iniciaste sesión en otro dispositivo.';
+        notifyListeners();
+
+        return false;
+      }
+
+      return false;
+    }
+  }
+
+  // Actualizar el método checkAndRefreshToken existente
+  Future<bool> checkAndRefreshToken() async {
+    if (_user == null || _user!.token.isEmpty) {
+      return false;
+    }
+
+    try {
+      // PRIMERO: Verificar validez de la sesión
+      final isValidSession = await checkSessionValidity();
+      if (!isValidSession) {
+        return false;
+      }
+
+      // SEGUNDO: Verificar datos del usuario y perfil
+      final userData = await _authService.getUserData();
+
+      if (userData['success']) {
+        final userInfo = userData['data']['data'];
+
+        // Solo verificar perfil completo para usuarios normales
+        if (_user!.rol != 'admin' && _user!.rol != 'operador') {
+          _perfilCompleto = userInfo['perfil_completo'] ?? false;
+          _codigoCorresponsal = userInfo['codigo_corresponsal'];
+
+          if (!_perfilCompleto && _authStatus == AuthStatus.authenticated) {
+            _authStatus = AuthStatus.needsProfileCompletion;
+            notifyListeners();
+          } else if (_perfilCompleto &&
+              _authStatus == AuthStatus.needsProfileCompletion) {
+            _authStatus = AuthStatus.authenticated;
+            notifyListeners();
+          }
+        }
+
+        // Actualizar usuario con datos más recientes
+        _user = _user!.copyWith(
+          nombre: userInfo['nombre'] ?? _user!.nombre,
+          perfilCompleto: _perfilCompleto,
+          codigoCorresponsal: _codigoCorresponsal,
+          nombreLocal: userInfo['nombre_local'],
+        );
+
+        return true;
+      }
+
+      // Si getUserData falló, el AuthService automáticamente intentó el refresh
+      print('No se pudo verificar token ni hacer refresh - cerrando sesión');
+      await logout();
+      return false;
+    } catch (e) {
+      print('Error al verificar token: $e');
+
+      // Verificar si es error de sesión cerrada
+      if (e.toString().contains('sesión fue cerrada') ||
+          e.toString().contains('otro dispositivo')) {
+        await logout();
+        _errorMessage =
+            'Tu sesión fue cerrada porque iniciaste sesión en otro dispositivo.';
+        notifyListeners();
+        return false;
+      }
+
+      // En caso de error de red, asumir que el token es válido
+      return true;
     }
   }
 }
