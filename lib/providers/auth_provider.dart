@@ -13,7 +13,7 @@ enum AuthStatus {
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
-  final ApiService _apiService = ApiService(); // ← NUEVO: Para sincronización
+  final ApiService _apiService = ApiService(); // ← Para sincronización
   
   AuthStatus _authStatus = AuthStatus.uninitialized;
   User? _user;
@@ -34,7 +34,7 @@ class AuthProvider with ChangeNotifier {
   String? get codigoCorresponsal => _codigoCorresponsal;
   bool get needsProfileCompletion => _authStatus == AuthStatus.needsProfileCompletion;
   
-  // ← NUEVO: Getter para ApiService
+  // Getter para ApiService
   ApiService get apiService => _apiService;
   
   // Constructor
@@ -57,7 +57,7 @@ class AuthProvider with ChangeNotifier {
         _user = _authService.currentUser;
         _authStatus = AuthStatus.authenticated;
         
-        // ← NUEVO: Sincronizar tokens con ApiService
+        // Sincronizar tokens con ApiService
         _syncTokensWithApiService();
         
         print('AuthProvider: Usuario autenticado: ${_user!.nombre}');
@@ -74,7 +74,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  // ← NUEVO: Método para sincronizar tokens con ApiService
+  // Método para sincronizar tokens con ApiService
   void _syncTokensWithApiService() {
     if (_user != null && _user!.token.isNotEmpty) {
       _apiService.setAuthToken(_user!.token);
@@ -83,7 +83,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
   
-  // ← NUEVO: Método para sincronizar después de refresh automático
+  // Método para sincronizar después de refresh automático
   void syncTokensAfterRefresh() {
     if (_authService.isAuthenticated() && _authService.currentUser != null) {
       _user = _authService.currentUser;
@@ -155,7 +155,7 @@ class AuthProvider with ChangeNotifier {
           }
         }
         
-        // ← NUEVO: Sincronizar tokens con ApiService
+        // Sincronizar tokens con ApiService
         _syncTokensWithApiService();
         
         await _authService.setRememberMe(_rememberMe);
@@ -237,14 +237,85 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // ← ACTUALIZADO: Verificar y renovar token con refresh automático
+  // NUEVO: Método para verificar el estado del usuario periódicamente
+  Future<bool> checkUserStatus() async {
+    if (_user == null || _user!.token.isEmpty) {
+      return false;
+    }
+    
+    try {
+      final userData = await _authService.getUserData();
+      
+      if (userData['success']) {
+        final userInfo = userData['data']['data'];
+        final currentState = userInfo['estado'] ?? 'pendiente';
+        
+        // Si el usuario no está activo, cerrar sesión automáticamente
+        if (currentState != 'activo') {
+          print('AuthProvider: Usuario con estado $currentState detectado - cerrando sesión');
+          
+          // Mostrar mensaje específico
+          String message = _getStateMessage(currentState);
+          
+          // Cerrar sesión
+          await logout();
+          
+          // Mostrar notificación
+          _errorMessage = message;
+          notifyListeners();
+          
+          return false;
+        }
+        
+        // Actualizar información del usuario si está activo
+        _user = _user!.copyWith(
+          nombre: userInfo['nombre'] ?? _user!.nombre,
+          rol: userInfo['rol'] ?? _user!.rol,
+          perfilCompleto: userInfo['perfil_completo'] ?? _user!.perfilCompleto,
+          codigoCorresponsal: userInfo['codigo_corresponsal'],
+          nombreLocal: userInfo['nombre_local'],
+        );
+        
+        return true;
+      }
+      
+      return false;
+    } catch (e) {
+      print('Error al verificar estado del usuario: $e');
+      return false;
+    }
+  }
+
+  // NUEVO: Obtener mensaje según el estado
+  String _getStateMessage(String state) {
+    switch (state.toLowerCase()) {
+      case 'pendiente':
+        return 'Su cuenta está pendiente de aprobación. Contacte al administrador.';
+      case 'suspendido':
+        return 'Su cuenta ha sido suspendida. Contacte al administrador.';
+      case 'inactivo':
+        return 'Su cuenta está inactiva. Contacte al administrador.';
+      case 'rechazado':
+        return 'Su cuenta ha sido rechazada. Contacte al administrador.';
+      default:
+        return 'Su cuenta no está disponible. Contacte al administrador.';
+    }
+  }
+
+  // CORREGIDO: Verificar y renovar token con validación de estado
   Future<bool> checkAndRefreshToken() async {
     if (_user == null || _user!.token.isEmpty) {
       return false;
     }
     
     try {
-      // Intentar obtener datos del usuario (esto activará el refresh automático si es necesario)
+      // PRIMERO: Verificar estado del usuario
+      final isActive = await checkUserStatus();
+      if (!isActive) {
+        return false;
+      }
+      
+      // SEGUNDO: Verificar datos del usuario y perfil
       final userData = await _authService.getUserData();
       
       if (userData['success']) {
@@ -287,7 +358,7 @@ class AuthProvider with ChangeNotifier {
     }
   }
   
-  // ← NUEVO: Método para forzar refresh de token manualmente
+  // Método para forzar refresh de token manualmente
   Future<bool> refreshToken() async {
     try {
       final success = await _authService.refreshAccessToken();
@@ -311,7 +382,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  // ← ACTUALIZADO: Logout con limpieza completa
+  // Logout con limpieza completa
   Future<void> logout() async {
     _isLoading = true;
     notifyListeners();
@@ -336,8 +407,8 @@ class AuthProvider with ChangeNotifier {
   
   // Actualizar URL base
   void updateBaseUrl(String newUrl) {
-  _apiService.updateBaseUrl(newUrl);
-}
+    _apiService.updateBaseUrl(newUrl);
+  }
   
   // Verificar si el usuario tiene un rol específico
   bool hasRole(String role) {
@@ -345,7 +416,7 @@ class AuthProvider with ChangeNotifier {
     return _user!.rol == role;
   }
   
-  // ← NUEVO: Método para manejar errores de autenticación global
+  // Método para manejar errores de autenticación global
   void handleAuthError(String error) {
     _errorMessage = error;
     notifyListeners();
@@ -357,21 +428,22 @@ class AuthProvider with ChangeNotifier {
     }
   }
   
-Future<bool> isTokenNearExpiration() async {
-  // Verificar si el token expira en los próximos 5 minutos
-  try {
-    final prefs = await SharedPreferences.getInstance(); // ← AGREGAR await aquí
-    final expiryTime = prefs.getInt(AuthService.TOKEN_EXPIRY_KEY) ?? 0;
-    final now = DateTime.now().millisecondsSinceEpoch;
-    final fiveMinutesFromNow = now + (5 * 60 * 1000); // 5 minutos
-    
-    return expiryTime > 0 && expiryTime <= fiveMinutesFromNow;
-  } catch (e) {
-    print('Error verificando expiración de token: $e');
-    return false;
+  // Verificar si el token está próximo a expirar
+  Future<bool> isTokenNearExpiration() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final expiryTime = prefs.getInt(AuthService.TOKEN_EXPIRY_KEY) ?? 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final fiveMinutesFromNow = now + (5 * 60 * 1000); // 5 minutos
+      
+      return expiryTime > 0 && expiryTime <= fiveMinutesFromNow;
+    } catch (e) {
+      print('Error verificando expiración de token: $e');
+      return false;
+    }
   }
-}
-  // ← NUEVO: Método para renovación proactiva de token
+  
+  // Método para renovación proactiva de token
   Future<void> proactiveTokenRefresh() async {
     if (await isTokenNearExpiration()) {
       print('AuthProvider: Token próximo a expirar - renovando proactivamente');
@@ -400,114 +472,4 @@ Future<bool> isTokenNearExpiration() async {
       return false;
     }
   }
-
-  // Agregar este método en lib/providers/auth_provider.dart
-
-// NUEVO: Método para verificar el estado del usuario periódicamente
-Future<bool> checkUserStatus() async {
-  if (_user == null || _user!.token.isEmpty) {
-    return false;
-  }
-  
-  try {
-    final userData = await _authService.getUserData();
-    
-    if (userData['success']) {
-      final userInfo = userData['data']['data'];
-      final currentState = userInfo['estado'] ?? 'pendiente';
-      
-      // Si el usuario no está activo, cerrar sesión automáticamente
-      if (currentState != 'activo') {
-        print('AuthProvider: Usuario con estado $currentState detectado - cerrando sesión');
-        
-        // Mostrar mensaje específico
-        String message = _getStateMessage(currentState);
-        
-        // Cerrar sesión
-        await logout();
-        
-        // Mostrar notificación
-        _errorMessage = message;
-        notifyListeners();
-        
-        return false;
-      }
-      
-      // Actualizar información del usuario si está activo
-      _user = _user!.copyWith(
-        nombre: userInfo['nombre'] ?? _user!.nombre,
-        rol: userInfo['rol'] ?? _user!.rol,
-        perfilCompleto: userInfo['perfil_completo'] ?? _user!.perfilCompleto,
-        codigoCorresponsal: userInfo['codigo_corresponsal'],
-        nombreLocal: userInfo['nombre_local'],
-      );
-      
-      return true;
-    }
-    
-    return false;
-  } catch (e) {
-    print('Error al verificar estado del usuario: $e');
-    return false;
-  }
-}
-
-// NUEVO: Obtener mensaje según el estado
-String _getStateMessage(String state) {
-  switch (state.toLowerCase()) {
-    case 'pendiente':
-      return 'Su cuenta está pendiente de aprobación. Contacte al administrador.';
-    case 'suspendido':
-      return 'Su cuenta ha sido suspendida. Contacte al administrador.';
-    case 'inactivo':
-      return 'Su cuenta está inactiva. Contacte al administrador.';
-    case 'rechazado':
-      return 'Su cuenta ha sido rechazada. Contacte al administrador.';
-    default:
-      return 'Su cuenta no está disponible. Contacte al administrador.';
-  }
-}
-
-Future<bool> checkAndRefreshToken() async {
-  if (_user == null || _user!.token.isEmpty) {
-    return false;
-  }
-  
-  try {
-    // Verificar estado del usuario
-    final isActive = await checkUserStatus();
-    if (!isActive) {
-      return false;
-    }
-    
-    // Resto del código existente...
-    final userData = await _authService.getUserData();
-    
-    if (userData['success']) {
-      final userInfo = userData['data']['data'];
-      
-      // Solo verificar perfil completo para usuarios normales
-      if (_user!.rol != 'admin' && _user!.rol != 'operador') {
-        _perfilCompleto = userInfo['perfil_completo'] ?? false;
-        _codigoCorresponsal = userInfo['codigo_corresponsal'];
-        
-        if (!_perfilCompleto && _authStatus == AuthStatus.authenticated) {
-          _authStatus = AuthStatus.needsProfileCompletion;
-          notifyListeners();
-        } else if (_perfilCompleto && _authStatus == AuthStatus.needsProfileCompletion) {
-          _authStatus = AuthStatus.authenticated;
-          notifyListeners();
-        }
-      }
-      
-      return true;
-    }
-    
-    return false;
-  } catch (e) {
-    print('Error al verificar token: $e');
-    return true; // En caso de error de red, asumir que el token es válido
-  }
-}
-
 }

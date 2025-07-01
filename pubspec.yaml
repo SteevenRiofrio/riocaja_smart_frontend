@@ -1,5 +1,5 @@
 name: riocaja_smart
-description: "Aplicación para gestión de comprobantes."
+description: "RíoCaja Smart - Gestión de comprobantes CNB"
 publish_to: 'none'
 
 version: 1.0.0+1

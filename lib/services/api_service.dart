@@ -9,7 +9,6 @@ import 'package:flutter/material.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/services/auth_service.dart';
-import 'dart:convert';
 
 class ApiService {
   // URL base de la API
@@ -74,133 +73,141 @@ class ApiService {
     return headers;
   }
 
-  Future<http.Response> _makeRequestWithRetry(
-  String method,
-  String url, {
-  Map<String, dynamic>? body,
-  Map<String, String>? customHeaders,
-  int maxRetries = 3,
-}) async {
-  int retryCount = 0;
-  Duration retryDelay = Duration(seconds: 2);
-
-  while (true) {
-    try {
-      http.Response response;
-      final headers = customHeaders ?? getHeaders();
-
-      switch (method.toUpperCase()) {
-        case 'GET':
-          response = await http.get(Uri.parse(url), headers: headers)
-              .timeout(Duration(seconds: 60));
-          break;
-        case 'POST':
-          response = await http.post(
-            Uri.parse(url),
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          ).timeout(Duration(seconds: 60));
-          break;
-        case 'PUT':
-          response = await http.put(
-            Uri.parse(url),
-            headers: headers,
-            body: body != null ? jsonEncode(body) : null,
-          ).timeout(Duration(seconds: 60));
-          break;
-        case 'DELETE':
-          response = await http.delete(Uri.parse(url), headers: headers)
-              .timeout(Duration(seconds: 60));
-          break;
-        default:
-          throw Exception('Método HTTP no soportado: $method');
-      }
-
-      print('ApiService: Respuesta ${response.statusCode} de $url');
-
-      // NUEVO: Verificar errores específicos de estado de cuenta
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        print('Error ${response.statusCode}: ${response.body}');
+  // NUEVO: Método para redirigir a login
+  void _redirectToLogin(String message) {
+    if (_context != null) {
+      Future.microtask(() {
+        ScaffoldMessenger.of(_context!).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
+          ),
+        );
         
-        try {
-          final errorData = jsonDecode(response.body);
-          final errorMessage = errorData['detail'] ?? 'Error de autenticación';
-          
-          // Verificar si es un error de estado de cuenta
-          if (errorMessage.contains('pendiente') || 
-              errorMessage.contains('suspendido') || 
-              errorMessage.contains('inactivo') ||
-              errorMessage.contains('rechazado')) {
-            
-            print('ApiService: Usuario con cuenta no activa detectado');
-            
-            // Forzar logout en el AuthProvider
-            if (_context != null) {
-              final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-              await authProvider.logout();
-              
-              // Redirigir a login con mensaje
-              Future.microtask(() {
-                if (_context != null) {
-                  ScaffoldMessenger.of(_context!).showSnackBar(
-                    SnackBar(
-                      content: Text(errorMessage),
-                      backgroundColor: Colors.red,
-                      duration: Duration(seconds: 5),
-                    ),
-                  );
-                  
-                  Navigator.of(_context!).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => LoginScreen()),
-                    (route) => false,
-                  );
-                }
-              });
-            }
-          }
-        } catch (e) {
-          print('Error al procesar respuesta de error: $e');
-        }
-      }
-
-      // Manejar refresh automático para otros errores 401
-      if (response.statusCode == 401 && !url.contains('/login') && !url.contains('/refresh')) {
-        print('Error 401: Intentando refresh automático');
-        
-        if (_authService != null) {
-          final refreshSuccess = await _authService!.refreshAccessToken();
-          if (refreshSuccess) {
-            print('ApiService: Token renovado automáticamente, reintentando petición');
-            _authToken = _authService!.currentUser?.token;
-            continue; // Reintentar la petición con el nuevo token
-          }
-        }
-        
-        print('ApiService: No se pudo renovar token, cerrando sesión');
-        if (_context != null) {
-          final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-          await authProvider.logout();
-          _redirectToLogin('Sesión expirada. Por favor inicie sesión nuevamente.');
-        }
-      }
-
-      return response;
-      
-    } catch (e) {
-      retryCount++;
-      print('ApiService: Error en petición (intento $retryCount): $e');
-      
-      if (retryCount >= maxRetries) {
-        print('ApiService: Máximo de reintentos alcanzado para $url');
-        rethrow;
-      }
-      
-      print('ApiService: Reintentando en ${retryDelay.inSeconds} segundos...');
-      await Future.delayed(retryDelay);
-      retryDelay *= 2; // Backoff exponencial
+        Navigator.of(_context!).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => LoginScreen()),
+          (route) => false,
+        );
+      });
     }
   }
-}
+
+  // Método mejorado para hacer peticiones HTTP con validación de estado
+  Future<http.Response> _makeRequestWithRetry(
+    String method,
+    String url, {
+    Map<String, dynamic>? body,
+    Map<String, String>? customHeaders,
+    int maxRetries = 3,
+  }) async {
+    int retryCount = 0;
+    Duration retryDelay = Duration(seconds: 2);
+
+    while (true) {
+      try {
+        http.Response response;
+        final headers = customHeaders ?? getHeaders();
+
+        switch (method.toUpperCase()) {
+          case 'GET':
+            response = await http.get(Uri.parse(url), headers: headers)
+                .timeout(Duration(seconds: 60));
+            break;
+          case 'POST':
+            response = await http.post(
+              Uri.parse(url),
+              headers: headers,
+              body: body != null ? jsonEncode(body) : null,
+            ).timeout(Duration(seconds: 60));
+            break;
+          case 'PUT':
+            response = await http.put(
+              Uri.parse(url),
+              headers: headers,
+              body: body != null ? jsonEncode(body) : null,
+            ).timeout(Duration(seconds: 60));
+            break;
+          case 'DELETE':
+            response = await http.delete(Uri.parse(url), headers: headers)
+                .timeout(Duration(seconds: 60));
+            break;
+          default:
+            throw Exception('Método HTTP no soportado: $method');
+        }
+
+        print('ApiService: Respuesta ${response.statusCode} de $url');
+
+        // NUEVO: Verificar errores específicos de estado de cuenta
+        if (response.statusCode == 401 || response.statusCode == 403) {
+          print('Error ${response.statusCode}: ${response.body}');
+          
+          try {
+            final errorData = jsonDecode(response.body);
+            final errorMessage = errorData['detail'] ?? 'Error de autenticación';
+            
+            // Verificar si es un error de estado de cuenta
+            if (errorMessage.contains('pendiente') || 
+                errorMessage.contains('suspendido') || 
+                errorMessage.contains('inactivo') ||
+                errorMessage.contains('rechazado')) {
+              
+              print('ApiService: Usuario con cuenta no activa detectado');
+              
+              // Forzar logout en el AuthProvider
+              if (_context != null) {
+                final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+                await authProvider.logout();
+                
+                // Redirigir a login con mensaje
+                _redirectToLogin(errorMessage);
+              }
+              
+              return response; // Retornar la respuesta para evitar loops
+            }
+          } catch (e) {
+            print('Error al procesar respuesta de error: $e');
+          }
+        }
+
+        // Manejar refresh automático para otros errores 401
+        if (response.statusCode == 401 && !url.contains('/login') && !url.contains('/refresh')) {
+          print('Error 401: Intentando refresh automático');
+          
+          if (_authService != null) {
+            final refreshSuccess = await _authService!.refreshAccessToken();
+            if (refreshSuccess) {
+              print('ApiService: Token renovado automáticamente, reintentando petición');
+              _authToken = _authService!.currentUser?.token;
+              continue; // Reintentar la petición con el nuevo token
+            }
+          }
+          
+          print('ApiService: No se pudo renovar token, cerrando sesión');
+          if (_context != null) {
+            final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+            await authProvider.logout();
+            _redirectToLogin('Sesión expirada. Por favor inicie sesión nuevamente.');
+          }
+        }
+
+        return response;
+        
+      } catch (e) {
+        retryCount++;
+        print('ApiService: Error en petición (intento $retryCount): $e');
+        
+        if (retryCount >= maxRetries) {
+          print('ApiService: Máximo de reintentos alcanzado para $url');
+          rethrow;
+        }
+        
+        print('ApiService: Reintentando en ${retryDelay.inSeconds} segundos...');
+        await Future.delayed(retryDelay);
+        retryDelay *= 2; // Backoff exponencial
+      }
+    }
+  }
 
   // Método auxiliar para hacer peticiones HTTP básicas (sin interceptor)
   Future<http.Response> _makeRawRequest(
@@ -253,11 +260,7 @@ class ApiService {
         final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
         await authProvider.logout();
         
-        Future.microtask(() {
-          Navigator.of(_context!).pushReplacement(
-            MaterialPageRoute(builder: (context) => LoginScreen()),
-          );
-        });
+        _redirectToLogin('Sesión cerrada');
       }
     } catch (e) {
       print('Error durante logout: $e');
@@ -566,7 +569,6 @@ class ApiService {
     return a < b ? a : b;
   }
 
-
   // Método para decodificar respuestas UTF-8 correctamente
   Map<String, dynamic> _decodeUtf8Response(String responseBody) {
     try {
@@ -601,5 +603,4 @@ class ApiService {
         .replaceAll('Ãš', 'Ú')
         .replaceAll('Ã', 'Ñ');
   }
-
 }
