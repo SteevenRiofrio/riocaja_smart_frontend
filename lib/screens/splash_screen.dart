@@ -1,3 +1,4 @@
+// lib/screens/splash_screen.dart - SOLUCIÓN DEFINITIVA
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -18,112 +19,138 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkAuth() async {
-    // Esperamos un tiempo suficiente para que el AuthProvider se inicialice
+    // Esperamos tiempo suficiente para que AuthProvider se inicialice
     await Future.delayed(Duration(seconds: 3));
     
     if (!mounted) return;
     
-    // Verificar el estado de autenticación
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
-    print('SplashScreen: Estado de autenticación: ${authProvider.authStatus}');
-    print('SplashScreen: ¿Usuario autenticado? ${authProvider.isAuthenticated}');
-    print('SplashScreen: ¿Necesita completar perfil? ${authProvider.needsProfileCompletion}');
+    print('🔍 SplashScreen: Verificando estado de autenticación...');
+    print('📊 Estado: ${authProvider.authStatus}');
+    print('👤 Usuario: ${authProvider.user?.nombre ?? "null"}');
+    print('🔑 Rol: ${authProvider.user?.rol ?? "null"}');
+    print('✅ Perfil completo: ${authProvider.perfilCompleto}');
     
+    // ✅ PRIORIDAD 1: Verificar si el usuario tiene un rol privilegiado
     if (authProvider.user != null) {
-      print('SplashScreen: Usuario: ${authProvider.user!.nombre}');
-      print('SplashScreen: Rol: ${authProvider.user!.rol}');
-      print('SplashScreen: Perfil completo: ${authProvider.perfilCompleto}');
-      print('SplashScreen: Código corresponsal: ${authProvider.codigoCorresponsal}');
+      final rol = authProvider.user!.rol;
+      
+      // 🚨 IMPORTANTE: Admin y Asesor NUNCA van a completar perfil
+      if (rol == 'admin' || rol == 'asesor') {
+        print('🔒 SplashScreen: Usuario privilegiado detectado ($rol) - Acceso directo al dashboard');
+        _navigateToHome();
+        return;
+      }
     }
     
-    // LÓGICA CORREGIDA: Verificar primero si es admin/asesor
-    if (authProvider.user != null && 
-        (authProvider.user!.rol == 'admin' || authProvider.user!.rol == 'asesor')) {
-      // Admin y asesores SIEMPRE van directo al dashboard
-      print('SplashScreen: Admin/Asesor detectado - Acceso directo al dashboard');
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-      );
-      return;
+    // ✅ PRIORIDAD 2: Para usuarios normales, verificar estado de autenticación
+    switch (authProvider.authStatus) {
+      case AuthStatus.authenticated:
+        print('✅ SplashScreen: Usuario autenticado - Redirigiendo a Home');
+        _navigateToHome();
+        break;
+        
+      case AuthStatus.needsProfileCompletion:
+        print('📝 SplashScreen: Usuario necesita completar perfil');
+        _navigateToCompleteProfile();
+        break;
+        
+      case AuthStatus.unauthenticated:
+      default:
+        print('🚪 SplashScreen: Usuario no autenticado - Redirigiendo a Login');
+        _navigateToLogin();
+        break;
     }
-    
-    // Para usuarios normales (CNB), verificar estado normal
-    if (authProvider.isAuthenticated) {
-      print('SplashScreen: Usuario normal autenticado - Redirigiendo a Home');
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeScreen()),
-      );
-    } else if (authProvider.needsProfileCompletion) {
-      print('SplashScreen: Usuario normal necesita completar perfil');
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => CompleteProfileScreen(
-            codigoCorresponsal: authProvider.codigoCorresponsal,
-          ),
+  }
+
+  void _navigateToHome() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => HomeScreen()),
+    );
+  }
+
+  void _navigateToCompleteProfile() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => CompleteProfileScreen(
+          codigoCorresponsal: authProvider.codigoCorresponsal,
         ),
-      );
-    } else {
-      print('SplashScreen: Sin autenticación - Redirigiendo a Login');
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => LoginScreen()),
-      );
-    }
+      ),
+    );
+  }
+
+  void _navigateToLogin() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (context) => LoginScreen()),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.green.shade50,
+      backgroundColor: Color(0xFF2E7D32),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo o icono de la app
+            // Logo
             Container(
               width: 120,
               height: 120,
               decoration: BoxDecoration(
-                color: Colors.green.shade700,
-                shape: BoxShape.circle,
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black26,
+                    blurRadius: 15,
+                    offset: Offset(0, 5),
+                  ),
+                ],
               ),
               child: Icon(
                 Icons.account_balance,
                 size: 60,
+                color: Color(0xFF2E7D32),
+              ),
+            ),
+            SizedBox(height: 30),
+            
+            // Título
+            Text(
+              'RioCaja Smart',
+              style: TextStyle(
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 24),
+            SizedBox(height: 10),
             
-            // Nombre de la app
+            // Subtítulo
             Text(
-              'RíoCaja Smart',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: Colors.green.shade700,
-              ),
-            ),
-            SizedBox(height: 8),
-            Text(
-              'Gestión de Comprobantes CNB',
+              'Sistema de Gestión Bancaria',
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.grey.shade700,
+                color: Colors.white70,
               ),
             ),
-            SizedBox(height: 40),
+            SizedBox(height: 50),
             
-            // Indicador de carga
+            // Loading indicator
             CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade700),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 20),
+            
+            // Texto de carga
             Text(
-              'Verificando credenciales...',
+              'Iniciando aplicación...',
               style: TextStyle(
-                color: Colors.grey.shade600,
                 fontSize: 14,
+                color: Colors.white70,
               ),
             ),
           ],
