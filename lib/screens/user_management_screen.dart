@@ -244,8 +244,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                       items: [
                         DropdownMenuItem(value: 'todos', child: Text('Todos los roles')),
                         DropdownMenuItem(value: 'admin', child: Text('Administradores')),
-                        DropdownMenuItem(value: 'operador', child: Text('Operadores')),
-                        DropdownMenuItem(value: 'lector', child: Text('Lectores')),
+                        DropdownMenuItem(value: 'asesor', child: Text('Asesor')),
+                        DropdownMenuItem(value: 'cnb', child: Text('CNB')),
                       ],
                       onChanged: (value) {
                         setState(() {
@@ -730,8 +730,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                       prefixIcon: Icon(Icons.person_outline),
                     ),
                     items: [
-                      DropdownMenuItem(value: 'lector', child: Text('Lector')),
-                      DropdownMenuItem(value: 'operador', child: Text('Operador')),
+                      DropdownMenuItem(value: 'cnb', child: Text('CNB')),
+                      DropdownMenuItem(value: 'asesor', child: Text('Asesor')),
                       DropdownMenuItem(value: 'admin', child: Text('Administrador')),
                     ],
                     onChanged: (value) {
@@ -910,8 +910,8 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                   items: [
-                    DropdownMenuItem(value: 'lector', child: Text('Lector')),
-                    DropdownMenuItem(value: 'operador', child: Text('Operador')),
+                    DropdownMenuItem(value: 'cnb', child: Text('CNB')),
+                    DropdownMenuItem(value: 'asesor', child: Text('Asesor')),
                     DropdownMenuItem(value: 'admin', child: Text('Administrador')),
                   ],
                   onChanged: (value) {
@@ -967,8 +967,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
     switch (rol.toLowerCase()) {
       case 'admin':
         return Colors.red.shade700;
-      case 'operador':
+      case 'asesor':
         return Colors.orange.shade700;
+      case 'cnb':
       default:
         return Colors.blue.shade700;
     }
@@ -978,10 +979,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
     switch (rol.toLowerCase()) {
       case 'admin':
         return 'Administrador';
-      case 'operador':
-        return 'Operador';
+      case 'asesor':
+        return 'Asesor';
+      case 'cnb':
       default:
-        return 'Lector';
+        return 'CNB';
     }
   }
 

@@ -1,44 +1,18 @@
-// lib/utils/text_constants.dart
 class TextConstants {
-  // ==================== TEXTOS PRINCIPALES ====================
+  // Constructor privado para prevenir instanciación
+  TextConstants._();
   
-  // App
-  static const String appName = 'RíoCaja Smart';
-  static const String appSubtitle = 'Gestión de Comprobantes CNB';
-  static const String appVersion = 'Versión 1.0.0';
+  // ==================== APP ====================
   
-  // ==================== SECCIONES PRINCIPALES ====================
-  
-  // Administración
-  static const String administracion = 'Administración';
-  static const String gestionUsuarios = 'Gestión de Usuarios';
-  static const String usuariosPendientes = 'Usuarios Pendientes';
-  static const String todosLosUsuarios = 'Todos los Usuarios';
-  static const String pendientes = 'Pendientes';
-  static const String administrarTodosLosUsuarios = 'Administrar todos los usuarios';
-  static const String soloPendientesAprobacion = 'Solo pendientes de aprobación';
-  
-  // Reportes
-  static const String reportes = 'Reportes';
-  static const String reportesCierre = 'Reportes de Cierre';
-  static const String reportesExcel = 'Reportes Excel';
-  static const String exportarDatos = 'Exportar datos a Excel';
-  static const String verCompartir = 'Ver y compartir como texto/PDF';
-  
-  // Mensajes
-  static const String mensajes = 'Mensajes';
-  static const String nuevoMensaje = 'Nuevo Mensaje';
-  static const String marcarLeido = 'Marcar como leído';
-  static const String crearMensaje = 'Crear Mensaje';
+  static const String appName = 'RioCaja Smart';
+  static const String version = '1.0.0';
   
   // ==================== AUTENTICACIÓN ====================
   
   // Login
-  static const String iniciarSesion = 'Iniciar Sesión';
-  static const String cerrarSesion = 'Cerrar Sesión';
-  static const String email = 'Correo Electrónico';
+  static const String email = 'Email';
   static const String password = 'Contraseña';
-  static const String recordarme = 'Recordarme';
+  static const String login = 'Iniciar Sesión';
   static const String olvidoPassword = '¿Olvidó su contraseña?';
   static const String noTieneCuenta = '¿No tiene cuenta?';
   static const String yaSeRegistro = '¿Ya se registró?';
@@ -57,8 +31,8 @@ class TextConstants {
   
   // Roles
   static const String administrador = 'Administrador';
-  static const String operador = 'Operador';
-  static const String lector = 'Lector';
+  static const String asesor = 'Asesor';                    // Antes era Operador
+  static const String cnb = 'CNB';                          // Antes era Lector
   static const String administradorLocal = 'Administrador Local';
   static const String administracionPrincipal = 'Administración Principal';
   
@@ -97,136 +71,78 @@ class TextConstants {
   
   // Campos específicos
   static const String nroTransaccion = 'Nro. Transacción';
-  static const String codigoCorresponsal = 'Código de Corresponsal';
-  static const String nombreCorresponsal = 'Nombre del Corresponsal';
-  static const String nombreLocal = 'Nombre del Local';
-  static const String fechaRegistro = 'Fecha de Registro';
-  static const String ultimoAcceso = 'Último Acceso';
+  static const String fechaTransaccion = 'Fecha de Transacción';
+  static const String tipoTransaccion = 'Tipo de Transacción';
+  static const String valorTransaccion = 'Valor de Transacción';
+  static const String cedulaRemitente = 'Cédula Remitente';
+  static const String nombreRemitente = 'Nombre Remitente';
+  static const String cedulaBeneficiario = 'Cédula Beneficiario';
+  static const String nombreBeneficiario = 'Nombre Beneficiario';
+  static const String telefonoBeneficiario = 'Teléfono Beneficiario';
+  static const String ciudadDestino = 'Ciudad Destino';
+  static const String entidadPagadora = 'Entidad Pagadora';
+  static const String codigoClaro = 'Código Claro';
+  static const String numeroRecarga = 'Número para Recarga';
+  static const String empresa = 'Empresa';
+  static const String referencia = 'Referencia';
+  static const String codigoBarras = 'Código de Barras';
+  static const String numeroReferencia = 'Número de Referencia';
   
-  // ==================== ACCIONES ====================
+  // ==================== NAVEGACIÓN Y MENÚS ====================
   
-  // Acciones básicas
-  static const String guardar = 'Guardar';
-  static const String cancelar = 'Cancelar';
-  static const String aceptar = 'Aceptar';
-  static const String rechazar = 'Rechazar';
-  static const String eliminar = 'Eliminar';
-  static const String editar = 'Editar';
-  static const String buscar = 'Buscar';
-  static const String filtrar = 'Filtrar';
-  static const String actualizar = 'Actualizar';
-  static const String refrescar = 'Refrescar';
-  static const String continuar = 'Continuar';
-  
-  // Acciones específicas
-  static const String escanear = 'Escanear';
-  static const String escanearComprobante = 'Escanear Comprobante';
-  static const String fotografiar = 'Fotografiar';
-  static const String procesar = 'Procesar';
-  static const String generar = 'Generar';
-  static const String descargar = 'Descargar';
-  static const String compartir = 'Compartir';
-  
-  // Acciones de usuarios
-  static const String aprobar = 'Aprobar';
-  static const String bloquear = 'Bloquear';
-  static const String activar = 'Activar';
-  
-  // ==================== NAVEGACIÓN ====================
-  
+  // Navegación principal
   static const String inicio = 'Inicio';
   static const String comprobantes = 'Comprobantes';
-  static const String historial = 'Historial';
-  static const String historialComprobantes = 'Historial de Comprobantes';
-  static const String usuarios = 'Usuarios';
-  static const String diagnostico = 'Diagnóstico';
+  static const String reportes = 'Reportes';
+  static const String configuracion = 'Configuración';
+  static const String perfil = 'Perfil';
+  static const String ayuda = 'Ayuda';
+  static const String salir = 'Salir';
+  static const String cerrarSesion = 'Cerrar Sesión';
   
-  // ==================== MENSAJES Y NOTIFICACIONES ====================
+  // Acciones
+  static const String crear = 'Crear';
+  static const String editar = 'Editar';
+  static const String eliminar = 'Eliminar';
+  static const String guardar = 'Guardar';
+  static const String cancelar = 'Cancelar';
+  static const String buscar = 'Buscar';
+  static const String filtrar = 'Filtrar';
+  static const String exportar = 'Exportar';
+  static const String imprimir = 'Imprimir';
+  static const String actualizar = 'Actualizar';
+  static const String confirmar = 'Confirmar';
+  static const String aceptar = 'Aceptar';
+  static const String rechazar = 'Rechazar';
+  static const String aprobar = 'Aprobar';
+  static const String siguiente = 'Siguiente';
+  static const String anterior = 'Anterior';
+  static const String continuar = 'Continuar';
+  static const String finalizar = 'Finalizar';
+  
+  // ==================== MENSAJES Y VALIDACIONES ====================
   
   // Mensajes de éxito
-  static const String loginExitoso = 'Inicio de sesión exitoso';
-  static const String registroExitoso = 'Registro exitoso';
-  static const String datoGuardado = 'Dato guardado correctamente';
-  static const String usuarioAprobado = 'Usuario aprobado correctamente';
-  static const String usuarioRechazado = 'Usuario rechazado';
-  static const String sesionCerradaCorrectamente = 'Sesión cerrada correctamente';
+  static const String operacionExitosa = 'Operación realizada exitosamente';
+  static const String comprobanteCreado = 'Comprobante creado exitosamente';
+  static const String perfilActualizado = 'Perfil actualizado correctamente';
+  static const String cambiosGuardados = 'Cambios guardados correctamente';
   
   // Mensajes de error
-  static const String errorGeneral = 'Ha ocurrido un error';
-  static const String errorConexion = 'Error de conexión';
-  static const String errorCerrarSesion = 'Error al cerrar sesión';
-  static const String datosIncompletos = 'Datos incompletos';
-  static const String credencialesInvalidas = 'Credenciales inválidas';
+  static const String errorGenerico = 'Ha ocurrido un error inesperado';
+  static const String errorConexion = 'Error de conexión. Verifique su internet';
+  static const String errorServidor = 'Error del servidor. Intente más tarde';
+  static const String errorValidacion = 'Por favor, complete todos los campos requeridos';
+  static const String emailInvalido = 'Email inválido';
+  static const String passwordCorto = 'La contraseña debe tener al menos 6 caracteres';
+  static const String passwordsNoCoinciden = 'Las contraseñas no coinciden';
+  static const String campoRequerido = 'Este campo es requerido';
+  static const String formatoInvalido = 'Formato inválido';
   
-  // Mensajes informativos
-  static const String verificandoCredenciales = 'Verificando credenciales...';
-  static const String cargandoDatos = 'Cargando datos...';
-  static const String guardandoDatos = 'Guardando datos...';
-  static const String cerrandoSesion = 'Cerrando sesión...';
-  static const String noDetectado = 'No detectado';
-  
-  // ==================== INFORMACIÓN Y AYUDA ====================
-  
-  // Títulos informativos
-  static const String informacion = 'Información';
-  static const String informacionImportante = 'Información importante';
-  static const String informacionNuevosUsuarios = 'Información para nuevos usuarios';
-  static const String caracteristicasReportes = 'Características de los reportes';
-  
-  // ==================== CONFIGURACIÓN ====================
-  
-  static const String configuracion = 'Configuración';
-  static const String notificaciones = 'Notificaciones';
-  static const String cuenta = 'Cuenta';
-  static const String perfil = 'Perfil';
-  
-  // ==================== ESTADÍSTICAS ====================
-  
-  static const String estadisticas = 'Estadísticas';
-  static const String resumen = 'Resumen';
-  static const String totales = 'Totales';
-  
-  // ==================== FILTROS Y BÚSQUEDAS ====================
-  
-  static const String todos = 'Todos';
-  static const String todosLosRoles = 'Todos los roles';
-  static const String todosLosEstados = 'Todos los estados';
-  
-  // ==================== FECHAS Y TIEMPO ====================
-  
-  static const String hoy = 'Hoy';
-  static const String ayer = 'Ayer';
-  static const String estaSemana = 'Esta semana';
-  static const String esteMes = 'Este mes';
-  
-  // ==================== INFORMACIÓN ESPECÍFICA ====================
-  
-  // Información de nuevos usuarios
-  static const String infoNuevosUsuarios = '''• Los nuevos usuarios deben ser aprobados por un administrador
-• Después de la aprobación, completará su perfil con el código de corresponsal
-• Contacte al administrador si tiene dudas''';
-  
-  // Información importante
-  static const String infoImportante = '''• Tu cuenta será revisada por un administrador
-• Recibirás notificación cuando sea aprobada
-• Mantén tus datos actualizados
-• Contacta al administrador si tienes dudas''';
-  
-  // ==================== TEXTOS ESPECÍFICOS DE PANTALLAS ====================
-  
-  // OCR y Escaneo
-  static const String textoCompletoEscaneado = 'Ver texto completo escaneado';
-  static const String errorExtrayendoTexto = 'Error al extraer texto';
-  
-  // Dashboard
-  static const String bienvenido = 'Bienvenido';
-  
-  // Banco
-  static const String bancoDelBarrio = 'Banco del Barrio';
-  static const String cnb = 'CNB';
-  
-  // Diálogos
-  static const String confirmarCierreSesion = '¿Está seguro que desea cerrar sesión?';
+  // Mensajes de confirmación
+  static const String confirmarAccion = '¿Está seguro que desea realizar esta acción?';
+  static const String confirmarEliminacion = '¿Está seguro que desea eliminar este elemento?';
+  static const String confirmarCambios = '¿Está seguro que desea guardar los cambios?';
   static const String estaSeguroCerrarSesion = 'Esta acción cerrará su sesión actual.';
   
   // Estados de usuarios pendientes
@@ -245,12 +161,12 @@ class TextConstants {
     switch (rol.toLowerCase()) {
       case 'admin':
         return administrador;
-      case 'operador':
-        return operador;
-      case 'lector':
-        return lector;
+      case 'asesor':
+        return asesor;
+      case 'cnb':
+        return cnb;
       default:
-        return lector;
+        return cnb;  // Por defecto CNB
     }
   }
   

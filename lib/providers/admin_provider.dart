@@ -139,7 +139,7 @@ class AdminProvider with ChangeNotifier {
         if (userIndex >= 0) {
           _allUsers[userIndex]['rol'] = newRole;
           // Si es admin u operador, marcar perfil como completo
-          if (newRole == 'admin' || newRole == 'operador') {
+          if (newRole == 'admin' || newRole == 'asesor') {
             _allUsers[userIndex]['perfil_completo'] = true;
           }
           notifyListeners();
@@ -184,13 +184,13 @@ class AdminProvider with ChangeNotifier {
         'suspendidos': 0,
         'inactivos': 0,
         'admins': 0,
-        'operadores': 0,
-        'lectores': 0,
+        'asesores': 0,
+        'cnbs': 0,
       };
     }
     
     int activos = 0, pendientes = 0, suspendidos = 0, inactivos = 0;
-    int admins = 0, operadores = 0, lectores = 0;
+    int admins = 0, asesores  = 0, cnbs  = 0;
     
     for (var user in _allUsers) {
       // Contar por estado
@@ -214,12 +214,12 @@ class AdminProvider with ChangeNotifier {
         case 'admin':
           admins++;
           break;
-        case 'operador':
-          operadores++;
+        case 'asesor':
+          asesores++;
           break;
-        case 'lector':
+        case 'cnb':
         default:
-          lectores++;
+          cnbs++;
           break;
       }
     }
@@ -231,8 +231,8 @@ class AdminProvider with ChangeNotifier {
       'suspendidos': suspendidos,
       'inactivos': inactivos,
       'admins': admins,
-      'operadores': operadores,
-      'lectores': lectores,
+      'asesores': asesores,
+      'cnbs': cnbs,
     };
   }
   
