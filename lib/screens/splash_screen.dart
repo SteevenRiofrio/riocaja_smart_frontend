@@ -1,4 +1,3 @@
-// lib/screens/splash_screen.dart - ACTUALIZADO CON FLUJO DE PERFIL
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -38,32 +37,34 @@ class _SplashScreenState extends State<SplashScreen> {
       print('SplashScreen: Código corresponsal: ${authProvider.codigoCorresponsal}');
     }
     
-    // Determinar a qué pantalla dirigir al usuario
+    // LÓGICA CORREGIDA: Verificar primero si es admin/asesor
+    if (authProvider.user != null && 
+        (authProvider.user!.rol == 'admin' || authProvider.user!.rol == 'asesor')) {
+      // Admin y asesores SIEMPRE van directo al dashboard
+      print('SplashScreen: Admin/Asesor detectado - Acceso directo al dashboard');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+      return;
+    }
+    
+    // Para usuarios normales (CNB), verificar estado normal
     if (authProvider.isAuthenticated) {
-      print('SplashScreen: Usuario autenticado - Redirigiendo a Home');
+      print('SplashScreen: Usuario normal autenticado - Redirigiendo a Home');
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => HomeScreen()),
       );
     } else if (authProvider.needsProfileCompletion) {
-      print('SplashScreen: Usuario necesita completar perfil');
-      // Verificar que no sea admin/asesor (seguridad adicional)
-      if (authProvider.user?.rol == 'admin' || authProvider.user?.rol == 'asesor') {
-        print('SplashScreen: Admin/Operador detectado - Redirigiendo a Home directamente');
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-        );
-      } else {
-        print('SplashScreen: Redirigiendo a Completar Perfil');
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (context) => CompleteProfileScreen(
-              codigoCorresponsal: authProvider.codigoCorresponsal,
-            ),
+      print('SplashScreen: Usuario normal necesita completar perfil');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(
+          builder: (context) => CompleteProfileScreen(
+            codigoCorresponsal: authProvider.codigoCorresponsal,
           ),
-        );
-      }
+        ),
+      );
     } else {
-      print('SplashScreen: Redirigiendo a Login');
+      print('SplashScreen: Sin autenticación - Redirigiendo a Login');
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => LoginScreen()),
       );
