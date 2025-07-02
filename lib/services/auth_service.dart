@@ -1,4 +1,4 @@
-// lib/services/auth_service.dart - COMPLETO CON REFRESH TOKENS
+// lib/services/auth_service.dart - COMPLETO CON REFRESH TOKENS Y CORRECCIÓN DE ROL
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -219,32 +219,40 @@ class AuthService {
             await _saveUserData();
             print('Datos completos del usuario guardados');
           } else {
-            // Crear usuario básico si no se pueden obtener datos completos
+            // ✅ CORREGIDO: CREAR USUARIO CON DATOS DEL BACKEND (sin valores por defecto)
+            final String rolFromResponse = responseData['rol'];  // ← SIN ?? 'cnb'
+            final bool perfilCompletoFromResponse = responseData['perfil_completo'] ?? false;
+            
             _currentUser = User(
               id: 'temp_id',
               nombre: email.split('@')[0],
               email: email,
-              rol: 'cnb',
+              rol: rolFromResponse,  // ← USAR DIRECTAMENTE EL ROL DEL BACKEND
               token: _token!,
-              refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
+              refreshToken: _refreshToken,
+              perfilCompleto: perfilCompletoFromResponse,
             );
             
             await _saveUserData();
-            print('No se pudieron obtener datos adicionales. Usando datos básicos.');
+            print('Usando datos del backend directamente - Rol: $rolFromResponse');
           }
         } catch (e) {
-          // Crear usuario básico en caso de error
+          // ✅ CORREGIDO: CREAR USUARIO CON DATOS DEL BACKEND (sin valores por defecto)
+          final String rolFromResponse = responseData['rol'];  // ← SIN ?? 'cnb'
+          final bool perfilCompletoFromResponse = responseData['perfil_completo'] ?? false;
+          
           _currentUser = User(
             id: 'temp_id',
             nombre: email.split('@')[0],
             email: email,
-            rol: 'cnb',
+            rol: rolFromResponse,  // ← USAR DIRECTAMENTE EL ROL DEL BACKEND
             token: _token!,
-            refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
+            refreshToken: _refreshToken,
+            perfilCompleto: perfilCompletoFromResponse,
           );
           
           await _saveUserData();
-          print('Error al obtener datos adicionales: $e. Usando datos básicos.');
+          print('Error al obtener datos adicionales: $e. Usando rol del backend: $rolFromResponse');
         }
         
         return {

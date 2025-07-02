@@ -76,9 +76,24 @@ if (success) {
     ),
   );
 
+print('🔑 LOGIN SCREEN DEBUG:');
+print('   Usuario: ${authProvider.user?.nombre}');
+print('   Rol: "${authProvider.user?.rol}"');
+print('   Perfil completo: ${authProvider.user?.perfilCompleto}');
+print('   Rol == admin: ${authProvider.user?.rol == 'admin'}');
+print('   Rol == asesor: ${authProvider.user?.rol == 'asesor'}');
+
   // Navegación después de un pequeño delay
   Future.delayed(Duration(milliseconds: 800), () {
-    if (authProvider.user?.perfilCompleto == true) {
+    // 🚨 PRIORIDAD: Admin y Asesor SIEMPRE van directo al dashboard
+    if (authProvider.user?.rol == 'admin' || authProvider.user?.rol == 'asesor') {
+      print('🔑 LoginScreen: ${authProvider.user?.rol} detectado - directo al dashboard');
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => HomeScreen()),
+      );
+    } 
+    // Solo usuarios CNB verifican perfil completo
+    else if (authProvider.user?.perfilCompleto == true) {
       Navigator.of(context).pushReplacement(
         MaterialPageRoute(builder: (context) => HomeScreen()),
       );

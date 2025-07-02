@@ -1,5 +1,6 @@
-// lib/widgets/dashboard_summary.dart - VERSIÓN SIN "NO HAY DATOS PARA MOSTRAR HOY"
+// lib/widgets/dashboard_summary.dart - VERSIÓN CORREGIDA COMPLETA
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -23,76 +24,108 @@ class _DashboardSummaryState extends State<DashboardSummary> {
   @override
   void initState() {
     super.initState();
-    _loadReportData();
     
-    // Inicializar providers adicionales si es administrador
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
-      _loadAdminData();
-    }
-    
-    // Cargar mensajes para todos los usuarios
-    _loadMessages();
+    // ✅ CORRECCIÓN: Usar WidgetsBinding para evitar setState durante build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadReportData();
+      
+      // Inicializar providers adicionales si es administrador
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
+        _loadAdminData();
+      }
+      
+      // Cargar mensajes para todos los usuarios
+      _loadMessages();
+    });
   }
 
-  Future<void> _loadReportData() async {
-    final receiptsProvider = Provider.of<ReceiptsProvider>(
-      context,
-      listen: false,
+Future<void> _loadReportData() async {
+  // ✅ CONFIGURAR TOKEN PARA RECEIPTS PROVIDER
+  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+  final receiptsProvider = Provider.of<ReceiptsProvider>(context, listen: false);
+  if (authProvider.isAuthenticated && authProvider.user?.token != null) {
+    final receiptsProvider = Provider.of<ReceiptsProvider>(context, listen: false);
+    receiptsProvider.setContext(context);
+    print('DashboardSummary: Token configurado para ReceiptsProvider');
+  }
+
+  setState(() => _isLoading = true);
+
+  try {
+    // Obtener el reporte para la fecha actual
+    final reportData = await receiptsProvider.generateClosingReport(
+      DateTime.now(),
     );
 
-    setState(() => _isLoading = true);
-
-    try {
-      // Obtener el reporte para la fecha actual
-      final reportData = await receiptsProvider.generateClosingReport(
-        DateTime.now(),
-      );
-
-      setState(() {
-        _reportData = reportData;
-        _isLoading = false;
-      });
-    } catch (e) {
-      print('Error loading report data: $e');
-      setState(() {
-        _reportData = {
-          'summary': {},
-          'total': 0.0,
-          'date': DateTime.now().toString(),
-          'count': 0,
-        };
-        _isLoading = false;
-      });
-    }
+    setState(() {
+      _reportData = reportData;
+      _isLoading = false;
+    });
+  } catch (e) {
+    print('Error loading report data: $e');
+    setState(() {
+      _reportData = {
+        'summary': {},
+        'total': 0.0,
+        'date': DateTime.now().toString(),
+        'count': 0,
+      };
+      _isLoading = false;
+    });
   }
+}
   
-  // Método para cargar datos de administrador
+  // ✅ MÉTODO CORREGIDO: Cargar datos de administrador
   Future<void> _loadAdminData() async {
-    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-    adminProvider.setContext(context);
-    
-    // Establecer token desde el AuthProvider
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.isAuthenticated) {
-      adminProvider.setAuthToken(authProvider.user?.token);
+    try {
+      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      if (!authProvider.isAuthenticated || authProvider.user?.token == null) {
+        print('DashboardSummary: No hay token disponible para AdminProvider');
+        return;
+      }
+      
+      // Configurar contexto y token
+      adminProvider.setContext(context);
+      adminProvider.setAuthToken(authProvider.user!.token);
+      
+      print('DashboardSummary: Token configurado para AdminProvider');
+      
+      // ✅ CORRECCIÓN: Usar Future.delayed para evitar setState durante build
+      await Future.delayed(Duration.zero);
+      await adminProvider.loadPendingUsers();
+      
+    } catch (e) {
+      print('Error en _loadAdminData: $e');
     }
-    
-    await adminProvider.loadPendingUsers();
   }
-  
-  // Método para cargar mensajes
+
+  // ✅ MÉTODO CORREGIDO: Cargar mensajes
   Future<void> _loadMessages() async {
-    final messageProvider = Provider.of<MessageProvider>(context, listen: false);
-    messageProvider.setContext(context);
-    
-    // Establecer token desde el AuthProvider
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.isAuthenticated) {
-      messageProvider.setAuthToken(authProvider.user?.token);
+    try {
+      final messageProvider = Provider.of<MessageProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      
+      if (!authProvider.isAuthenticated || authProvider.user?.token == null) {
+        print('DashboardSummary: No hay token disponible para MessageProvider');
+        return;
+      }
+      
+      // Configurar contexto y token
+      messageProvider.setContext(context);
+      messageProvider.setAuthToken(authProvider.user!.token);
+      
+      print('DashboardSummary: Token configurado para MessageProvider');
+      
+      // ✅ CORRECCIÓN: Usar Future.delayed para evitar setState durante build
+      await Future.delayed(Duration.zero);
+      await messageProvider.loadMessages();
+      
+    } catch (e) {
+      print('Error en _loadMessages: $e');
     }
-    
-    await messageProvider.loadMessages();
   }
 
   @override
@@ -115,8 +148,6 @@ class _DashboardSummaryState extends State<DashboardSummary> {
           
         // Mensajes para todos los usuarios
         _buildMessagesAlert(),
-        
-
         
         // Resumen del día - SOLO SI HAY DATOS
         if (_isLoading) 

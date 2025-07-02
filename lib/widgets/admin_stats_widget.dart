@@ -1,8 +1,10 @@
+// lib/widgets/admin_stats_widget.dart - LAYOUT 2x3 EN LUGAR DE 3x2
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/admin_provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/user_management_screen.dart';
+import 'package:flutter/scheduler.dart';
 
 class AdminStatsWidget extends StatefulWidget {
   @override
@@ -10,25 +12,44 @@ class AdminStatsWidget extends StatefulWidget {
 }
 
 class _AdminStatsWidgetState extends State<AdminStatsWidget> {
-  @override
-  void initState() {
-    super.initState();
+@override
+void initState() {
+  super.initState();
+  
+  WidgetsBinding.instance.addPostFrameCallback((_) {
     _loadStats();
-  }
+  });
+}
 
-  Future<void> _loadStats() async {
+Future<void> _loadStats() async {
+  try {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
-      final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-      adminProvider.setContext(context);
-      
-      if (authProvider.isAuthenticated) {
-        adminProvider.setAuthToken(authProvider.user?.token);
-      }
-      
-      await adminProvider.loadAllUsers();
+    
+    if (!authProvider.hasRole('admin') && !authProvider.hasRole('asesor')) {
+      return;
     }
+    
+    if (!authProvider.isAuthenticated || authProvider.user?.token == null) {
+      print('AdminStatsWidget: No hay token disponible');
+      return;
+    }
+    
+    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
+    
+    // Configurar contexto y token
+    adminProvider.setContext(context);
+    adminProvider.setAuthToken(authProvider.user!.token);
+    
+    print('AdminStatsWidget: Token configurado: ${authProvider.user!.token.substring(0, 10)}...');
+    
+    // ✅ CORRECCIÓN: Usar Future.delayed para evitar setState durante build
+    await Future.delayed(Duration.zero);
+    await adminProvider.loadAllUsers();
+    
+  } catch (e) {
+    print('Error en _loadStats: $e');
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -89,72 +110,60 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                 ),
                 SizedBox(height: 16),
                 
-                // Estadísticas generales
-                Row(
+                // ✅ CAMBIO: Grid 2x3 en lugar de filas separadas
+                GridView.count(
+                  shrinkWrap: true,
+                  physics: NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,  // ← 2 columnas
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.8,  // ← Más ancho que alto para que se vean bien
                   children: [
-                    Expanded(
-                      child: _buildStatCard(
-                        'Total Usuarios',
-                        stats['total'].toString(),
-                        Icons.people,
-                        Colors.blue.shade700,
-                      ),
+                    // Fila 1
+                    _buildStatCard(
+                      'Total Usuarios',
+                      stats['total'].toString(),
+                      Icons.people,
+                      Colors.blue.shade700,
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatCard(
-                        'Activos',
-                        stats['activos'].toString(),
-                        Icons.check_circle,
-                        Colors.green.shade700,
-                      ),
+                    _buildStatCard(
+                      'Activos',
+                      stats['activos'].toString(),
+                      Icons.check_circle,
+                      Colors.green.shade700,
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatCard(
-                        'Pendientes',
-                        stats['pendientes'].toString(),
-                        Icons.pending,
-                        Colors.orange.shade700,
-                      ),
+                    
+                    // Fila 2
+                    _buildStatCard(
+                      'Pendientes',
+                      stats['pendientes'].toString(),
+                      Icons.pending,
+                      Colors.orange.shade700,
                     ),
-                  ],
-                ),
-                SizedBox(height: 12),
-                
-                // Segunda fila de estadísticas
-                Row(
-                  children: [
-                    Expanded(
-                      child: _buildStatCard(
-                        'Suspendidos',
-                        stats['suspendidos'].toString(),
-                        Icons.block,
-                        Colors.red.shade700,
-                      ),
+                    _buildStatCard(
+                      'Suspendidos',
+                      stats['suspendidos'].toString(),
+                      Icons.block,
+                      Colors.red.shade700,
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatCard(
-                        'Admins',
-                        stats['admins'].toString(),
-                        Icons.admin_panel_settings,
-                        Colors.purple.shade700,
-                      ),
+                    
+                    // Fila 3
+                    _buildStatCard(
+                      'Admins',
+                      stats['admins'].toString(),
+                      Icons.admin_panel_settings,
+                      Colors.purple.shade700,
                     ),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: _buildStatCard(
-                        'CNBS',
-                        stats['cnbs'].toString(),
-                        Icons.person,
-                        Colors.indigo.shade700,
-                      ),
+                    _buildStatCard(
+                      'CNBS',
+                      stats['cnbs'].toString(),
+                      Icons.person,
+                      Colors.indigo.shade700,
                     ),
                   ],
                 ),
                 
-                // Alertas si hay problemas - CORREGIDO
+                // Alertas si hay problemas
                 if ((stats['pendientes'] as int) > 0) ...[
                   SizedBox(height: 16),
                   Container(
@@ -170,7 +179,8 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                                   '${stats['pendientes']} usuario${((stats['pendientes'] as int) > 1) ? 's' : ''} esperando aprobación',                            style: TextStyle(
+                            '${stats['pendientes']} usuario${((stats['pendientes'] as int) > 1) ? 's' : ''} pendiente${((stats['pendientes'] as int) > 1) ? 's' : ''} de aprobación',
+                            style: TextStyle(
                               color: Colors.orange.shade800,
                               fontWeight: FontWeight.w500,
                             ),
@@ -185,7 +195,7 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                               ),
                             );
                           },
-                          child: Text('Revisar'),
+                          child: Text('Gestionar'),
                         ),
                       ],
                     ),
@@ -203,7 +213,7 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.block, color: Colors.red.shade800),
+                        Icon(Icons.warning, color: Colors.red.shade800),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -246,6 +256,7 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
         border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, color: color, size: 20),
           SizedBox(height: 4),

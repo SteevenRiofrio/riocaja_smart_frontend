@@ -1,12 +1,9 @@
-// lib/screens/home_screen.dart - VERSIÓN COMPLETA Y CORREGIDA
+// lib/screens/home_screen.dart - VERSIÓN FINAL LIMPIA
 import 'package:flutter/material.dart';
 import 'package:riocaja_smart/screens/scanner_screen.dart';
 import 'package:riocaja_smart/screens/history_screen.dart';
 import 'package:riocaja_smart/screens/report_screen.dart';
 import 'package:riocaja_smart/screens/excel_reports_screen.dart';
-import 'package:riocaja_smart/screens/user_management_screen.dart';
-import 'package:riocaja_smart/screens/pending_users_screen.dart';
-import 'package:riocaja_smart/screens/messages_screen.dart';
 import 'package:riocaja_smart/widgets/dashboard_summary.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
@@ -47,10 +44,24 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   @override
-  Widget build(BuildContext context) {
-    return Consumer<AuthProvider>(
-      builder: (context, authProvider, child) {
-        return Scaffold(
+Widget build(BuildContext context) {
+  return Consumer<AuthProvider>(
+    builder: (context, authProvider, child) {
+      
+      // ✅ CONFIGURAR TODOS LOS SERVICIOS CON EL TOKEN AL INICIO
+      if (authProvider.isAuthenticated && authProvider.user?.token != null) {
+        // Configurar ReceiptsProvider
+        final receiptsProvider = Provider.of<ReceiptsProvider>(context, listen: false);
+        receiptsProvider.setContext(context);
+        
+        // Configurar ApiService global (para reportes)
+        authProvider.apiService.setContext(context);
+        authProvider.apiService.setAuthToken(authProvider.user!.token);
+        
+        print('HomeScreen: Todos los servicios configurados con token');
+      }
+      
+      return Scaffold(
           appBar: AppBar(
             title: Text('RíoCaja Smart', style: TextStyle(color: Colors.white)),
             backgroundColor: Colors.green.shade700,
@@ -81,7 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Resumen del dashboard
+                  // Dashboard con estadísticas (AdminStatsWidget + alertas)
                   DashboardSummary(),
                   SizedBox(height: 20),
 
@@ -171,142 +182,35 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
 
-                  // ADMIN y ASESOR ven Panel de Administración + Mensajes
+                  // ✅ ADMIN/ASESOR: SOLO ven el dashboard, todo lo demás por menú
                   if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) ...[
-                    Text(
-                      'Panel de Administración',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    
-                    // Panel de administración para Admin/Asesor
-                    GridView.count(
-                      shrinkWrap: true,
-                      physics: NeverScrollableScrollPhysics(),
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.1,
-                      children: [
-                        // Gestión de Usuarios
-                        _buildModernActionCard(
-                          context: context,
-                          title: 'GESTIÓN',
-                          subtitle: 'USUARIOS',
-                          icon: Icons.people,
-                          iconSecondary: Icons.admin_panel_settings,
-                          color: Colors.indigo.shade600,
-                          gradientColors: [Colors.indigo.shade400, Colors.indigo.shade700],
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => UserManagementScreen()),
+                    Center(
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.admin_panel_settings,
+                            size: 48,
+                            color: Colors.grey.shade400,
                           ),
-                        ),
-                        
-                        // Usuarios Pendientes
-                        _buildModernActionCard(
-                          context: context,
-                          title: 'USUARIOS',
-                          subtitle: 'PENDIENTES',
-                          icon: Icons.person_add,
-                          iconSecondary: Icons.pending_actions,
-                          color: Colors.orange.shade600,
-                          gradientColors: [Colors.orange.shade400, Colors.orange.shade700],
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => PendingUsersScreen()),
-                          ),
-                        ),
-                        
-                        // Mensajes del Sistema
-                        _buildModernActionCard(
-                          context: context,
-                          title: 'MENSAJES',
-                          subtitle: 'SISTEMA',
-                          icon: Icons.message,
-                          iconSecondary: Icons.notification_important,
-                          color: Colors.red.shade600,
-                          gradientColors: [Colors.red.shade400, Colors.red.shade700],
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => MessagesScreen()),
-                          ),
-                        ),
-                        
-                        // Reportes Avanzados
-                        _buildModernActionCard(
-                          context: context,
-                          title: 'REPORTES',
-                          subtitle: 'AVANZADOS',
-                          icon: Icons.analytics,
-                          iconSecondary: Icons.insights,
-                          color: Colors.purple.shade600,
-                          gradientColors: [Colors.purple.shade400, Colors.purple.shade700],
-                          onTap: () => Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => ExcelReportsScreen()),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    SizedBox(height: 20),
-                    
-                    // Sección de Mensajes para Admin/Asesor
-                    Text(
-                      'Mensajes',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey.shade800,
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    
-                    // Widget de mensajes
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => MessagesScreen()),
-                      ),
-                      child: Container(
-                        padding: EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.message, color: Colors.blue.shade700, size: 32),
-                            SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Sistema de Mensajes',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                      color: Colors.blue.shade700,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    'Comunícate con usuarios y administra notificaciones del sistema.',
-                                    style: TextStyle(fontSize: 14, color: Colors.blue.shade600),
-                                  ),
-                                ],
-                              ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Panel de Administración',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.grey.shade600,
                             ),
-                            Icon(Icons.arrow_forward_ios, color: Colors.blue.shade700),
-                          ],
-                        ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            'Usa el menú lateral para acceder a todas las funciones administrativas',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey.shade500,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -319,7 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Método para construir tarjetas modernas de acción
+  // Método para construir tarjetas modernas de acción (solo para CNB)
   Widget _buildModernActionCard({
     required BuildContext context,
     required String title,

@@ -1,4 +1,4 @@
-// lib/models/user.dart - CON REFRESH TOKEN AGREGADO
+// lib/models/user.dart - CON REFRESH TOKEN Y SIN ROL POR DEFECTO
 class User {
   final String id;
   final String nombre;
@@ -40,13 +40,13 @@ class User {
     };
   }
 
-  // Crear objeto desde Map
+  // ✅ CORREGIDO: Crear objeto desde Map SIN valor por defecto para rol
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
       id: json['id'] ?? json['_id'] ?? '',
       nombre: json['nombre'] ?? '',
       email: json['email'] ?? '',
-      rol: json['rol'] ?? 'cnb',
+      rol: json['rol'],  // ← SIN valor por defecto - usa el que viene del backend
       token: json['token'] ?? '',
       refreshToken: json['refresh_token'], 
       estado: json['estado'] ?? 'activo',

@@ -58,6 +58,12 @@ class AuthProvider with ChangeNotifier {
         _user = _authService.currentUser;
         _authStatus = AuthStatus.authenticated;
 
+        print('🔑 AUTH PROVIDER DEBUG:');
+        print('   Usuario: ${_user!.nombre}');
+        print('   Rol: "${_user!.rol}"');
+        print('   AuthStatus: $_authStatus');
+        print('   Perfil completo: $_perfilCompleto');
+
         // Sincronizar tokens con ApiService
         _syncTokensWithApiService();
 
@@ -74,8 +80,6 @@ class AuthProvider with ChangeNotifier {
     _isLoading = false;
     notifyListeners();
   }
-
-
 
   // Método para sincronizar tokens con ApiService
   void _syncTokensWithApiService() {
