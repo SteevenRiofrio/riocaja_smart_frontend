@@ -1,4 +1,4 @@
-// lib/widgets/app_drawer.dart - ACTUALIZADO CON TEXT CONSTANTS
+// lib/widgets/app_drawer.dart - MENÚ CORRECTO PARA CADA ROL
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -18,6 +18,10 @@ class AppDrawer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
+    final userRole = authProvider.user?.rol ?? 'cnb';
+    final isAdmin = userRole == 'admin';
+    final isAsesor = userRole == 'asesor';
+    final isCNB = userRole == 'cnb';
     
     return Drawer(
       child: Column(
@@ -48,15 +52,14 @@ class AppDrawer extends StatelessWidget {
               ),
             ),
             otherAccountsPictures: [
-              // Indicador de rol
               Container(
                 decoration: BoxDecoration(
-                  color: _getRoleColor(authProvider.user?.rol ?? 'cnb'),
+                  color: _getRoleColor(userRole),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
-                    _getRoleIcon(authProvider.user?.rol ?? 'cnb'),
+                    _getRoleIcon(userRole),
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -72,23 +75,24 @@ class AppDrawer extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
+                // 1. INICIO - Para todos
                 ListTile(
                   leading: Icon(Icons.home),
-                  title: Text(TextConstants.inicio),
+                  title: Text('Inicio'),
                   onTap: () {
-                    Navigator.of(context).pop(); // Cerrar drawer
+                    Navigator.of(context).pop();
                     Navigator.of(context).pushReplacement(
                       MaterialPageRoute(builder: (context) => HomeScreen()),
                     );
                   },
                 ),
                 
-                // Escanear Comprobante para todos los roles
+                // 2. ESCANEAR COMPROBANTE - Para todos
                 ListTile(
                   leading: Icon(Icons.document_scanner, color: Colors.green.shade700),
-                  title: Text(TextConstants.escanearComprobante),
+                  title: Text('Escanear Comprobante'),
                   onTap: () {
-                    Navigator.pop(context); // Cerrar drawer
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => ScannerScreen()),
@@ -96,82 +100,72 @@ class AppDrawer extends StatelessWidget {
                   },
                 ),
                 
+                // 3. HISTORIAL DE COMPROBANTES - Para todos
                 ListTile(
                   leading: Icon(Icons.history),
-                  title: Text(TextConstants.historialComprobantes),
+                  title: Text('Historial de Comprobantes'),
                   onTap: () {
-                    Navigator.pop(context); // Cerrar drawer
+                    Navigator.pop(context);
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => HistoryScreen()),
                     );
                   },
                 ),
-                
-                Divider(),
-                
-                // Sección de Reportes
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Text(
-                    TextConstants.reportes,
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
+
+                // Solo para ADMIN y ASESOR - Reportes adicionales
+                if (isAdmin || isAsesor) ...[
+                  // 4. REPORTES DE CIERRE - Solo Admin/Asesor
+                  ListTile(
+                    leading: Icon(Icons.assessment, color: Colors.blue.shade700),
+                    title: Text('Reportes de Cierre'),
+                    subtitle: Text('Ver y compartir reportes'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ReportScreen()),
+                      );
+                    },
                   ),
-                ),
+                  
+                  // 5. REPORTES EXCEL - Solo Admin/Asesor
+                  ListTile(
+                    leading: Icon(Icons.table_chart, color: Colors.green.shade700),
+                    title: Text('Reportes Excel'),
+                    subtitle: Text('Exportar datos detallados'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ExcelReportsScreen()),
+                      );
+                    },
+                  ),
+                ],
+
+                // 6. MENSAJES - Para Admin y Asesor
+                if (isAdmin || isAsesor) ...[
+                  ListTile(
+                    leading: Icon(Icons.message, color: Colors.purple.shade700),
+                    title: Text('Mensajes'),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => MessagesScreen()),
+                      );
+                    },
+                  ),
+                ],
                 
-                ListTile(
-                  leading: Icon(Icons.summarize, color: Colors.blue.shade700),
-                  title: Text(TextConstants.reportesCierre),
-                  subtitle: Text(TextConstants.verCompartir),
-                  onTap: () {
-                    Navigator.pop(context); // Cerrar drawer
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ReportScreen()),
-                    );
-                  },
-                ),
-                
-                ListTile(
-                  leading: Icon(Icons.table_chart, color: Colors.green.shade700),
-                  title: Text(TextConstants.reportesExcel),
-                  subtitle: Text(TextConstants.exportarDatos),
-                  onTap: () {
-                    Navigator.pop(context); // Cerrar drawer
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => ExcelReportsScreen()),
-                    );
-                  },
-                ),
-                
-                Divider(),
-                
-                // Mensajes para todos los usuarios
-                ListTile(
-                  leading: Icon(Icons.mail),
-                  title: Text(TextConstants.mensajes),
-                  onTap: () {
-                    Navigator.pop(context); // Cerrar drawer
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => MessagesScreen()),
-                    );
-                  },
-                ),
-                
-                Divider(),
-                
-                // Opciones de administrador
-                if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) ...[
+                // Separador para administración
+                if (isAdmin || isAsesor) ...[
+                  Divider(),
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
-                      TextConstants.administracion,
+                      'Administración',
                       style: TextStyle(
                         color: Colors.grey.shade600,
                         fontWeight: FontWeight.bold,
@@ -180,12 +174,13 @@ class AppDrawer extends StatelessWidget {
                     ),
                   ),
                   
+                  // 7. GESTIÓN DE USUARIOS - Solo Admin/Asesor
                   ListTile(
                     leading: Icon(Icons.people_alt, color: Colors.green.shade700),
-                    title: Text(TextConstants.gestionUsuarios),
-                    subtitle: Text(TextConstants.administrarTodosLosUsuarios),
+                    title: Text('Gestión de Usuarios'),
+                    subtitle: Text('Administrar todos los usuarios del sistema'),
                     onTap: () {
-                      Navigator.pop(context); // Cerrar drawer
+                      Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => UserManagementScreen()),
@@ -193,12 +188,13 @@ class AppDrawer extends StatelessWidget {
                     },
                   ),
                   
+                  // 8. USUARIOS PENDIENTES - Solo Admin/Asesor  
                   ListTile(
                     leading: Icon(Icons.person_add, color: Colors.orange.shade700),
-                    title: Text(TextConstants.usuariosPendientes),
-                    subtitle: Text(TextConstants.soloPendientesAprobacion),
+                    title: Text('Usuarios Pendientes'),
+                    subtitle: Text('Solo usuarios pendientes de aprobación'),
                     onTap: () {
-                      Navigator.pop(context); // Cerrar drawer
+                      Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => PendingUsersScreen()),
@@ -206,24 +202,26 @@ class AppDrawer extends StatelessWidget {
                     },
                   ),
                   
+                  // 9. DIAGNÓSTICO - Solo Admin/Asesor
                   ListTile(
                     leading: Icon(Icons.bug_report, color: Colors.red.shade700),
-                    title: Text(TextConstants.diagnostico),
+                    title: Text('Diagnóstico'),
                     onTap: () {
-                      Navigator.pop(context); // Cerrar drawer
+                      Navigator.pop(context);
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (context) => DebugScreen()),
                       );
                     },
                   ),
-                  Divider(),
                 ],
+                
+                // CNB solo ve lo básico (ya está arriba)
               ],
             ),
           ),
           
-          // Sección inferior con logout
+          // Sección inferior con información de rol y logout
           Container(
             padding: EdgeInsets.all(8),
             child: Column(
@@ -244,14 +242,14 @@ class AppDrawer extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Rol: ${TextConstants.getRoleName(authProvider.user?.rol ?? 'cnb')}',
+                              'Rol: ${_getRoleName(userRole)}',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
                             Text(
-                              'Local: ${authProvider.user?.nombreLocal ?? TextConstants.administracion}',
+                              'Local: ${authProvider.user?.nombreLocal ?? 'Administración'}',
                               style: TextStyle(fontSize: 10),
                             ),
                           ],
@@ -260,16 +258,21 @@ class AppDrawer extends StatelessWidget {
                     ],
                   ),
                 ),
+                
                 SizedBox(height: 8),
                 
-                // Botón de cerrar sesión
-                ElevatedButton(
-                  onPressed: () => _showLogoutDialog(context, authProvider),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
+                // Botón de logout
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showLogoutDialog(context),
+                    icon: Icon(Icons.logout),
+                    label: Text('Cerrar Sesión'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
                   ),
-                  child: Text(TextConstants.cerrarSesion),
                 ),
               ],
             ),
@@ -279,23 +282,23 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  // Mostrar diálogo de confirmación para cerrar sesión
-  void _showLogoutDialog(BuildContext context, AuthProvider authProvider) {
+  // Diálogo de confirmación de logout
+  void _showLogoutDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: Text(TextConstants.confirmarCierreSesion),
-          content: Text(TextConstants.estaSeguroCerrarSesion),
+          title: Text('Confirmar cierre de sesión'),
+          content: Text('¿Está seguro que desea cerrar sesión?'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(); // Cerrar diálogo
-              },
-              child: Text(TextConstants.cancelar),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text('Cancelar'),
             ),
             ElevatedButton(
               onPressed: () async {
+                final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                
                 Navigator.of(dialogContext).pop(); // Cerrar diálogo
                 Navigator.of(context).pop(); // Cerrar drawer
                 
@@ -312,7 +315,7 @@ class AppDrawer extends StatelessWidget {
                           children: [
                             CircularProgressIndicator(),
                             SizedBox(height: 16),
-                            Text(TextConstants.cerrandoSesion),
+                            Text('Cerrando sesión...'),
                           ],
                         ),
                       ),
@@ -321,29 +324,25 @@ class AppDrawer extends StatelessWidget {
                 );
                 
                 try {
-                  // Realizar logout
                   await authProvider.logout();
                   
-                  // Cerrar indicador de carga y navegar a login
                   Navigator.of(context).pushAndRemoveUntil(
                     MaterialPageRoute(builder: (context) => LoginScreen()),
-                    (route) => false, // Eliminar todas las rutas anteriores
+                    (route) => false,
                   );
                   
-                  // Mostrar mensaje de confirmación
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text(TextConstants.sesionCerradaCorrectamente),
+                      content: Text('Sesión cerrada correctamente'),
                       backgroundColor: Colors.green,
                       duration: Duration(seconds: 2),
                     ),
                   );
                 } catch (e) {
-                  // En caso de error, cerrar el indicador y mostrar error
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
-                      content: Text('${TextConstants.errorCerrarSesion}: $e'),
+                      content: Text('Error al cerrar sesión: $e'),
                       backgroundColor: Colors.red,
                     ),
                   );
@@ -353,7 +352,7 @@ class AppDrawer extends StatelessWidget {
                 backgroundColor: Colors.red,
                 foregroundColor: Colors.white,
               ),
-              child: Text(TextConstants.cerrarSesion),
+              child: Text('Cerrar Sesión'),
             ),
           ],
         );
@@ -361,7 +360,7 @@ class AppDrawer extends StatelessWidget {
     );
   }
 
-  // Obtener color según el rol
+  // Funciones auxiliares para colores e iconos
   Color _getRoleColor(String rol) {
     switch (rol) {
       case 'admin':
@@ -373,7 +372,6 @@ class AppDrawer extends StatelessWidget {
     }
   }
 
-  // Obtener icono según el rol
   String _getRoleIcon(String rol) {
     switch (rol) {
       case 'admin':
@@ -381,7 +379,18 @@ class AppDrawer extends StatelessWidget {
       case 'asesor':
         return 'O';
       default:
-        return 'L';
+        return 'C';
+    }
+  }
+
+  String _getRoleName(String rol) {
+    switch (rol) {
+      case 'admin':
+        return 'Administrador';
+      case 'asesor':
+        return 'Asesor';
+      default:
+        return 'CNB';
     }
   }
 }
