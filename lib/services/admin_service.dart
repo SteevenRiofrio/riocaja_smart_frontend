@@ -89,69 +89,74 @@ class AdminService {
   // NUEVO: Función auxiliar para mínimo
   int _min(int a, int b) => a < b ? a : b;
 
-  // ACTUALIZAR EL MÉTODO _retryableRequest EXISTENTE
-  Future<http.Response> _retryableRequest(
-    String method,
-    String url, {
-    Map<String, dynamic>? body,
-    int maxRetries = 3,
-  }) async {
-    for (int i = 0; i < maxRetries; i++) {
-      try {
-        final headers = await getHeaders();  // USAR EL NUEVO MÉTODO getHeaders()
-        
-        late http.Response response;
-        switch (method.toUpperCase()) {
-          case 'GET':
-            response = await http.get(Uri.parse(url), headers: headers);
+Future<http.Response> _retryableRequest(
+  String method,
+  String url, {
+  Map<String, dynamic>? body,
+  int maxRetries = 3,
+}) async {
+  for (int i = 0; i < maxRetries; i++) {
+    try {
+      // ✅ CAMBIO CLAVE: Usar getHeaders() que incluye Authorization
+      final headers = await getHeaders();
+      
+      print('AdminService: Petición $method a: $url');
+      print('AdminService: Headers incluyen Authorization: ${headers.containsKey('Authorization')}');
+      
+      late http.Response response;
+      switch (method.toUpperCase()) {
+        case 'GET':
+          response = await http.get(Uri.parse(url), headers: headers);
+          break;
+        case 'POST':
+          response = await http.post(
+            Uri.parse(url),
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          );
+          break;
+        case 'PUT':
+          response = await http.put(
+            Uri.parse(url),
+            headers: headers,
+            body: body != null ? jsonEncode(body) : null,
+          );
+          break;
+        case 'DELETE':
+          response = await http.delete(Uri.parse(url), headers: headers);
+          break;
+        default:
+          throw Exception('Método HTTP no soportado: $method');
+      }
+      
+      print('AdminService: Respuesta ${response.statusCode} de $url');
+      
+      // Manejar token expirado
+      if (response.statusCode == 401) {
+        print('AdminService: Token expirado, intentando renovar...');
+        if (_context != null) {
+          final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+          final refreshSuccess = await authProvider.refreshToken();
+          if (refreshSuccess) {
+            _authToken = authProvider.user?.token;
+            continue; // Reintentar con nuevo token
+          } else {
+            _redirectToLogin('Sesión expirada. Por favor inicie sesión nuevamente.');
             break;
-          case 'POST':
-            response = await http.post(
-              Uri.parse(url),
-              headers: headers,
-              body: body != null ? jsonEncode(body) : null,
-            );
-            break;
-          case 'PUT':
-            response = await http.put(
-              Uri.parse(url),
-              headers: headers,
-              body: body != null ? jsonEncode(body) : null,
-            );
-            break;
-          case 'DELETE':
-            response = await http.delete(Uri.parse(url), headers: headers);
-            break;
-          default:
-            throw Exception('Método HTTP no soportado: $method');
-        }
-        
-        // Manejar token expirado
-        if (response.statusCode == 401) {
-          print('AdminService: Token expirado, intentando renovar...');
-          if (_context != null) {
-            final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-            final refreshSuccess = await authProvider.refreshToken();
-            if (refreshSuccess) {
-              _authToken = authProvider.user?.token;
-              continue; // Reintentar con nuevo token
-            } else {
-              _redirectToLogin('Sesión expirada. Por favor inicie sesión nuevamente.');
-              break;
-            }
           }
         }
-        
-        return response;
-      } catch (e) {
-        print('AdminService: Error en intento ${i + 1}: $e');
-        if (i == maxRetries - 1) rethrow;
-        await Future.delayed(Duration(seconds: 1));
       }
+      
+      return response;
+      
+    } catch (e) {
+      print('AdminService: Error en intento ${i + 1}: $e');
+      if (i == maxRetries - 1) rethrow;
+      await Future.delayed(Duration(seconds: 1));
     }
-    throw Exception('Máximo número de reintentos alcanzado');
   }
-  
+  throw Exception('Máximo número de reintentos alcanzado');
+}
   // ================================
   // GESTIÓN DE USUARIOS PENDIENTES
   // ================================
