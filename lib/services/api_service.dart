@@ -722,4 +722,174 @@ Future<bool> refreshToken() async {
 }
 
 
+
+// ================================
+  // MÉTODOS DE ADMINISTRACIÓN DE USUARIOS
+  // ================================
+
+  // Obtener usuarios pendientes
+  Future<List<Map<String, dynamic>>> getPendingUsers() async {
+    try {
+      final url = '$baseUrl/auth/pending-users';
+      print('Obteniendo usuarios pendientes: $url');
+
+      final response = await _makeRequestWithRetry('GET', url);
+      print('Código de respuesta usuarios pendientes: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final responseData = jsonDecode(response.body);
+        if (responseData is List) {
+          return responseData.cast<Map<String, dynamic>>();
+        } else if (responseData['users'] != null) {
+          return List<Map<String, dynamic>>.from(responseData['users']);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error al obtener usuarios pendientes: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Obtener todos los usuarios
+  Future<List<Map<String, dynamic>>> getAllUsers() async {
+    try {
+      final url = '$baseUrl/auth/all-users';
+      print('Obteniendo todos los usuarios: $url');
+
+      final response = await _makeRequestWithRetry('GET', url);
+      print('Código de respuesta todos usuarios: ${response.statusCode}');
+
+      if (response.statusCode == 200 && response.body.isNotEmpty) {
+        final responseData = jsonDecode(response.body);
+        if (responseData is List) {
+          return responseData.cast<Map<String, dynamic>>();
+        } else if (responseData['users'] != null) {
+          return List<Map<String, dynamic>>.from(responseData['users']);
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error al obtener todos los usuarios: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Aprobar usuario con código
+  Future<bool> approveUserWithCode(String userId, String codigo) async {
+    try {
+      final url = '$baseUrl/auth/approve-user';
+      print('Aprobando usuario con código: $url');
+
+      final response = await _makeRequestWithRetry(
+        'POST',
+        url,
+        body: {
+          'user_id': userId,
+          'codigo_corresponsal': codigo,
+        },
+      );
+
+      print('Código de respuesta aprobar usuario: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error al aprobar usuario: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Rechazar usuario
+  Future<bool> rejectUser(String userId, {String? reason}) async {
+    try {
+      final url = '$baseUrl/auth/reject-user';
+      print('Rechazando usuario: $url');
+
+      final response = await _makeRequestWithRetry(
+        'POST',
+        url,
+        body: {
+          'user_id': userId,
+          if (reason != null) 'reason': reason,
+        },
+      );
+
+      print('Código de respuesta rechazar usuario: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error al rechazar usuario: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Cambiar estado de usuario
+  Future<bool> changeUserState(String userId, String newState, {String? reason}) async {
+    try {
+      final url = '$baseUrl/auth/change-user-state';
+      print('Cambiando estado de usuario: $url');
+
+      final response = await _makeRequestWithRetry(
+        'POST',
+        url,
+        body: {
+          'user_id': userId,
+          'state': newState,
+          if (reason != null) 'reason': reason,
+        },
+      );
+
+      print('Código de respuesta cambiar estado: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error al cambiar estado de usuario: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Cambiar rol de usuario
+  Future<bool> changeUserRole(String userId, String newRole) async {
+    try {
+      final url = '$baseUrl/auth/change-role';
+      print('Cambiando rol de usuario: $url');
+
+      final response = await _makeRequestWithRetry(
+        'POST',
+        url,
+        body: {
+          'user_id': userId,
+          'role': newRole,
+        },
+      );
+
+      print('Código de respuesta cambiar rol: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error al cambiar rol de usuario: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Eliminar usuario
+  Future<bool> deleteUser(String userId, {String? reason}) async {
+    try {
+      final url = '$baseUrl/auth/delete-user';
+      print('Eliminando usuario: $url');
+
+      final response = await _makeRequestWithRetry(
+        'POST',
+        url,
+        body: {
+          'user_id': userId,
+          if (reason != null) 'reason': reason,
+        },
+      );
+
+      print('Código de respuesta eliminar usuario: ${response.statusCode}');
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error al eliminar usuario: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+
 }

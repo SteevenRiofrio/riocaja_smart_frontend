@@ -447,7 +447,19 @@ class AuthProvider with ChangeNotifier {
       final userData = await _authService.getUserData();
 
       if (userData['success']) {
-        final userInfo = userData['data']['data'];
+        // ✅ CORRECCIÓN: Verificar que los datos no sean null
+        final dataResponse = userData['data'];
+        if (dataResponse == null) {
+          print('AuthProvider: Datos de usuario null en respuesta');
+          return false;
+        }
+
+        final userInfo = dataResponse['data'] ?? dataResponse;
+        if (userInfo == null) {
+          print('AuthProvider: userInfo es null');
+          return false;
+        }
+
         final currentState = userInfo['estado'] ?? 'pendiente';
 
         // Si el usuario no está activo, cerrar sesión automáticamente
@@ -479,7 +491,6 @@ class AuthProvider with ChangeNotifier {
         _errorMessage =
             'Tu sesión fue cerrada porque iniciaste sesión en otro dispositivo.';
         notifyListeners();
-
         return false;
       }
 
@@ -487,7 +498,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Actualizar el método checkAndRefreshToken existente
   Future<bool> checkAndRefreshToken() async {
     if (_user == null || _user!.token.isEmpty) {
       return false;
@@ -504,7 +514,18 @@ class AuthProvider with ChangeNotifier {
       final userData = await _authService.getUserData();
 
       if (userData['success']) {
-        final userInfo = userData['data']['data'];
+        // ✅ CORRECCIÓN: Verificar que los datos no sean null
+        final dataResponse = userData['data'];
+        if (dataResponse == null) {
+          print('AuthProvider: Datos de usuario null en checkAndRefreshToken');
+          return false;
+        }
+
+        final userInfo = dataResponse['data'] ?? dataResponse;
+        if (userInfo == null) {
+          print('AuthProvider: userInfo es null en checkAndRefreshToken');
+          return false;
+        }
 
         // Solo verificar perfil completo para usuarios normales
         if (_user!.rol != 'admin' && _user!.rol != 'asesor') {

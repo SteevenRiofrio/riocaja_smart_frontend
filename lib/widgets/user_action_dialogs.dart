@@ -1,487 +1,254 @@
-// lib/widgets/user_action_dialogs.dart - DIÁLOGOS PARA ACCIONES DE USUARIO
+// lib/widgets/user_action_dialogs.dart
 import 'package:flutter/material.dart';
-import 'package:riocaja_smart/utils/text_constants.dart';
 
 class UserActionDialogs {
   
-  // ================================
-  // DIÁLOGO DE APROBACIÓN CON CÓDIGO
-  // ================================
-  
+  // Diálogo de aprobación
   static Future<String?> showApprovalDialog(BuildContext context, String userName) async {
-    final TextEditingController codigoController = TextEditingController();
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
+    String? codigo;
+    
     return showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 28),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Aprobar Usuario',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+      builder: (context) => AlertDialog(
+        title: Text('Aprobar Usuario'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¿Desea aprobar a $userName?'),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Código de Corresponsal',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Usuario: $userName', style: TextStyle(fontWeight: FontWeight.w500)),
-                SizedBox(height: 16),
-                Text(
-                  'Asignar Código de Corresponsal:',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                SizedBox(height: 8),
-                TextFormField(
-                  controller: codigoController,
-                  decoration: InputDecoration(
-                    hintText: 'Ej: CNB001',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    prefixIcon: Icon(Icons.qr_code),
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'El código es obligatorio';
-                    }
-                    if (value.trim().length < 4) {
-                      return 'El código debe tener al menos 4 caracteres';
-                    }
-                    if (!RegExp(r'^[A-Z0-9]+$').hasMatch(value.trim().toUpperCase())) {
-                      return 'Solo letras mayúsculas y números';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: 12),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.green.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.info, color: Colors.green.shade700, size: 20),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Se enviará un email automático de aprobación con el código asignado.',
-                          style: TextStyle(
-                            color: Colors.green.shade700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                if (formKey.currentState!.validate()) {
-                  Navigator.of(context).pop(codigoController.text.trim().toUpperCase());
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Aprobar'),
+              onChanged: (value) => codigo = value,
             ),
           ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (codigo != null && codigo!.isNotEmpty) {
+                Navigator.pop(context, codigo);
+              }
+            },
+            child: Text('Aprobar'),
+          ),
+        ],
+      ),
     );
   }
 
-  // ================================
-  // DIÁLOGO DE RECHAZO CON MOTIVO
-  // ================================
-  
+  // Diálogo de rechazo
   static Future<String?> showRejectDialog(BuildContext context, String userName) async {
-    final TextEditingController reasonController = TextEditingController();
-    final GlobalKey<FormState> formKey = GlobalKey<FormState>();
-
+    String? reason;
+    
     return showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Icon(Icons.cancel, color: Colors.red, size: 28),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Rechazar Usuario',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+      builder: (context) => AlertDialog(
+        title: Text('Rechazar Usuario'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¿Desea rechazar a $userName?'),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Motivo (opcional)',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          content: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Usuario: $userName', style: TextStyle(fontWeight: FontWeight.w500)),
-                SizedBox(height: 16),
-                Text(
-                  'Motivo del rechazo (opcional):',
-                  style: TextStyle(fontWeight: FontWeight.w500),
-                ),
-                SizedBox(height: 8),
-                TextFormField(
-                  controller: reasonController,
-                  maxLines: 3,
-                  decoration: InputDecoration(
-                    hintText: 'Ej: Documentación incompleta, datos incorretos...',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    prefixIcon: Icon(Icons.note_alt),
-                  ),
-                ),
-                SizedBox(height: 12),
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red.shade200),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.warning, color: Colors.red.shade700, size: 20),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Se enviará un email automático de rechazo al usuario.',
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final reason = reasonController.text.trim();
-                Navigator.of(context).pop(reason.isEmpty ? null : reason);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Rechazar'),
+              maxLines: 3,
+              onChanged: (value) => reason = value,
             ),
           ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, reason ?? ''),
+            child: Text('Rechazar'),
+          ),
+        ],
+      ),
     );
   }
 
-  // ================================
-  // DIÁLOGO GENÉRICO DE CAMBIO DE ESTADO
-  // ================================
-  
-  static Future<String?> showChangeStateDialog(
-    BuildContext context, 
-    String userName, 
-    String newState
-  ) async {
-    final TextEditingController reasonController = TextEditingController();
+  // Diálogo de cambio de estado
+  static Future<String?> showChangeStateDialog(BuildContext context, String userName, String newState) async {
+    String? reason;
     
-    // Configurar información según el estado
-    late String title;
-    late IconData icon;
-    late Color color;
-    late String actionText;
-    late String description;
-    
-    switch (newState.toLowerCase()) {
-      case 'suspendido':
-        title = 'Suspender Usuario';
-        icon = Icons.pause_circle;
-        color = Colors.orange;
-        actionText = 'Suspender';
-        description = 'El usuario no podrá acceder temporalmente al sistema.';
-        break;
-      case 'inactivo':
-        title = 'Desactivar Usuario';
-        icon = Icons.block;
-        color = Colors.grey;
-        actionText = 'Desactivar';
-        description = 'El usuario será marcado como inactivo.';
-        break;
-      case 'activo':
-        title = 'Activar Usuario';
-        icon = Icons.check_circle;
-        color = Colors.green;
-        actionText = 'Activar';
-        description = 'El usuario podrá acceder normalmente al sistema.';
-        break;
-      default:
-        title = 'Cambiar Estado';
-        icon = Icons.edit;
-        color = Colors.blue;
-        actionText = 'Cambiar';
-        description = 'Se cambiará el estado del usuario.';
-    }
-
     return showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Icon(icon, color: color, size: 28),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+      builder: (context) => AlertDialog(
+        title: Text('Cambiar Estado'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¿Cambiar estado de $userName a $newState?'),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Motivo (opcional)',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Usuario: $userName', style: TextStyle(fontWeight: FontWeight.w500)),
-              SizedBox(height: 8),
-              Text('Nuevo estado: ${TextConstants.getEstadoName(newState)}', 
-                   style: TextStyle(fontWeight: FontWeight.w500)),
-              SizedBox(height: 16),
-              Text(description, style: TextStyle(color: Colors.grey.shade600)),
-              SizedBox(height: 16),
-              Text(
-                'Motivo (opcional):',
-                style: TextStyle(fontWeight: FontWeight.w500),
-              ),
-              SizedBox(height: 8),
-              TextFormField(
-                controller: reasonController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Razón del cambio de estado...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: Icon(Icons.note_alt),
-                ),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: color.withOpacity(0.3)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.email, color: color, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Se enviará un email automático notificando el cambio.',
-                        style: TextStyle(
-                          color: color,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final reason = reasonController.text.trim();
-                Navigator.of(context).pop(reason.isEmpty ? null : reason);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: color,
-                foregroundColor: Colors.white,
-              ),
-              child: Text(actionText),
+              maxLines: 3,
+              onChanged: (value) => reason = value,
             ),
           ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, reason ?? ''),
+            child: Text('Cambiar'),
+          ),
+        ],
+      ),
     );
   }
 
-  // ================================
-  // DIÁLOGO DE ELIMINACIÓN
-  // ================================
-  
+  // Diálogo de cambio de rol
+  static Future<String?> showChangeRoleDialog(BuildContext context, String userName, String currentRole, String newRole) async {
+    String? reason;
+    
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Cambiar Rol'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¿Cambiar rol de $userName de $currentRole a $newRole?'),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Motivo (opcional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+              onChanged: (value) => reason = value,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, reason ?? ''),
+            child: Text('Cambiar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Diálogo de eliminación
   static Future<String?> showDeleteDialog(BuildContext context, String userName) async {
-    final TextEditingController reasonController = TextEditingController();
-
+    String? reason;
+    
     return showDialog<String>(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Icon(Icons.delete_forever, color: Colors.red.shade700, size: 28),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Eliminar Usuario',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
+      builder: (context) => AlertDialog(
+        title: Text('Eliminar Usuario'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('¿ELIMINAR PERMANENTEMENTE a $userName?'),
+            SizedBox(height: 16),
+            TextField(
+              decoration: InputDecoration(
+                labelText: 'Motivo (opcional)',
+                border: OutlineInputBorder(),
               ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Usuario: $userName', style: TextStyle(fontWeight: FontWeight.w500)),
-              SizedBox(height: 16),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red.shade200),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.warning, color: Colors.red.shade700, size: 20),
-                        SizedBox(width: 8),
-                        Text(
-                          '¡ATENCIÓN!',
-                          style: TextStyle(
-                            color: Colors.red.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Esta acción es IRREVERSIBLE. El usuario será eliminado permanentemente del sistema.',
-                      style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Motivo de eliminación (opcional):',
-                style: TextStyle(fontWeight: FontWeight.w500),
-              ),
-              SizedBox(height: 8),
-              TextFormField(
-                controller: reasonController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Razón de la eliminación...',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: Icon(Icons.note_alt),
-                ),
-              ),
-              SizedBox(height: 12),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.email, color: Colors.blue.shade700, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Se enviará un email automático notificando la eliminación.',
-                        style: TextStyle(
-                          color: Colors.blue.shade700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                final reason = reasonController.text.trim();
-                Navigator.of(context).pop(reason.isEmpty ? null : reason);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade700,
-                foregroundColor: Colors.white,
-              ),
-              child: Text('Eliminar'),
+              maxLines: 3,
+              onChanged: (value) => reason = value,
             ),
           ],
-        );
-      },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, reason ?? ''),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Eliminar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
   }
 
-  // ================================
-  // DIÁLOGO DE CONFIRMACIÓN SIMPLE
-  // ================================
-  
+  // Diálogo de selección de estado
+  static Future<String?> showStateSelectionDialog(BuildContext context, String userName, List<String> availableStates) async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Cambiar Estado'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Seleccione el nuevo estado para $userName:'),
+            SizedBox(height: 16),
+            ...availableStates.map((state) => ListTile(
+              title: Text(state.toUpperCase()),
+              onTap: () => Navigator.pop(context, state),
+            )).toList(),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Diálogo de selección de rol
+  static Future<String?> showRoleSelectionDialog(BuildContext context, String userName, String currentRole, List<String> availableRoles) async {
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Cambiar Rol'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Rol actual: $currentRole'),
+            SizedBox(height: 8),
+            Text('Seleccione el nuevo rol para $userName:'),
+            SizedBox(height: 16),
+            ...availableRoles.map((role) => ListTile(
+              title: Text(role.toUpperCase()),
+              onTap: () => Navigator.pop(context, role),
+            )).toList(),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cancelar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Diálogo de confirmación
   static Future<bool> showConfirmationDialog(
     BuildContext context, {
     required String title,
@@ -493,256 +260,121 @@ class UserActionDialogs {
   }) async {
     final result = await showDialog<bool>(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              if (icon != null) ...[
-                Icon(icon, color: confirmColor ?? Colors.blue, size: 28),
-                SizedBox(width: 8),
-              ],
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(cancelText),
           ),
-          content: Text(message),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(cancelText),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: confirmColor ?? Colors.blue,
             ),
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: confirmColor ?? Colors.blue,
-                foregroundColor: Colors.white,
-              ),
-              child: Text(confirmText),
-            ),
-          ],
-        );
-      },
+            child: Text(confirmText, style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
     );
+    
     return result ?? false;
   }
 
-  // ================================
-  // DIÁLOGO DE INFORMACIÓN/ÉXITO
-  // ================================
-  
-  static Future<void> showSuccessDialog(
-    BuildContext context, {
-    required String title,
-    required String message,
-    String buttonText = 'Aceptar',
-  }) async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: 28),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(message),
-              SizedBox(height: 16),
-              Container(
-                padding: EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.green.shade200),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.email_outlined, color: Colors.green.shade700, size: 20),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Se ha enviado una notificación por email automáticamente.',
-                        style: TextStyle(
-                          color: Colors.green.shade700,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
-              child: Text(buttonText),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ================================
-  // DIÁLOGO DE ERROR
-  // ================================
-  
-  static Future<void> showErrorDialog(
-    BuildContext context, {
-    required String title,
-    required String message,
-    String buttonText = 'Aceptar',
-  }) async {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Icon(Icons.error, color: Colors.red, size: 28),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  title,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          content: Text(message),
-          actions: [
-            ElevatedButton(
-              onPressed: () => Navigator.of(context).pop(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: Text(buttonText),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // ================================
-  // DIÁLOGO DE CARGA/PROGRESO
-  // ================================
-  
+  // Diálogo de carga
   static void showLoadingDialog(BuildContext context, String message) {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircularProgressIndicator(),
-              SizedBox(height: 16),
-              Text(message),
-            ],
-          ),
-        );
-      },
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 16),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
     );
   }
 
-  // ================================
-  // DIÁLOGO DE SELECCIÓN DE ESTADO
-  // ================================
-  
-  static Future<String?> showStateSelectionDialog(
-    BuildContext context, 
-    String userName,
-    List<String> availableStates
-  ) async {
-    return showDialog<String>(
+  // Diálogo de éxito
+  static Future<void> showSuccessDialog(
+    BuildContext context, {
+    required String title,
+    required String message,
+  }) async {
+    return showDialog(
       context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          title: Row(
-            children: [
-              Icon(Icons.edit, color: Colors.blue, size: 28),
-              SizedBox(width: 8),
-              Text('Cambiar Estado'),
-            ],
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            child: Text('Aceptar', style: TextStyle(color: Colors.white)),
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+        ],
+      ),
+    );
+  }
+
+  // Diálogo de error
+  static Future<void> showErrorDialog(
+    BuildContext context, {
+    required String title,
+    required String message,
+  }) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text('Cerrar', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Diálogo de detalles del usuario
+  static Future<void> showUserDetailsDialog(BuildContext context, Map<String, dynamic> user) async {
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Detalles del Usuario'),
+        content: SingleChildScrollView(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Usuario: $userName', style: TextStyle(fontWeight: FontWeight.w500)),
-              SizedBox(height: 16),
-              Text('Seleccionar nuevo estado:', style: TextStyle(fontWeight: FontWeight.w500)),
-              SizedBox(height: 12),
-              ...availableStates.map((state) {
-                IconData icon;
-                Color color;
-                
-                switch (state.toLowerCase()) {
-                  case 'activo':
-                    icon = Icons.check_circle;
-                    color = Colors.green;
-                    break;
-                  case 'inactivo':
-                    icon = Icons.block;
-                    color = Colors.grey;
-                    break;
-                  case 'suspendido':
-                    icon = Icons.pause_circle;
-                    color = Colors.orange;
-                    break;
-                  default:
-                    icon = Icons.radio_button_unchecked;
-                    color = Colors.blue;
-                }
-                
-                return ListTile(
-                  leading: Icon(icon, color: color),
-                  title: Text(TextConstants.getEstadoName(state)),
-                  onTap: () => Navigator.of(context).pop(state),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                );
-              }).toList(),
+              Text('Nombre: ${user['nombre'] ?? 'N/A'}'),
+              SizedBox(height: 8),
+              Text('Email: ${user['email'] ?? 'N/A'}'),
+              SizedBox(height: 8),
+              Text('Estado: ${user['estado'] ?? 'N/A'}'),
+              SizedBox(height: 8),
+              Text('Rol: ${user['rol'] ?? 'N/A'}'),
+              SizedBox(height: 8),
+              Text('Código: ${user['codigo_corresponsal'] ?? 'N/A'}'),
+              SizedBox(height: 8),
+              Text('Teléfono: ${user['telefono'] ?? 'N/A'}'),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: Text('Cancelar'),
-            ),
-          ],
-        );
-      },
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text('Cerrar'),
+          ),
+        ],
+      ),
     );
   }
 }

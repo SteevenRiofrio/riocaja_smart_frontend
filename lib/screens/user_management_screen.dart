@@ -1,4 +1,5 @@
-// lib/screens/user_management_screen.dart - CON CONFIGURACIÓN DEL TOKEN
+// lib/screens/user_management_screen.dart - PARTE 1 (Líneas 1-500)
+// CON CONFIGURACIÓN DEL TOKEN Y FUNCIONALIDADES COMPLETAS
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/admin_provider.dart';
@@ -257,6 +258,54 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     }
   }
 
+  // ✅ NUEVO: Método para cambiar rol de usuario
+  Future<void> _changeUserRole(Map<String, dynamic> user, String newRole) async {
+    try {
+      final reason = await UserActionDialogs.showChangeRoleDialog(
+        context,
+        user['nombre'] ?? 'Usuario',
+        user['rol'] ?? 'cnb',
+        newRole,
+      );
+      
+      // El usuario confirmó el cambio (reason puede ser null)
+      if (reason != null || await UserActionDialogs.showConfirmationDialog(
+        context,
+        title: 'Confirmar Cambio de Rol',
+        message: '¿Está seguro de cambiar el rol de ${user['nombre']} a ${newRole.toUpperCase()}?',
+        confirmText: 'Cambiar',
+        icon: Icons.admin_panel_settings,
+      )) {
+        UserActionDialogs.showLoadingDialog(context, 'Cambiando rol...');
+        
+        final success = await _adminService.changeUserRole(
+          user['_id'],
+          newRole,
+        );
+        
+        Navigator.of(context).pop(); // Cerrar loading
+        
+        if (success) {
+          await UserActionDialogs.showSuccessDialog(
+            context,
+            title: 'Rol Cambiado',
+            message: 'El rol del usuario ${user['nombre']} ha sido cambiado a ${newRole.toUpperCase()}.',
+          );
+          _loadData(); // Recargar datos
+        } else {
+          throw Exception('Error al cambiar rol');
+        }
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Cerrar loading si está abierto
+      await UserActionDialogs.showErrorDialog(
+        context,
+        title: 'Error',
+        message: 'No se pudo cambiar el rol: $e',
+      );
+    }
+  }
+
   Future<void> _deleteUser(Map<String, dynamic> user) async {
     try {
       final reason = await UserActionDialogs.showDeleteDialog(
@@ -303,8 +352,122 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     }
   }
 
+  // ✅ NUEVO: Método para mostrar menú de cambio de estado
+  Future<void> _showStateChangeMenu(Map<String, dynamic> user) async {
+    final availableStates = ['activo', 'inactivo', 'suspendido'];
+    final currentState = user['estado'] ?? 'pendiente';
+    
+    // Remover el estado actual de las opciones
+    availableStates.removeWhere((state) => state == currentState);
+    
+    final selectedState = await UserActionDialogs.showStateSelectionDialog(
+      context,
+      user['nombre'] ?? 'Usuario',
+      availableStates,
+    );
+    
+    if (selectedState != null) {
+      await _changeUserState(user, selectedState);
+    }
+  }
+
+  // ✅ NUEVO: Método para mostrar menú de cambio de rol
+  Future<void> _showRoleChangeMenu(Map<String, dynamic> user) async {
+    final availableRoles = ['admin', 'asesor', 'cnb'];
+    final currentRole = user['rol'] ?? 'cnb';
+    
+    // Remover el rol actual de las opciones
+    availableRoles.removeWhere((role) => role == currentRole);
+    
+    final selectedRole = await UserActionDialogs.showRoleSelectionDialog(
+      context,
+      user['nombre'] ?? 'Usuario',
+      currentRole,
+      availableRoles,
+    );
+    
+    if (selectedRole != null) {
+      await _changeUserRole(user, selectedRole);
+    }
+  }
+
+  // ✅ NUEVO: Método para mostrar detalles del usuario
+  Future<void> _showUserDetails(Map<String, dynamic> user) async {
+    await UserActionDialogs.showUserDetailsDialog(context, user);
+  }
+
+  // ✅ NUEVO: Widget para estadísticas mejoradas
+  Widget _buildStatsHeader() {
+    final activeUsers = _allUsers.where((u) => u['estado'] == 'activo').length;
+    final pendingUsers = _pendingUsers.length;
+    final suspendedUsers = _allUsers.where((u) => u['estado'] == 'suspendido').length;
+    final inactiveUsers = _allUsers.where((u) => u['estado'] == 'inactivo').length;
+    final totalUsers = _allUsers.length;
+
+    return Container(
+      padding: EdgeInsets.all(16),
+      color: Theme.of(context).primaryColor.withOpacity(0.1),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              _buildStatCard('Total', totalUsers, Colors.blue, Icons.people),
+              _buildStatCard('Activos', activeUsers, Colors.green, Icons.check_circle),
+              _buildStatCard('Pendientes', pendingUsers, Colors.orange, Icons.schedule),
+              _buildStatCard('Suspendidos', suspendedUsers, Colors.red, Icons.block),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              _buildStatCard('Inactivos', inactiveUsers, Colors.grey, Icons.pause_circle),
+              _buildStatCard('Admins', _allUsers.where((u) => u['rol'] == 'admin').length, Colors.purple, Icons.admin_panel_settings),
+              _buildStatCard('Asesores', _allUsers.where((u) => u['rol'] == 'asesor').length, Colors.teal, Icons.support_agent),
+              _buildStatCard('CNBs', _allUsers.where((u) => u['rol'] == 'cnb' || u['rol'] == null).length, Colors.indigo, Icons.person),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatCard(String label, int count, Color color, IconData icon) {
+    return Expanded(
+      child: Container(
+        margin: EdgeInsets.symmetric(horizontal: 2),
+        padding: EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withOpacity(0.3)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 16),
+            SizedBox(height: 2),
+            Text(
+              count.toString(),
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 8,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ================================
-  // UI BUILDERS
+  // UI BUILDERS - PARTE 2 (Líneas 501-Final)
   // ================================
 
   @override
@@ -411,6 +574,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
   Widget _buildAllUsersTab() {
     return Column(
       children: [
+        _buildStatsHeader(), // ✅ NUEVO: Estadísticas mejoradas
         _buildSearchAndFilters(),
         Expanded(
           child: RefreshIndicator(
@@ -643,7 +807,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
             
             SizedBox(height: 16),
             
-            // Botones de acción
+            // ✅ BOTONES DE ACCIÓN ACTUALIZADOS PARA PENDIENTES
             Row(
               children: [
                 Expanded(
@@ -657,7 +821,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                     ),
                   ),
                 ),
-                SizedBox(width: 12),
+                SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _rejectUser(user),
@@ -668,6 +832,58 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                       foregroundColor: Colors.white,
                     ),
                   ),
+                ),
+                SizedBox(width: 8),
+                
+                // Menú de opciones adicionales para pendientes
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'details':
+                        _showUserDetails(user);
+                        break;
+                      case 'change_role':
+                        _showRoleChangeMenu(user);
+                        break;
+                      case 'delete':
+                        _deleteUser(user);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'details',
+                      child: Row(
+                        children: [
+                          Icon(Icons.info, size: 16, color: Colors.blue),
+                          SizedBox(width: 8),
+                          Text('Ver Detalles'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'change_role',
+                      child: Row(
+                        children: [
+                          Icon(Icons.admin_panel_settings, size: 16, color: Colors.purple),
+                          SizedBox(width: 8),
+                          Text('Cambiar Rol'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuDivider(),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 16, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Eliminar', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -726,7 +942,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                   child: Text(
                     estado.toUpperCase(),
                     style: TextStyle(
-                      color: statusColor..withOpacity(0.8),
+                      color: statusColor,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -759,13 +975,13 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade100,
+                    color: _getRoleColor(user['rol'] ?? 'cnb').withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Rol: ${user['rol']?.toUpperCase() ?? 'cnb'}',
+                    'Rol: ${user['rol']?.toUpperCase() ?? 'CNB'}',
                     style: TextStyle(
-                      color: Colors.blue.shade700,
+                      color: _getRoleColor(user['rol'] ?? 'cnb'),
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                     ),
@@ -794,73 +1010,137 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
             
             SizedBox(height: 16),
             
-            // Botones de acción
+            // ✅ BOTONES DE ACCIÓN ACTUALIZADOS
             Row(
               children: [
-                if (estado != 'activo') ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _changeUserState(user, 'activo'),
-                      icon: Icon(Icons.check_circle, size: 16),
-                      label: Text('Activar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white,
-                      ),
+                // Botón de estado
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showStateChangeMenu(user),
+                    icon: Icon(Icons.swap_horiz, size: 16),
+                    label: Text('Estado'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.orange.shade100,
+                      foregroundColor: Colors.orange.shade700,
                     ),
                   ),
-                  SizedBox(width: 8),
-                ],
-                if (estado != 'inactivo') ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _changeUserState(user, 'inactivo'),
-                      icon: Icon(Icons.pause_circle, size: 16),
-                      label: Text('Desactivar'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                ],
+                ),
+                SizedBox(width: 8),
                 
-                // Menú de opciones adicionales (solo para admins)
+                // Botón de rol
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _showRoleChangeMenu(user),
+                    icon: Icon(Icons.admin_panel_settings, size: 16),
+                    label: Text('Rol'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade100,
+                      foregroundColor: Colors.blue.shade700,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 8),
+                
+                // Menú de opciones adicionales
                 PopupMenuButton<String>(
                   icon: Icon(Icons.more_vert),
                   onSelected: (value) {
                     switch (value) {
+                      case 'details':
+                        _showUserDetails(user);
+                        break;
                       case 'delete':
                         _deleteUser(user);
                         break;
-                      case 'change_state':
-                        _showStateChangeMenu(user);
+                      case 'activate':
+                        _changeUserState(user, 'activo');
+                        break;
+                      case 'deactivate':
+                        _changeUserState(user, 'inactivo');
+                        break;
+                      case 'suspend':
+                        _changeUserState(user, 'suspendido');
                         break;
                     }
                   },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'change_state',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, size: 16),
-                          SizedBox(width: 8),
-                          Text('Cambiar Estado'),
-                        ],
+                  itemBuilder: (context) {
+                    final estado = user['estado'] ?? 'pendiente';
+                    List<PopupMenuEntry<String>> items = [
+                      PopupMenuItem(
+                        value: 'details',
+                        child: Row(
+                          children: [
+                            Icon(Icons.info, size: 16, color: Colors.blue),
+                            SizedBox(width: 8),
+                            Text('Ver Detalles'),
+                          ],
+                        ),
                       ),
-                    ),
-                    PopupMenuItem(
-                      value: 'delete',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete, size: 16, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Eliminar', style: TextStyle(color: Colors.red)),
-                        ],
+                    ];
+                    
+                    // Opciones de estado según el estado actual
+                    if (estado != 'activo') {
+                      items.add(
+                        PopupMenuItem(
+                          value: 'activate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, size: 16, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Activar'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    
+                    if (estado != 'inactivo') {
+                      items.add(
+                        PopupMenuItem(
+                          value: 'deactivate',
+                          child: Row(
+                            children: [
+                              Icon(Icons.pause_circle, size: 16, color: Colors.grey),
+                              SizedBox(width: 8),
+                              Text('Desactivar'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    
+                    if (estado != 'suspendido') {
+                      items.add(
+                        PopupMenuItem(
+                          value: 'suspend',
+                          child: Row(
+                            children: [
+                              Icon(Icons.block, size: 16, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Suspender'),
+                            ],
+                          ),
+                        ),
+                      );
+                    }
+                    
+                    // Separador y opción de eliminar
+                    items.addAll([
+                      PopupMenuDivider(),
+                      PopupMenuItem(
+                        value: 'delete',
+                        child: Row(
+                          children: [
+                            Icon(Icons.delete, size: 16, color: Colors.red),
+                            SizedBox(width: 8),
+                            Text('Eliminar', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ]);
+                    
+                    return items;
+                  },
                 ),
               ],
             ),
@@ -868,24 +1148,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
         ),
       ),
     );
-  }
-
-  Future<void> _showStateChangeMenu(Map<String, dynamic> user) async {
-    final availableStates = ['activo', 'inactivo', 'suspendido'];
-    final currentState = user['estado'] ?? 'pendiente';
-    
-    // Remover el estado actual de las opciones
-    availableStates.removeWhere((state) => state == currentState);
-    
-    final selectedState = await UserActionDialogs.showStateSelectionDialog(
-      context,
-      user['nombre'] ?? 'Usuario',
-      availableStates,
-    );
-    
-    if (selectedState != null) {
-      await _changeUserState(user, selectedState);
-    }
   }
 
   Widget _buildEmptyState({
@@ -932,5 +1194,45 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
         ],
       ),
     );
+  }
+
+  // ✅ MÉTODOS AUXILIARES
+  Color _getRoleColor(String role) {
+    switch (role.toLowerCase()) {
+      case 'admin':
+        return Colors.purple;
+      case 'asesor':
+        return Colors.teal;
+      case 'cnb':
+      default:
+        return Colors.indigo;
+    }
+  }
+
+  String _getRoleDisplayName(String role) {
+    switch (role.toLowerCase()) {
+      case 'admin':
+        return 'Administrador';
+      case 'asesor':
+        return 'Asesor';
+      case 'cnb':
+      default:
+        return 'CNB';
+    }
+  }
+
+  String _getStateDisplayName(String state) {
+    switch (state.toLowerCase()) {
+      case 'activo':
+        return 'Activo';
+      case 'inactivo':
+        return 'Inactivo';
+      case 'suspendido':
+        return 'Suspendido';
+      case 'pendiente':
+        return 'Pendiente';
+      default:
+        return state.toUpperCase();
+    }
   }
 }

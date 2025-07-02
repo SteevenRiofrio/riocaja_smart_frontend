@@ -202,22 +202,13 @@ class TextConstants {
   }
   
   /// Obtiene el nombre del estado en español
-  static String getEstadoName(String estado) {
-    switch (estado.toLowerCase()) {
-      case 'activo':
-        return activo;
-      case 'inactivo':
-        return inactivo;
-      case 'pendiente':
-        return pendiente;
-      case 'aprobado':
-        return aprobado;
-      case 'rechazado':
-        return rechazado;
-      case 'bloqueado':
-        return bloqueado;
-      default:
-        return pendiente;
-    }
+static String getEstadoName(String estado) {
+  switch (estado.toLowerCase()) {
+    case 'activo': return 'Activo';
+    case 'inactivo': return 'Inactivo'; 
+    case 'suspendido': return 'Suspendido';
+    case 'pendiente': return 'Pendiente';
+    default: return estado.toUpperCase();
   }
+}
 }
