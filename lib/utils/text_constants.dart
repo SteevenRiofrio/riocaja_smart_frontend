@@ -6,6 +6,8 @@ class TextConstants {
   
   static const String appName = 'RioCaja Smart';
   static const String version = '1.0.0';
+  static const String appVersion = 'v1.0.0';
+  static const String appSubtitle = 'Sistema de Gestión CNB';
   
   // ==================== AUTENTICACIÓN ====================
   
@@ -13,6 +15,7 @@ class TextConstants {
   static const String email = 'Email';
   static const String password = 'Contraseña';
   static const String login = 'Iniciar Sesión';
+  static const String iniciarSesion = 'Iniciar Sesión';
   static const String olvidoPassword = '¿Olvidó su contraseña?';
   static const String noTieneCuenta = '¿No tiene cuenta?';
   static const String yaSeRegistro = '¿Ya se registró?';
@@ -27,6 +30,10 @@ class TextConstants {
   static const String registrarse = 'Registrarse';
   static const String crearCuenta = 'Crear Cuenta';
   
+  // Información usuarios
+  static const String informacionNuevosUsuarios = 'Información para Nuevos Usuarios';
+  static const String infoNuevosUsuarios = 'Los nuevos usuarios deben registrarse y esperar aprobación del administrador';
+  
   // ==================== ROLES Y ESTADOS ====================
   
   // Roles
@@ -35,6 +42,7 @@ class TextConstants {
   static const String cnb = 'CNB';                          // Antes era Lector
   static const String administradorLocal = 'Administrador Local';
   static const String administracionPrincipal = 'Administración Principal';
+  static const String administracion = 'Administración';
   
   // Estados
   static const String activo = 'Activo';
@@ -100,6 +108,20 @@ class TextConstants {
   static const String salir = 'Salir';
   static const String cerrarSesion = 'Cerrar Sesión';
   
+  // Menús específicos
+  static const String escanearComprobante = 'Escanear Comprobante';
+  static const String historialComprobantes = 'Historial de Comprobantes';
+  static const String reportesCierre = 'Reportes de Cierre';
+  static const String verCompartir = 'Ver y compartir reportes';
+  static const String reportesExcel = 'Reportes Excel';
+  static const String exportarDatos = 'Exportar datos detallados';
+  static const String mensajes = 'Mensajes';
+  static const String gestionUsuarios = 'Gestión de Usuarios';
+  static const String administrarTodosLosUsuarios = 'Administrar todos los usuarios del sistema';
+  static const String usuariosPendientes = 'Usuarios Pendientes';
+  static const String soloPendientesAprobacion = 'Solo usuarios pendientes de aprobación';
+  static const String diagnostico = 'Diagnóstico';
+  
   // Acciones
   static const String crear = 'Crear';
   static const String editar = 'Editar';
@@ -130,6 +152,8 @@ class TextConstants {
   
   // Mensajes de error
   static const String errorGenerico = 'Ha ocurrido un error inesperado';
+  static const String errorGeneral = 'Error';
+  static const String credencialesInvalidas = 'Credenciales inválidas';
   static const String errorConexion = 'Error de conexión. Verifique su internet';
   static const String errorServidor = 'Error del servidor. Intente más tarde';
   static const String errorValidacion = 'Por favor, complete todos los campos requeridos';
@@ -144,6 +168,7 @@ class TextConstants {
   static const String confirmarEliminacion = '¿Está seguro que desea eliminar este elemento?';
   static const String confirmarCambios = '¿Está seguro que desea guardar los cambios?';
   static const String estaSeguroCerrarSesion = 'Esta acción cerrará su sesión actual.';
+  static const String confirmarCierreSesion = '¿Confirmar cierre de sesión?';
   
   // Estados de usuarios pendientes
   static const String noHayUsuariosPendientes = 'No hay usuarios pendientes';
@@ -153,6 +178,12 @@ class TextConstants {
   static const String sinNombre = 'Sin nombre';
   static const String sinEmail = 'Sin email';
   static const String sinRol = 'Sin rol';
+  
+  // ==================== SESIÓN ====================
+  
+  static const String cerrandoSesion = 'Cerrando sesión...';
+  static const String sesionCerradaCorrectamente = 'Sesión cerrada correctamente';
+  static const String errorCerrarSesion = 'Error al cerrar sesión';
   
   // ==================== MÉTODOS AUXILIARES ====================
   
