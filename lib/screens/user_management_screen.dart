@@ -1,8 +1,8 @@
-// lib/screens/user_management_screen.dart - PANTALLA COMPLETA DE GESTIÓN DE USUARIOS
+// lib/screens/user_management_screen.dart - CON NOTIFICACIONES INTEGRADAS
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:riocaja_smart/providers/admin_provider.dart';
 import 'package:riocaja_smart/services/admin_service.dart';
+import 'package:riocaja_smart/widgets/user_action_dialogs.dart';
+import 'package:riocaja_smart/utils/text_constants.dart';
 import 'package:intl/intl.dart';
 
 class UserManagementScreen extends StatefulWidget {
@@ -10,8 +10,13 @@ class UserManagementScreen extends StatefulWidget {
   _UserManagementScreenState createState() => _UserManagementScreenState();
 }
 
-class _UserManagementScreenState extends State<UserManagementScreen> with SingleTickerProviderStateMixin {
+class _UserManagementScreenState extends State<UserManagementScreen> with TickerProviderStateMixin {
+  final AdminService _adminService = AdminService();
   late TabController _tabController;
+  
+  List<Map<String, dynamic>> _pendingUsers = [];
+  List<Map<String, dynamic>> _allUsers = [];
+  bool _isLoading = false;
   String _searchQuery = '';
   String _statusFilter = 'todos';
   String _roleFilter = 'todos';
@@ -20,7 +25,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _loadUserData();
+    _loadData();
   }
 
   @override
@@ -29,148 +34,448 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
     super.dispose();
   }
 
-  Future<void> _loadUserData() async {
-    final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-    adminProvider.setContext(context);
-    await adminProvider.loadPendingUsers();
-    await adminProvider.loadAllUsers(); // Nueva función
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+    try {
+      final pendingUsers = await _adminService.getPendingUsers();
+      final allUsers = await _adminService.getAllUsers();
+      
+      setState(() {
+        _pendingUsers = pendingUsers;
+        _allUsers = allUsers;
+      });
+    } catch (e) {
+      _showSnackBar('Error cargando datos: $e', isError: true);
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
+
+  void _showSnackBar(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  // ================================
+  // ACCIONES CON NOTIFICACIONES
+  // ================================
+
+  Future<void> _approveUser(Map<String, dynamic> user) async {
+    try {
+      final codigo = await UserActionDialogs.showApprovalDialog(
+        context, 
+        user['nombre'] ?? 'Usuario'
+      );
+      
+      if (codigo != null) {
+        UserActionDialogs.showLoadingDialog(context, 'Aprobando usuario...');
+        
+        final success = await _adminService.approveUserWithCode(
+          user['_id'],
+          codigo,
+        );
+        
+        Navigator.of(context).pop(); // Cerrar loading
+        
+        if (success) {
+          await UserActionDialogs.showSuccessDialog(
+            context,
+            title: 'Usuario Aprobado',
+            message: 'El usuario ${user['nombre']} ha sido aprobado exitosamente con el código $codigo.',
+          );
+          _loadData(); // Recargar datos
+        } else {
+          throw Exception('Error al aprobar usuario');
+        }
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Cerrar loading si está abierto
+      await UserActionDialogs.showErrorDialog(
+        context,
+        title: 'Error',
+        message: 'No se pudo aprobar el usuario: $e',
+      );
+    }
+  }
+
+  Future<void> _rejectUser(Map<String, dynamic> user) async {
+    try {
+      final reason = await UserActionDialogs.showRejectDialog(
+        context,
+        user['nombre'] ?? 'Usuario'
+      );
+      
+      // El usuario confirmó el rechazo (reason puede ser null)
+      if (reason != null || await UserActionDialogs.showConfirmationDialog(
+        context,
+        title: 'Confirmar Rechazo',
+        message: '¿Está seguro de rechazar este usuario sin especificar motivo?',
+        confirmText: 'Rechazar',
+        confirmColor: Colors.red,
+        icon: Icons.warning,
+      )) {
+        UserActionDialogs.showLoadingDialog(context, 'Rechazando usuario...');
+        
+        final success = await _adminService.rejectUser(
+          user['_id'],
+          reason: reason,
+        );
+        
+        Navigator.of(context).pop(); // Cerrar loading
+        
+        if (success) {
+          await UserActionDialogs.showSuccessDialog(
+            context,
+            title: 'Usuario Rechazado',
+            message: 'El usuario ${user['nombre']} ha sido rechazado.',
+          );
+          _loadData(); // Recargar datos
+        } else {
+          throw Exception('Error al rechazar usuario');
+        }
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Cerrar loading si está abierto
+      await UserActionDialogs.showErrorDialog(
+        context,
+        title: 'Error',
+        message: 'No se pudo rechazar el usuario: $e',
+      );
+    }
+  }
+
+  Future<void> _changeUserState(Map<String, dynamic> user, String newState) async {
+    try {
+      final reason = await UserActionDialogs.showChangeStateDialog(
+        context,
+        user['nombre'] ?? 'Usuario',
+        newState,
+      );
+      
+      // El usuario confirmó el cambio (reason puede ser null)
+      if (reason != null || await UserActionDialogs.showConfirmationDialog(
+        context,
+        title: 'Confirmar Cambio',
+        message: '¿Está seguro de cambiar el estado sin especificar motivo?',
+        confirmText: 'Cambiar',
+        icon: Icons.warning,
+      )) {
+        UserActionDialogs.showLoadingDialog(context, 'Cambiando estado...');
+        
+        final success = await _adminService.changeUserState(
+          user['_id'],
+          newState,
+          reason: reason,
+        );
+        
+        Navigator.of(context).pop(); // Cerrar loading
+        
+        if (success) {
+          await UserActionDialogs.showSuccessDialog(
+            context,
+            title: 'Estado Cambiado',
+            message: 'El estado del usuario ${user['nombre']} ha sido cambiado a ${TextConstants.getEstadoName(newState)}.',
+          );
+          _loadData(); // Recargar datos
+        } else {
+          throw Exception('Error al cambiar estado');
+        }
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Cerrar loading si está abierto
+      await UserActionDialogs.showErrorDialog(
+        context,
+        title: 'Error',
+        message: 'No se pudo cambiar el estado: $e',
+      );
+    }
+  }
+
+  Future<void> _deleteUser(Map<String, dynamic> user) async {
+    try {
+      final reason = await UserActionDialogs.showDeleteDialog(
+        context,
+        user['nombre'] ?? 'Usuario'
+      );
+      
+      // El usuario confirmó la eliminación (reason puede ser null)
+      if (reason != null || await UserActionDialogs.showConfirmationDialog(
+        context,
+        title: 'Confirmar Eliminación',
+        message: '¿Está ABSOLUTAMENTE SEGURO de eliminar este usuario sin especificar motivo? Esta acción es IRREVERSIBLE.',
+        confirmText: 'Eliminar',
+        confirmColor: Colors.red.shade700,
+        icon: Icons.delete_forever,
+      )) {
+        UserActionDialogs.showLoadingDialog(context, 'Eliminando usuario...');
+        
+        final success = await _adminService.deleteUser(
+          user['_id'],
+          reason: reason,
+        );
+        
+        Navigator.of(context).pop(); // Cerrar loading
+        
+        if (success) {
+          await UserActionDialogs.showSuccessDialog(
+            context,
+            title: 'Usuario Eliminado',
+            message: 'El usuario ${user['nombre']} ha sido eliminado del sistema.',
+          );
+          _loadData(); // Recargar datos
+        } else {
+          throw Exception('Error al eliminar usuario');
+        }
+      }
+    } catch (e) {
+      Navigator.of(context).pop(); // Cerrar loading si está abierto
+      await UserActionDialogs.showErrorDialog(
+        context,
+        title: 'Error',
+        message: 'No se pudo eliminar el usuario: $e',
+      );
+    }
+  }
+
+  // ================================
+  // UI BUILDERS
+  // ================================
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Text('Gestión de Usuarios'),
-        backgroundColor: Colors.green.shade700,
+        backgroundColor: Theme.of(context).primaryColor,
         foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tabController,
+          indicatorColor: Colors.white,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          tabs: [
+            Tab(
+              icon: Icon(Icons.pending_actions),
+              text: 'Pendientes (${_pendingUsers.length})',
+            ),
+            Tab(
+              icon: Icon(Icons.people),
+              text: 'Todos (${_allUsers.length})',
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: Icon(Icons.refresh),
-            onPressed: _loadUserData,
+            onPressed: _loadData,
           ),
         ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: [
-            Tab(
-              text: 'Pendientes',
-              icon: Icon(Icons.person_add),
+      ),
+      body: _isLoading
+          ? Center(child: CircularProgressIndicator())
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildPendingUsersTab(),
+                _buildAllUsersTab(),
+              ],
             ),
-            Tab(
-              text: 'Todos los Usuarios',
-              icon: Icon(Icons.people),
+    );
+  }
+
+  Widget _buildPendingUsersTab() {
+    if (_pendingUsers.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.check_circle_outline,
+        title: 'No hay usuarios pendientes',
+        subtitle: 'Todos los usuarios han sido procesados',
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadData,
+      child: ListView.builder(
+        padding: EdgeInsets.all(16),
+        itemCount: _pendingUsers.length,
+        itemBuilder: (context, index) {
+          return _buildPendingUserCard(_pendingUsers[index]);
+        },
+      ),
+    );
+  }
+
+  Widget _buildAllUsersTab() {
+    return Column(
+      children: [
+        _buildSearchAndFilters(),
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadData,
+            child: _buildFilteredUsersList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPendingUserCard(Map<String, dynamic> user) {
+    String fechaRegistro = 'Desconocida';
+    if (user['fecha_registro'] != null) {
+      try {
+        final fecha = DateTime.parse(user['fecha_registro']);
+        fechaRegistro = DateFormat('dd/MM/yyyy HH:mm').format(fecha);
+      } catch (e) {
+        fechaRegistro = user['fecha_registro'] ?? 'Desconocida';
+      }
+    }
+
+    return Card(
+      margin: EdgeInsets.only(bottom: 16),
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header con estado
+            Row(
+              children: [
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.orange.shade300),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.pending, size: 16, color: Colors.orange.shade700),
+                      SizedBox(width: 4),
+                      Text(
+                        'PENDIENTE',
+                        style: TextStyle(
+                          color: Colors.orange.shade700,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Spacer(),
+                Icon(Icons.access_time, color: Colors.grey, size: 16),
+                SizedBox(width: 4),
+                Text(
+                  fechaRegistro,
+                  style: TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 12),
+            
+            // Información del usuario
+            Row(
+              children: [
+                CircleAvatar(
+                  backgroundColor: Theme.of(context).primaryColor,
+                  child: Text(
+                    (user['nombre'] ?? 'U')[0].toUpperCase(),
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user['nombre'] ?? 'Sin nombre',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        user['email'] ?? 'Sin email',
+                        style: TextStyle(color: Colors.grey.shade600),
+                      ),
+                      SizedBox(height: 4),
+                      Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Rol: ${TextConstants.getRoleName(user['rol'] ?? 'cnb')}',
+                          style: TextStyle(
+                            color: Colors.blue.shade700,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 16),
+            
+            // Botones de acción
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _approveUser(user),
+                    icon: Icon(Icons.check, size: 18),
+                    label: Text('Aprobar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _rejectUser(user),
+                    icon: Icon(Icons.close, size: 18),
+                    label: Text('Rechazar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          _buildPendingUsersTab(),
-          _buildAllUsersTab(),
-        ],
-      ),
     );
   }
 
-  // Tab de usuarios pendientes (existente)
-  Widget _buildPendingUsersTab() {
-    return Consumer<AdminProvider>(
-      builder: (context, adminProvider, child) {
-        if (adminProvider.isLoading) {
-          return Center(child: CircularProgressIndicator());
-        }
-
-        final pendingUsers = adminProvider.pendingUsers;
-
-        if (pendingUsers.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle, size: 64, color: Colors.green.shade400),
-                SizedBox(height: 16),
-                Text(
-                  'No hay usuarios pendientes',
-                  style: TextStyle(
-                    fontSize: 18,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Todos los usuarios han sido procesados',
-                  style: TextStyle(color: Colors.grey.shade600),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: _loadUserData,
-          child: ListView.builder(
-            itemCount: pendingUsers.length,
-            padding: EdgeInsets.all(16),
-            itemBuilder: (context, index) {
-              final user = pendingUsers[index];
-              return _buildPendingUserCard(context, user);
-            },
-          ),
-        );
-      },
-    );
-  }
-
-  // Nuevo tab de todos los usuarios
-  Widget _buildAllUsersTab() {
-    return Consumer<AdminProvider>(
-      builder: (context, adminProvider, child) {
-        if (adminProvider.isLoading) {
-          return Center(child: CircularProgressIndicator());
-        }
-
-        final allUsers = adminProvider.allUsers;
-        final filteredUsers = _filterUsers(allUsers);
-
-        return Column(
-          children: [
-            // Filtros y búsqueda
-            _buildFiltersSection(),
-            
-            // Lista de usuarios
-            Expanded(
-              child: filteredUsers.isEmpty
-                  ? _buildEmptyUsersState()
-                  : RefreshIndicator(
-                      onRefresh: _loadUserData,
-                      child: ListView.builder(
-                        itemCount: filteredUsers.length,
-                        padding: EdgeInsets.symmetric(horizontal: 16),
-                        itemBuilder: (context, index) {
-                          final user = filteredUsers[index];
-                          return _buildUserCard(context, user);
-                        },
-                      ),
-                    ),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  // Sección de filtros
-  Widget _buildFiltersSection() {
+  Widget _buildSearchAndFilters() {
     return Container(
       padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.grey.shade100,
-        border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-      ),
+      color: Colors.grey.shade50,
       child: Column(
         children: [
           // Barra de búsqueda
@@ -179,12 +484,11 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
               hintText: 'Buscar por nombre o email...',
               prefixIcon: Icon(Icons.search),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide.none,
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: Colors.grey.shade300),
               ),
               filled: true,
               fillColor: Colors.white,
-              contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
             onChanged: (value) {
               setState(() {
@@ -192,9 +496,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
               });
             },
           ),
+          
           SizedBox(height: 12),
           
-          // Filtros por estado y rol
+          // Filtros
           Row(
             children: [
               // Filtro por estado
@@ -213,9 +518,10 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                       items: [
                         DropdownMenuItem(value: 'todos', child: Text('Todos los estados')),
                         DropdownMenuItem(value: 'activo', child: Text('Activos')),
-                        DropdownMenuItem(value: 'pendiente', child: Text('Pendientes')),
-                        DropdownMenuItem(value: 'suspendido', child: Text('Suspendidos')),
                         DropdownMenuItem(value: 'inactivo', child: Text('Inactivos')),
+                        DropdownMenuItem(value: 'suspendido', child: Text('Suspendidos')),
+                        DropdownMenuItem(value: 'pendiente', child: Text('Pendientes')),
+                        DropdownMenuItem(value: 'rechazado', child: Text('Rechazados')),
                       ],
                       onChanged: (value) {
                         setState(() {
@@ -244,7 +550,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                       items: [
                         DropdownMenuItem(value: 'todos', child: Text('Todos los roles')),
                         DropdownMenuItem(value: 'admin', child: Text('Administradores')),
-                        DropdownMenuItem(value: 'asesor', child: Text('Asesor')),
+                        DropdownMenuItem(value: 'asesor', child: Text('Asesores')),
                         DropdownMenuItem(value: 'cnb', child: Text('CNB')),
                       ],
                       onChanged: (value) {
@@ -263,7 +569,26 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
     );
   }
 
-  // Filtrar usuarios según criterios
+  Widget _buildFilteredUsersList() {
+    final filteredUsers = _filterUsers(_allUsers);
+    
+    if (filteredUsers.isEmpty) {
+      return _buildEmptyState(
+        icon: Icons.search_off,
+        title: 'No se encontraron usuarios',
+        subtitle: 'Intenta ajustar los filtros de búsqueda',
+      );
+    }
+
+    return ListView.builder(
+      padding: EdgeInsets.all(16),
+      itemCount: filteredUsers.length,
+      itemBuilder: (context, index) {
+        return _buildUserCard(filteredUsers[index]);
+      },
+    );
+  }
+
   List<Map<String, dynamic>> _filterUsers(List<Map<String, dynamic>> users) {
     return users.where((user) {
       // Filtro por búsqueda
@@ -283,184 +608,49 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
     }).toList();
   }
 
-  // Card de usuario pendiente (existente, mejorado)
-  Widget _buildPendingUserCard(BuildContext context, Map<String, dynamic> user) {
-    String fechaRegistro = 'Desconocida';
-    if (user['fecha_registro'] != null) {
-      try {
-        final fecha = DateTime.parse(user['fecha_registro']);
-        fechaRegistro = DateFormat('dd/MM/yyyy HH:mm').format(fecha);
-      } catch (e) {
-        fechaRegistro = user['fecha_registro'] ?? 'Desconocida';
-      }
-    }
-
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      elevation: 2,
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Colors.orange.shade700,
-                  child: Text(
-                    (user['nombre'] as String?)?.isNotEmpty == true 
-                        ? (user['nombre'] as String).substring(0, 1).toUpperCase() 
-                        : 'U',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user['nombre'] ?? 'Sin nombre',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      Text(
-                        user['email'] ?? 'Sin email',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    'PENDIENTE',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange.shade800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 14, color: Colors.grey),
-                SizedBox(width: 4),
-                Text(
-                  'Registrado: $fechaRegistro',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 8),
-            Row(
-              children: [
-                Icon(Icons.person, size: 14, color: Colors.grey),
-                SizedBox(width: 4),
-                Text(
-                  'Rol solicitado: ${user['rol'] ?? 'cnb'}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey.shade600,
-                  ),
-                ),
-              ],
-            ),
-            SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                OutlinedButton.icon(
-                  icon: Icon(Icons.cancel, color: Colors.red, size: 18),
-                  label: Text('Rechazar'),
-                  onPressed: () => _confirmRejectUser(context, user),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.red,
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                ),
-                SizedBox(width: 16),
-                ElevatedButton.icon(
-                  icon: Icon(Icons.check_circle, size: 18),
-                  label: Text('Aprobar'),
-                  onPressed: () => _showApproveUserDialog(context, user),
-                  style: ElevatedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // Card de usuario (todos los usuarios)
-  Widget _buildUserCard(BuildContext context, Map<String, dynamic> user) {
-    final estado = user['estado'] ?? 'desconocido';
-    final rol = user['rol'] ?? 'cnb';
-    final perfilCompleto = user['perfil_completo'] ?? false;
-    
-    Color statusColor;
-    Color statusBgColor;
-    IconData statusIcon;
+  Widget _buildUserCard(Map<String, dynamic> user) {
+    final estado = user['estado'] ?? 'pendiente';
+    Color estadoColor;
+    IconData estadoIcon;
     
     switch (estado.toLowerCase()) {
       case 'activo':
-        statusColor = Colors.green.shade800;
-        statusBgColor = Colors.green.shade100;
-        statusIcon = Icons.check_circle;
-        break;
-      case 'pendiente':
-        statusColor = Colors.orange.shade800;
-        statusBgColor = Colors.orange.shade100;
-        statusIcon = Icons.pending;
-        break;
-      case 'suspendido':
-        statusColor = Colors.red.shade800;
-        statusBgColor = Colors.red.shade100;
-        statusIcon = Icons.block;
+        estadoColor = Colors.green;
+        estadoIcon = Icons.check_circle;
         break;
       case 'inactivo':
-        statusColor = Colors.grey.shade800;
-        statusBgColor = Colors.grey.shade100;
-        statusIcon = Icons.remove_circle;
+        estadoColor = Colors.grey;
+        estadoIcon = Icons.block;
+        break;
+      case 'suspendido':
+        estadoColor = Colors.orange;
+        estadoIcon = Icons.pause_circle;
+        break;
+      case 'rechazado':
+        estadoColor = Colors.red;
+        estadoIcon = Icons.cancel;
         break;
       default:
-        statusColor = Colors.grey.shade800;
-        statusBgColor = Colors.grey.shade100;
-        statusIcon = Icons.help;
+        estadoColor = Colors.blue;
+        estadoIcon = Icons.pending;
     }
 
     return Card(
       margin: EdgeInsets.only(bottom: 12),
-      elevation: 1,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header con información básica
             Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: _getRoleColor(rol),
+                  backgroundColor: Theme.of(context).primaryColor,
                   child: Text(
-                    (user['nombre'] as String?)?.isNotEmpty == true 
-                        ? (user['nombre'] as String).substring(0, 1).toUpperCase() 
-                        : 'U',
+                    (user['nombre'] ?? 'U')[0].toUpperCase(),
                     style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
@@ -476,33 +666,33 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                           fontSize: 16,
                         ),
                       ),
+                      SizedBox(height: 4),
                       Text(
                         user['email'] ?? 'Sin email',
-                        style: TextStyle(
-                          color: Colors.grey.shade600,
-                          fontSize: 14,
-                        ),
+                        style: TextStyle(color: Colors.grey.shade600),
                       ),
                     ],
                   ),
                 ),
+                // Estado
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: statusBgColor,
-                    borderRadius: BorderRadius.circular(12),
+                    color: estadoColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: estadoColor.withOpacity(0.3)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(statusIcon, size: 12, color: statusColor),
+                      Icon(estadoIcon, size: 16, color: estadoColor),
                       SizedBox(width: 4),
                       Text(
-                        estado.toUpperCase(),
+                        TextConstants.getEstadoName(estado).toUpperCase(),
                         style: TextStyle(
-                          fontSize: 10,
+                          color: estadoColor,
                           fontWeight: FontWeight.bold,
-                          color: statusColor,
+                          fontSize: 12,
                         ),
                       ),
                     ],
@@ -510,520 +700,203 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                 ),
               ],
             ),
+            
             SizedBox(height: 12),
             
             // Información adicional
             Row(
               children: [
-                Expanded(
-                  child: _buildInfoChip('Rol', _getRoleName(rol), _getRoleColor(rol)),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    'Rol: ${TextConstants.getRoleName(user['rol'] ?? 'cnb')}',
+                    style: TextStyle(
+                      color: Colors.blue.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
                 SizedBox(width: 8),
-                if (user['codigo_corresponsal'] != null)
-                  Expanded(
-                    child: _buildInfoChip('Código', user['codigo_corresponsal'], Colors.blue.shade700),
+                if (user['codigo_corresponsal'] != null) ...[
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.purple.shade100,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      'Código: ${user['codigo_corresponsal']}',
+                      style: TextStyle(
+                        color: Colors.purple.shade700,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ),
+                ],
               ],
             ),
             
-            if (user['nombre_local'] != null) ...[
-              SizedBox(height: 8),
-              _buildInfoChip('Local', user['nombre_local'], Colors.purple.shade700),
-            ],
+            SizedBox(height: 16),
             
-            SizedBox(height: 12),
-            
-            // Acciones
-            if (estado != 'pendiente')
-              Row(
-                children: [
-                  // Botón de cambiar estado
+            // Botones de acción
+            Row(
+              children: [
+                if (estado != 'activo') ...[
                   Expanded(
-                    child: OutlinedButton.icon(
-                      icon: Icon(_getStateActionIcon(estado), size: 16),
-                      label: Text(_getStateActionText(estado)),
-                      onPressed: () => _showChangeStateDialog(context, user),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: _getStateActionColor(estado),
+                    child: ElevatedButton.icon(
+                      onPressed: () => _changeUserState(user, 'activo'),
+                      icon: Icon(Icons.check_circle, size: 16),
+                      label: Text('Activar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green,
+                        foregroundColor: Colors.white,
                         padding: EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
                   ),
                   SizedBox(width: 8),
-                  
-                  // Botón de cambiar rol
+                ],
+                if (estado != 'suspendido') ...[
                   Expanded(
-                    child: OutlinedButton.icon(
-                      icon: Icon(Icons.admin_panel_settings, size: 16),
-                      label: Text('Cambiar Rol'),
-                      onPressed: () => _showChangeRoleDialog(context, user),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.blue.shade700,
+                    child: ElevatedButton.icon(
+                      onPressed: () => _changeUserState(user, 'suspendido'),
+                      icon: Icon(Icons.pause_circle, size: 16),
+                      label: Text('Suspender'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
                         padding: EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
                   ),
+                  SizedBox(width: 8),
                 ],
-              ),
+                if (estado != 'inactivo') ...[
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _changeUserState(user, 'inactivo'),
+                      icon: Icon(Icons.block, size: 16),
+                      label: Text('Inactivar'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey,
+                        foregroundColor: Colors.white,
+                        padding: EdgeInsets.symmetric(vertical: 8),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                ],
+                // Botón de eliminación (solo para admins)
+                PopupMenuButton<String>(
+                  icon: Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    switch (value) {
+                      case 'delete':
+                        _deleteUser(user);
+                        break;
+                      case 'change_state':
+                        _showStateChangeMenu(user);
+                        break;
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    PopupMenuItem(
+                      value: 'change_state',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 16),
+                          SizedBox(width: 8),
+                          Text('Cambiar Estado'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 16, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Eliminar', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  // Widget para información en chips
-  Widget _buildInfoChip(String label, String value, Color color) {
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            '$label: ',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: color,
-            ),
-          ),
-          Flexible(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 11,
-                color: color,
-              ),
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
+  Future<void> _showStateChangeMenu(Map<String, dynamic> user) async {
+    final availableStates = ['activo', 'inactivo', 'suspendido'];
+    final currentState = user['estado'] ?? 'pendiente';
+    
+    // Remover el estado actual de las opciones
+    availableStates.removeWhere((state) => state == currentState);
+    
+    final selectedState = await UserActionDialogs.showStateSelectionDialog(
+      context,
+      user['nombre'] ?? 'Usuario',
+      availableStates,
     );
+    
+    if (selectedState != null) {
+      await _changeUserState(user, selectedState);
+    }
   }
 
-  // Estado vacío para usuarios
-  Widget _buildEmptyUsersState() {
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.people_outline, size: 64, color: Colors.grey.shade400),
+          Icon(
+            icon,
+            size: 80,
+            color: Colors.grey.shade400,
+          ),
           SizedBox(height: 16),
           Text(
-            'No se encontraron usuarios',
+            title,
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
               color: Colors.grey.shade600,
             ),
           ),
           SizedBox(height: 8),
           Text(
-            'Ajusta los filtros para ver más resultados',
-            style: TextStyle(color: Colors.grey.shade600),
+            subtitle,
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade500,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: _loadData,
+            icon: Icon(Icons.refresh),
+            label: Text('Actualizar'),
+            style: ElevatedButton.styleFrom(
+              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
           ),
         ],
       ),
     );
   }
-
-  // Diálogos y métodos auxiliares existentes y nuevos...
-  
-  void _confirmRejectUser(BuildContext context, Map<String, dynamic> user) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Rechazar Usuario'),
-        content: Text(
-          '¿Está seguro de que desea rechazar la solicitud de ${user['nombre']}?\n\n'
-          'Esta acción no se puede deshacer.'
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancelar'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              
-              final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-              final success = await adminProvider.rejectUser(user['_id']);
-              
-              if (success) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Usuario rechazado correctamente')),
-                );
-                await adminProvider.loadAllUsers(); // Recargar todos los usuarios
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Error al rechazar usuario'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            child: Text('Rechazar', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showApproveUserDialog(BuildContext context, Map<String, dynamic> user) {
-    String selectedRole = user['rol'] ?? 'cnb';
-    final codigoController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('Aprobar Usuario'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Información del usuario
-                  Container(
-                    padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Usuario:', style: TextStyle(fontWeight: FontWeight.bold)),
-                        Text('${user['nombre']} (${user['email']})'),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  
-                  // Campo para código de corresponsal
-                  TextFormField(
-                    controller: codigoController,
-                    decoration: InputDecoration(
-                      labelText: 'Código de Corresponsal*',
-                      hintText: 'Ej: CNB001, 0123, etc.',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.qr_code),
-                      helperText: 'Código único para el usuario',
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  
-                  // Selector de rol
-                  Text('Rol del usuario:', style: TextStyle(fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    value: selectedRole,
-                    decoration: InputDecoration(
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.person_outline),
-                    ),
-                    items: [
-                      DropdownMenuItem(value: 'cnb', child: Text('CNB')),
-                      DropdownMenuItem(value: 'asesor', child: Text('Asesor')),
-                      DropdownMenuItem(value: 'admin', child: Text('Administrador')),
-                    ],
-                    onChanged: (value) {
-                      if (value != null) {
-                        setState(() {
-                          selectedRole = value;
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final codigo = codigoController.text.trim();
-                  
-                  if (codigo.isEmpty || codigo.length < 2) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Debe ingresar un código válido (mínimo 2 caracteres)'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                    return;
-                  }
-                  
-                  Navigator.of(context).pop();
-                  
-                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-                  final success = await adminProvider.approveUserWithCode(user['_id'], codigo);
-                  
-                  if (success && selectedRole != user['rol']) {
-                    await adminProvider.changeUserRole(user['_id'], selectedRole);
-                  }
-                  
-                  if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Usuario aprobado correctamente'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                    await adminProvider.loadPendingUsers();
-                    await adminProvider.loadAllUsers();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error al aprobar usuario'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
-                child: Text('Aprobar'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  void _showChangeStateDialog(BuildContext context, Map<String, dynamic> user) {
-  final currentState = user['estado'] ?? 'pendiente';
-  String newState = currentState;
-  
-  showDialog(
-    context: context,
-    builder: (dialogContext) => StatefulBuilder(
-      builder: (context, setState) {
-        return AlertDialog(
-          title: Text('Cambiar Estado del Usuario'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Usuario: ${user['nombre']}'),
-              Text('Estado actual: ${currentState.toUpperCase()}'),
-              SizedBox(height: 16),
-              Text('Nuevo estado:', style: TextStyle(fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              DropdownButtonFormField<String>(
-                value: newState,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.toggle_on),
-                ),
-                items: [
-                  DropdownMenuItem(value: 'activo', child: Text('Activo')),
-                  DropdownMenuItem(value: 'suspendido', child: Text('Suspendido')),
-                  DropdownMenuItem(value: 'inactivo', child: Text('Inactivo')),
-                  DropdownMenuItem(value: 'pendiente', child: Text('Pendiente')),
-                ],
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() {
-                      newState = value;
-                    });
-                  }
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text('Cancelar'),
-            ),
-            ElevatedButton(
-              onPressed: newState == currentState ? null : () async {
-                // Cerrar diálogo primero
-                Navigator.of(dialogContext).pop();
-                
-                // Usar el context original, no el del diálogo
-                final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-                final success = await adminProvider.changeUserState(user['_id'], newState);
-                
-                // Verificar que el widget aún esté montado antes de mostrar SnackBar
-                if (mounted) {
-                  if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Estado cambiado a ${newState.toUpperCase()}'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                    await adminProvider.loadAllUsers();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error al cambiar estado'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                }
-              },
-              child: Text('Cambiar Estado'),
-            ),
-          ],
-        );
-      },
-    ),
-  );
 }
-
-  void _showChangeRoleDialog(BuildContext context, Map<String, dynamic> user) {
-    final currentRole = user['rol'] ?? 'cnb';
-    String newRole = currentRole;
-    
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) {
-          return AlertDialog(
-            title: Text('Cambiar Rol del Usuario'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Usuario: ${user['nombre']}'),
-                Text('Rol actual: ${_getRoleName(currentRole)}'),
-                SizedBox(height: 16),
-                Text('Nuevo rol:', style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: newRole,
-                  decoration: InputDecoration(
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_outline),
-                  ),
-                  items: [
-                    DropdownMenuItem(value: 'cnb', child: Text('CNB')),
-                    DropdownMenuItem(value: 'asesor', child: Text('Asesor')),
-                    DropdownMenuItem(value: 'admin', child: Text('Administrador')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() {
-                        newRole = value;
-                      });
-                    }
-                  },
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('Cancelar'),
-              ),
-              ElevatedButton(
-                onPressed: newRole == currentRole ? null : () async {
-                  Navigator.of(context).pop();
-                  
-                  final adminProvider = Provider.of<AdminProvider>(context, listen: false);
-                  final success = await adminProvider.changeUserRole(user['_id'], newRole);
-                  
-                  if (success) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Rol cambiado a ${_getRoleName(newRole)}'),
-                        backgroundColor: Colors.green,
-                      ),
-                    );
-                    await adminProvider.loadAllUsers();
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error al cambiar rol'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
-                child: Text('Cambiar Rol'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  // Métodos auxiliares para obtener información de roles y estados
-  Color _getRoleColor(String rol) {
-    switch (rol.toLowerCase()) {
-      case 'admin':
-        return Colors.red.shade700;
-      case 'asesor':
-        return Colors.orange.shade700;
-      case 'cnb':
-      default:
-        return Colors.blue.shade700;
-    }
-  }
-
-  String _getRoleName(String rol) {
-    switch (rol.toLowerCase()) {
-      case 'admin':
-        return 'Administrador';
-      case 'asesor':
-        return 'Asesor';
-      case 'cnb':
-      default:
-        return 'CNB';
-    }
-  }
-
-  IconData _getStateActionIcon(String estado) {
-    switch (estado.toLowerCase()) {
-      case 'activo':
-        return Icons.pause_circle;
-      case 'suspendido':
-        return Icons.play_circle;
-      case 'inactivo':
-        return Icons.play_circle;
-      default:
-        return Icons.settings;
-    }
-  }
-
-  String _getStateActionText(String estado) {
-    switch (estado.toLowerCase()) {
-      case 'activo':
-        return 'Suspender';
-      case 'suspendido':
-        return 'Activar';
-      case 'inactivo':
-        return 'Activar';
-      default:
-        return 'Cambiar Estado';
-    }
-  }
-
-  Color _getStateActionColor(String estado) {
-    switch (estado.toLowerCase()) {
-      case 'activo':
-        return Colors.orange.shade700;
-      case 'suspendido':
-        return Colors.green.shade700;
-      case 'inactivo':
-        return Colors.green.shade700;
-      default:
-        return Colors.blue.shade700;
-    }
-  }
-}
-                      

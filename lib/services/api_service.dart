@@ -680,4 +680,46 @@ class ApiService {
         .replaceAll('Ãš', 'Ú')
         .replaceAll('Ã', 'Ñ');
   }
+
+Future<bool> refreshToken() async {
+  try {
+    print('ApiService: Intentando renovar token...');
+    
+    if (_authService != null) {
+      // Usar el AuthService configurado para renovar el token
+      final success = await _authService!.refreshAccessToken();
+      
+      if (success) {
+        // Obtener el nuevo token del AuthService
+        _authToken = _authService!.token;
+        print('ApiService: Token renovado exitosamente');
+        return true;
+      } else {
+        print('ApiService: Error renovando token con AuthService');
+        return false;
+      }
+    } else if (_context != null) {
+      // Usar AuthProvider como fallback
+      final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+      final success = await authProvider.refreshToken();
+      
+      if (success) {
+        _authToken = authProvider.user?.token;
+        print('ApiService: Token renovado exitosamente usando AuthProvider');
+        return true;
+      } else {
+        print('ApiService: Error renovando token con AuthProvider');
+        return false;
+      }
+    } else {
+      print('ApiService: No hay AuthService ni contexto configurado para renovar token');
+      return false;
+    }
+  } catch (e) {
+    print('ApiService: Error en refreshToken: $e');
+    return false;
+  }
+}
+
+
 }
