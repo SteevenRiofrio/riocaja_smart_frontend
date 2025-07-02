@@ -138,7 +138,7 @@ class AdminProvider with ChangeNotifier {
         final userIndex = _allUsers.indexWhere((user) => user['_id'] == userId);
         if (userIndex >= 0) {
           _allUsers[userIndex]['rol'] = newRole;
-          // Si es admin u operador, marcar perfil como completo
+          // Si es admin u asesor, marcar perfil como completo
           if (newRole == 'admin' || newRole == 'asesor') {
             _allUsers[userIndex]['perfil_completo'] = true;
           }

@@ -109,7 +109,7 @@ class AuthService {
   }
   
   // Registro de nuevo usuario
-  Future<Map<String, dynamic>> register(String nombre, String email, String password, {String rol = 'lector'}) async {
+  Future<Map<String, dynamic>> register(String nombre, String email, String password, {String rol = 'cnb'}) async {
     try {
       final url = '$baseUrl/auth/register';
       print('Registrando usuario en: $url');
@@ -224,7 +224,7 @@ class AuthService {
               id: 'temp_id',
               nombre: email.split('@')[0],
               email: email,
-              rol: 'lector',
+              rol: 'cnb',
               token: _token!,
               refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
             );
@@ -238,7 +238,7 @@ class AuthService {
             id: 'temp_id',
             nombre: email.split('@')[0],
             email: email,
-            rol: 'lector',
+            rol: 'cnb',
             token: _token!,
             refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
           );

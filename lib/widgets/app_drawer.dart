@@ -51,12 +51,12 @@ class AppDrawer extends StatelessWidget {
               // Indicador de rol
               Container(
                 decoration: BoxDecoration(
-                  color: _getRoleColor(authProvider.user?.rol ?? 'lector'),
+                  color: _getRoleColor(authProvider.user?.rol ?? 'cnb'),
                   shape: BoxShape.circle,
                 ),
                 child: Center(
                   child: Text(
-                    _getRoleIcon(authProvider.user?.rol ?? 'lector'),
+                    _getRoleIcon(authProvider.user?.rol ?? 'cnb'),
                     style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -167,7 +167,7 @@ class AppDrawer extends StatelessWidget {
                 Divider(),
                 
                 // Opciones de administrador
-                if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) ...[
+                if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) ...[
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Text(
@@ -244,7 +244,7 @@ class AppDrawer extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Rol: ${TextConstants.getRoleName(authProvider.user?.rol ?? 'lector')}',
+                              'Rol: ${TextConstants.getRoleName(authProvider.user?.rol ?? 'cnb')}',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -366,7 +366,7 @@ class AppDrawer extends StatelessWidget {
     switch (rol) {
       case 'admin':
         return Colors.red.shade700;
-      case 'operador':
+      case 'asesor':
         return Colors.orange.shade700;
       default:
         return Colors.blue.shade700;
@@ -378,7 +378,7 @@ class AppDrawer extends StatelessWidget {
     switch (rol) {
       case 'admin':
         return 'A';
-      case 'operador':
+      case 'asesor':
         return 'O';
       default:
         return 'L';

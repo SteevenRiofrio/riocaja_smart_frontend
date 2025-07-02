@@ -46,8 +46,8 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     } else if (authProvider.needsProfileCompletion) {
       print('SplashScreen: Usuario necesita completar perfil');
-      // Verificar que no sea admin/operador (seguridad adicional)
-      if (authProvider.user?.rol == 'admin' || authProvider.user?.rol == 'operador') {
+      // Verificar que no sea admin/asesor (seguridad adicional)
+      if (authProvider.user?.rol == 'admin' || authProvider.user?.rol == 'asesor') {
         print('SplashScreen: Admin/Operador detectado - Redirigiendo a Home directamente');
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => HomeScreen()),

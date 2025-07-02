@@ -205,7 +205,7 @@ class ExcelReportService {
     _addHeaderCell(sheet, 2, row, 'TIPO');
     _addHeaderCell(sheet, 3, row, 'TRANSACCIÓN');
     _addHeaderCell(sheet, 4, row, 'VALOR');
-    if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+    if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
       _addHeaderCell(sheet, 5, row, 'CORRESPONSAL');
     }
     row++;
@@ -218,7 +218,7 @@ class ExcelReportService {
       _addCell(sheet, 3, row, receipt.nroTransaccion);
       _addCurrencyCell(sheet, 4, row, receipt.valorTotal);
       
-      if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+      if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
         _addCell(sheet, 5, row, receipt.codigoCorresponsal ?? 'N/A');
       }
       row++;
@@ -373,7 +373,7 @@ class ExcelReportService {
     row++;
     
     final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-    final isAdminOrOperator = authProvider.hasRole('admin') || authProvider.hasRole('operador');
+    final isAdminOrOperator = authProvider.hasRole('admin') || authProvider.hasRole('asesor');
     
     // Headers
     _addHeaderCell(sheet, 0, row, 'FECHA');

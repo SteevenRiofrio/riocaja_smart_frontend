@@ -99,7 +99,7 @@ class AuthProvider with ChangeNotifier {
     String nombre,
     String email,
     String password, {
-    String rol = 'lector',
+    String rol = 'cnb',
   }) async {
     try {
       _isLoading = true;
@@ -151,8 +151,8 @@ class AuthProvider with ChangeNotifier {
         _codigoCorresponsal = result['codigo_corresponsal'];
 
         // Determinar estado de autenticación basado en el rol
-        if (_user!.rol == 'admin' || _user!.rol == 'operador') {
-          // Admin y operadores van directo al dashboard
+        if (_user!.rol == 'admin' || _user!.rol == 'asesor') {
+          // Admin y asesores van directo al dashboard
           _authStatus = AuthStatus.authenticated;
           print('AuthProvider: Admin/Operador autenticado - acceso completo');
         } else {
@@ -501,7 +501,7 @@ class AuthProvider with ChangeNotifier {
         final userInfo = userData['data']['data'];
 
         // Solo verificar perfil completo para usuarios normales
-        if (_user!.rol != 'admin' && _user!.rol != 'operador') {
+        if (_user!.rol != 'admin' && _user!.rol != 'asesor') {
           _perfilCompleto = userInfo['perfil_completo'] ?? false;
           _codigoCorresponsal = userInfo['codigo_corresponsal'];
 

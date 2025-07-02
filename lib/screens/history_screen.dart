@@ -177,7 +177,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               // NUEVO: Botón para filtro de corresponsal (solo para admin)
               Consumer<AuthProvider>(
                 builder: (context, authProvider, child) {
-                  if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+                  if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
                     return IconButton(
                       icon: Icon(Icons.person_search),
                       onPressed: _availableCorresponsales.isNotEmpty ? _showCorresponsalFilter : null,
@@ -802,7 +802,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   // SOLO ADMIN: Mostrar código del corresponsal en el header
                   Consumer<AuthProvider>(
                     builder: (context, authProvider, child) {
-                      if ((authProvider.hasRole('admin') || authProvider.hasRole('operador')) && 
+                      if ((authProvider.hasRole('admin') || authProvider.hasRole('asesor')) && 
                           receipt.codigoCorresponsal != null && receipt.codigoCorresponsal!.isNotEmpty) {
                         return Container(
                           margin: EdgeInsets.only(right: 8),
@@ -881,7 +881,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   // SOLO ADMIN/OPERADOR: Mostrar información del corresponsal
                   Consumer<AuthProvider>(
                     builder: (context, authProvider, child) {
-                      if ((authProvider.hasRole('admin') || authProvider.hasRole('operador')) && 
+                      if ((authProvider.hasRole('admin') || authProvider.hasRole('asesor')) && 
                           receipt.codigoCorresponsal != null && receipt.codigoCorresponsal!.isNotEmpty) {
                         return Container(
                           margin: EdgeInsets.only(top: 12),
@@ -1082,7 +1082,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     // SOLO ADMIN/OPERADOR: INFORMACIÓN DEL CORRESPONSAL
                     Consumer<AuthProvider>(
                       builder: (context, authProvider, child) {
-                        if ((authProvider.hasRole('admin') || authProvider.hasRole('operador')) && 
+                        if ((authProvider.hasRole('admin') || authProvider.hasRole('asesor')) && 
                             receipt.codigoCorresponsal != null && receipt.codigoCorresponsal!.isNotEmpty) {
                           return Column(
                             crossAxisAlignment: CrossAxisAlignment.start,

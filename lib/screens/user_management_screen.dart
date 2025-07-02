@@ -370,7 +370,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
                 Icon(Icons.person, size: 14, color: Colors.grey),
                 SizedBox(width: 4),
                 Text(
-                  'Rol solicitado: ${user['rol'] ?? 'lector'}',
+                  'Rol solicitado: ${user['rol'] ?? 'cnb'}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade600,
@@ -411,7 +411,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
   // Card de usuario (todos los usuarios)
   Widget _buildUserCard(BuildContext context, Map<String, dynamic> user) {
     final estado = user['estado'] ?? 'desconocido';
-    final rol = user['rol'] ?? 'lector';
+    final rol = user['rol'] ?? 'cnb';
     final perfilCompleto = user['perfil_completo'] ?? false;
     
     Color statusColor;
@@ -676,7 +676,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
   }
 
   void _showApproveUserDialog(BuildContext context, Map<String, dynamic> user) {
-    String selectedRole = user['rol'] ?? 'lector';
+    String selectedRole = user['rol'] ?? 'cnb';
     final codigoController = TextEditingController();
     
     showDialog(
@@ -885,7 +885,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Single
 }
 
   void _showChangeRoleDialog(BuildContext context, Map<String, dynamic> user) {
-    final currentRole = user['rol'] ?? 'lector';
+    final currentRole = user['rol'] ?? 'cnb';
     String newRole = currentRole;
     
     showDialog(

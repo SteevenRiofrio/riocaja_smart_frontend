@@ -82,10 +82,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
           );
         },
       ),
-      // Botón para crear mensaje solo para admin/operador
+      // Botón para crear mensaje solo para admin/asesor
       floatingActionButton: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
-          if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+          if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
             return FloatingActionButton(
               onPressed: () => _showCreateMessageDialog(context),
               child: Icon(Icons.add),
@@ -221,10 +221,10 @@ class _MessagesScreenState extends State<MessagesScreen> {
           ),
         ),
         actions: [
-          // Botón para eliminar (solo admin/operador)
+          // Botón para eliminar (solo admin/asesor)
           Consumer<AuthProvider>(
             builder: (context, authProvider, child) {
-              if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+              if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
                 return TextButton.icon(
                   icon: Icon(Icons.delete, color: Colors.red),
                   label: Text('Eliminar', style: TextStyle(color: Colors.red)),

@@ -27,7 +27,7 @@ class _DashboardSummaryState extends State<DashboardSummary> {
     
     // Inicializar providers adicionales si es administrador
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+    if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
       _loadAdminData();
     }
     
@@ -99,9 +99,9 @@ class _DashboardSummaryState extends State<DashboardSummary> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     
-    // Verificar si es admin o operador
+    // Verificar si es admin o asesor
     final isAdmin = authProvider.hasRole('admin');
-    final isOperador = authProvider.hasRole('operador');
+    final isOperador = authProvider.hasRole('asesor');
     
     return Column(
       children: [
@@ -109,7 +109,7 @@ class _DashboardSummaryState extends State<DashboardSummary> {
         if (isAdmin || isOperador)
           AdminStatsWidget(),
           
-        // Sección de alertas para usuarios pendientes (solo para admin/operador)
+        // Sección de alertas para usuarios pendientes (solo para admin/asesor)
         if (isAdmin || isOperador)
           _buildPendingUsersAlert(),
           

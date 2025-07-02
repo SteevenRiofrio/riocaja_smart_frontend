@@ -46,7 +46,7 @@ class User {
       id: json['id'] ?? json['_id'] ?? '',
       nombre: json['nombre'] ?? '',
       email: json['email'] ?? '',
-      rol: json['rol'] ?? 'lector',
+      rol: json['rol'] ?? 'cnb',
       token: json['token'] ?? '',
       refreshToken: json['refresh_token'], 
       estado: json['estado'] ?? 'activo',

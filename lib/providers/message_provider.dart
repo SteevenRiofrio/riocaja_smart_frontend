@@ -72,7 +72,7 @@ class MessageProvider with ChangeNotifier {
     }
   }
   
-  // Crear mensaje (solo admin/operador)
+  // Crear mensaje (solo admin/asesor)
   Future<bool> createMessage(String titulo, String contenido, String tipo,
                            {DateTime? visibleHasta, List<String>? destinatarios}) async {
     _isLoading = true;
@@ -100,7 +100,7 @@ class MessageProvider with ChangeNotifier {
     }
   }
   
-  // Eliminar mensaje (solo admin/operador)
+  // Eliminar mensaje (solo admin/asesor)
   Future<bool> deleteMessage(String messageId) async {
     try {
       final success = await _messageService.deleteMessage(messageId);

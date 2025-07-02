@@ -149,7 +149,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                 Icon(Icons.person, size: 14, color: Colors.grey),
                 SizedBox(width: 4),
                 Text(
-                  'Rol solicitado: ${user['rol'] ?? 'lector'}',
+                  'Rol solicitado: ${user['rol'] ?? 'cnb'}',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.grey.shade600,
@@ -225,7 +225,7 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
   }
   
  void _showApproveUserDialog(BuildContext context, Map<String, dynamic> user) {
-  String selectedRole = user['rol'] ?? 'lector';
+  String selectedRole = user['rol'] ?? 'cnb';
   final codigoController = TextEditingController();
   
   showDialog(
@@ -285,8 +285,8 @@ class _PendingUsersScreenState extends State<PendingUsersScreen> {
                     prefixIcon: Icon(Icons.person_outline),
                   ),
                   items: [
-                    DropdownMenuItem(value: 'lector', child: Text('Lector')),
-                    DropdownMenuItem(value: 'operador', child: Text('Operador')),
+                    DropdownMenuItem(value: 'cnb', child: Text('CNB')),
+                    DropdownMenuItem(value: 'asesor', child: Text('Asesor')),
                     DropdownMenuItem(value: 'admin', child: Text('Administrador')),
                   ],
                   onChanged: (value) {

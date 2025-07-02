@@ -18,7 +18,7 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
 
   Future<void> _loadStats() async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    if (authProvider.hasRole('admin') || authProvider.hasRole('operador')) {
+    if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
       final adminProvider = Provider.of<AdminProvider>(context, listen: false);
       adminProvider.setContext(context);
       
@@ -34,8 +34,8 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
     
-    // Solo mostrar para admin y operador
-    if (!authProvider.hasRole('admin') && !authProvider.hasRole('operador')) {
+    // Solo mostrar para admin y asesor
+    if (!authProvider.hasRole('admin') && !authProvider.hasRole('asesor')) {
       return SizedBox.shrink();
     }
 
@@ -145,8 +145,8 @@ class _AdminStatsWidgetState extends State<AdminStatsWidget> {
                     SizedBox(width: 12),
                     Expanded(
                       child: _buildStatCard(
-                        'Lectores',
-                        stats['lectores'].toString(),
+                        'CNBS',
+                        stats['cnbs'].toString(),
                         Icons.person,
                         Colors.indigo.shade700,
                       ),

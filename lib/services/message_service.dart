@@ -206,7 +206,7 @@ class MessageService {
     }
   }
   
-  // CORREGIDO: Crear un nuevo mensaje (solo para admin/operador)
+  // CORREGIDO: Crear un nuevo mensaje (solo para admin/asesor)
   Future<bool> createMessage(String titulo, String contenido, String tipo, 
                            {DateTime? visibleHasta, List<String>? destinatarios}) async {
     try {
@@ -239,7 +239,7 @@ class MessageService {
     }
   }
   
-  // CORREGIDO: Eliminar un mensaje (solo para admin/operador)
+  // CORREGIDO: Eliminar un mensaje (solo para admin/asesor)
   Future<bool> deleteMessage(String messageId) async {
     try {
       print('Eliminando mensaje: $messageId');

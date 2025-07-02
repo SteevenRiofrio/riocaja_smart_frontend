@@ -81,8 +81,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   DashboardSummary(),
                   SizedBox(height: 20),
 
-                  // Interfaz moderna para usuarios lector - Grid 2x2
-                  if (authProvider.hasRole('lector')) ...[
+                  // Interfaz moderna para usuarios cnb - Grid 2x2
+                  if (authProvider.hasRole('cnb')) ...[
                     Text(
                       'Acciones Rápidas',
                       style: TextStyle(
