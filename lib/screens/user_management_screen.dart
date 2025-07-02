@@ -1,5 +1,8 @@
-// lib/screens/user_management_screen.dart - CON NOTIFICACIONES INTEGRADAS
+// lib/screens/user_management_screen.dart - CON CONFIGURACIÓN DEL TOKEN
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:riocaja_smart/providers/admin_provider.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/services/admin_service.dart';
 import 'package:riocaja_smart/widgets/user_action_dialogs.dart';
 import 'package:riocaja_smart/utils/text_constants.dart';
@@ -25,7 +28,46 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // ✅ CRÍTICO: Configurar AdminService antes de cargar datos
+    _setupAdminService();
+    
+    // Cargar datos solo después de configurar el servicio
     _loadData();
+  }
+
+  /// ✅ MÉTODO CLAVE: Configurar AdminService con contexto y token
+  void _setupAdminService() {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    print('UserManagementScreen: Configurando AdminService...');
+    print('UserManagementScreen: Usuario autenticado: ${authProvider.isAuthenticated}');
+    print('UserManagementScreen: Rol del usuario: ${authProvider.user?.rol}');
+    print('UserManagementScreen: Token disponible: ${authProvider.user?.token != null ? "SÍ" : "NO"}');
+    
+    // Verificar permisos de administrador
+    if (!authProvider.hasRole('admin') && !authProvider.hasRole('asesor')) {
+      print('UserManagementScreen: ❌ Usuario sin permisos de administrador');
+      return;
+    }
+    
+    // Verificar que el token esté disponible
+    if (authProvider.user?.token == null) {
+      print('UserManagementScreen: ❌ No hay token de autenticación disponible');
+      return;
+    }
+    
+    // Configurar AdminService
+    _adminService.setContext(context);
+    _adminService.setAuthToken(authProvider.user!.token);
+    
+    print('UserManagementScreen: ✅ AdminService configurado correctamente');
+    print('UserManagementScreen: Token configurado: ${authProvider.user!.token.substring(0, 10)}...');
   }
 
   @override
@@ -35,8 +77,22 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
   }
 
   Future<void> _loadData() async {
+    // ✅ Verificar que el AdminService esté configurado antes de cargar
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    if (!authProvider.hasRole('admin') && !authProvider.hasRole('asesor')) {
+      print('UserManagementScreen: ❌ Sin permisos para cargar datos');
+      return;
+    }
+    
+    if (authProvider.user?.token == null) {
+      print('UserManagementScreen: ❌ Sin token para cargar datos');
+      return;
+    }
+
     setState(() => _isLoading = true);
     try {
+      print('UserManagementScreen: Iniciando carga de datos...');
+      
       final pendingUsers = await _adminService.getPendingUsers();
       final allUsers = await _adminService.getAllUsers();
       
@@ -44,7 +100,12 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
         _pendingUsers = pendingUsers;
         _allUsers = allUsers;
       });
+      
+      print('UserManagementScreen: ✅ Datos cargados exitosamente');
+      print('UserManagementScreen: Pendientes: ${_pendingUsers.length}, Todos: ${_allUsers.length}');
+      
     } catch (e) {
+      print('UserManagementScreen: ❌ Error cargando datos: $e');
       _showSnackBar('Error cargando datos: $e', isError: true);
     } finally {
       setState(() => _isLoading = false);
@@ -248,43 +309,81 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Gestión de Usuarios'),
-        backgroundColor: Theme.of(context).primaryColor,
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: [
-            Tab(
-              icon: Icon(Icons.pending_actions),
-              text: 'Pendientes (${_pendingUsers.length})',
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        // Verificar permisos antes de mostrar la interfaz
+        if (!authProvider.hasRole('admin') && !authProvider.hasRole('asesor')) {
+          return Scaffold(
+            appBar: AppBar(title: Text('Acceso Denegado')),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.lock, size: 64, color: Colors.red),
+                  SizedBox(height: 16),
+                  Text(
+                    'No tienes permisos de administrador',
+                    style: TextStyle(fontSize: 18, color: Colors.red),
+                  ),
+                  SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text('Volver'),
+                  ),
+                ],
+              ),
             ),
-            Tab(
-              icon: Icon(Icons.people),
-              text: 'Todos (${_allUsers.length})',
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _loadData,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : TabBarView(
+          );
+        }
+        
+        return Scaffold(
+          appBar: AppBar(
+            title: Text('Gestión de Usuarios'),
+            backgroundColor: Theme.of(context).primaryColor,
+            foregroundColor: Colors.white,
+            bottom: TabBar(
               controller: _tabController,
-              children: [
-                _buildPendingUsersTab(),
-                _buildAllUsersTab(),
+              indicatorColor: Colors.white,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: [
+                Tab(
+                  icon: Icon(Icons.pending_actions),
+                  text: 'Pendientes (${_pendingUsers.length})',
+                ),
+                Tab(
+                  icon: Icon(Icons.people),
+                  text: 'Todos (${_allUsers.length})',
+                ),
               ],
             ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.refresh),
+                onPressed: _loadData,
+              ),
+            ],
+          ),
+          body: _isLoading
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 16),
+                      Text('Cargando usuarios...'),
+                    ],
+                  ),
+                )
+              : TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildPendingUsersTab(),
+                    _buildAllUsersTab(),
+                  ],
+                ),
+        );
+      },
     );
   }
 
@@ -320,155 +419,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
           ),
         ),
       ],
-    );
-  }
-
-  Widget _buildPendingUserCard(Map<String, dynamic> user) {
-    String fechaRegistro = 'Desconocida';
-    if (user['fecha_registro'] != null) {
-      try {
-        final fecha = DateTime.parse(user['fecha_registro']);
-        fechaRegistro = DateFormat('dd/MM/yyyy HH:mm').format(fecha);
-      } catch (e) {
-        fechaRegistro = user['fecha_registro'] ?? 'Desconocida';
-      }
-    }
-
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header con estado
-            Row(
-              children: [
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.shade100,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.orange.shade300),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.pending, size: 16, color: Colors.orange.shade700),
-                      SizedBox(width: 4),
-                      Text(
-                        'PENDIENTE',
-                        style: TextStyle(
-                          color: Colors.orange.shade700,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Spacer(),
-                Icon(Icons.access_time, color: Colors.grey, size: 16),
-                SizedBox(width: 4),
-                Text(
-                  fechaRegistro,
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-            
-            SizedBox(height: 12),
-            
-            // Información del usuario
-            Row(
-              children: [
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  child: Text(
-                    (user['nombre'] ?? 'U')[0].toUpperCase(),
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user['nombre'] ?? 'Sin nombre',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        user['email'] ?? 'Sin email',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                      SizedBox(height: 4),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade100,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          'Rol: ${TextConstants.getRoleName(user['rol'] ?? 'cnb')}',
-                          style: TextStyle(
-                            color: Colors.blue.shade700,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            
-            SizedBox(height: 16),
-            
-            // Botones de acción
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _approveUser(user),
-                    icon: Icon(Icons.check, size: 18),
-                    label: Text('Aprobar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _rejectUser(user),
-                    icon: Icon(Icons.close, size: 18),
-                    label: Text('Rechazar'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -518,10 +468,9 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                       items: [
                         DropdownMenuItem(value: 'todos', child: Text('Todos los estados')),
                         DropdownMenuItem(value: 'activo', child: Text('Activos')),
+                        DropdownMenuItem(value: 'pendiente', child: Text('Pendientes')),
                         DropdownMenuItem(value: 'inactivo', child: Text('Inactivos')),
                         DropdownMenuItem(value: 'suspendido', child: Text('Suspendidos')),
-                        DropdownMenuItem(value: 'pendiente', child: Text('Pendientes')),
-                        DropdownMenuItem(value: 'rechazado', child: Text('Rechazados')),
                       ],
                       onChanged: (value) {
                         setState(() {
@@ -608,102 +557,203 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
     }).toList();
   }
 
-  Widget _buildUserCard(Map<String, dynamic> user) {
-    final estado = user['estado'] ?? 'pendiente';
-    Color estadoColor;
-    IconData estadoIcon;
-    
-    switch (estado.toLowerCase()) {
-      case 'activo':
-        estadoColor = Colors.green;
-        estadoIcon = Icons.check_circle;
-        break;
-      case 'inactivo':
-        estadoColor = Colors.grey;
-        estadoIcon = Icons.block;
-        break;
-      case 'suspendido':
-        estadoColor = Colors.orange;
-        estadoIcon = Icons.pause_circle;
-        break;
-      case 'rechazado':
-        estadoColor = Colors.red;
-        estadoIcon = Icons.cancel;
-        break;
-      default:
-        estadoColor = Colors.blue;
-        estadoIcon = Icons.pending;
+  Widget _buildPendingUserCard(Map<String, dynamic> user) {
+    String fechaRegistro = 'Desconocida';
+    if (user['fecha_registro'] != null) {
+      try {
+        final fecha = DateTime.parse(user['fecha_registro']);
+        fechaRegistro = DateFormat('dd/MM/yyyy HH:mm').format(fecha);
+      } catch (e) {
+        fechaRegistro = user['fecha_registro'] ?? 'Desconocida';
+      }
     }
 
     return Card(
       margin: EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header con información básica
+            // Header con nombre y estado
             Row(
               children: [
-                CircleAvatar(
-                  backgroundColor: Theme.of(context).primaryColor,
-                  child: Text(
-                    (user['nombre'] ?? 'U')[0].toUpperCase(),
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                SizedBox(width: 12),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user['nombre'] ?? 'Sin nombre',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        user['email'] ?? 'Sin email',
-                        style: TextStyle(color: Colors.grey.shade600),
-                      ),
-                    ],
+                  child: Text(
+                    user['nombre'] ?? 'Sin nombre',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                // Estado
                 Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: estadoColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: estadoColor.withOpacity(0.3)),
+                    color: Colors.orange.shade100,
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(estadoIcon, size: 16, color: estadoColor),
-                      SizedBox(width: 4),
-                      Text(
-                        TextConstants.getEstadoName(estado).toUpperCase(),
-                        style: TextStyle(
-                          color: estadoColor,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    'PENDIENTE',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
               ],
             ),
             
-            SizedBox(height: 12),
+            SizedBox(height: 8),
             
-            // Información adicional
+            // Email
+            Row(
+              children: [
+                Icon(Icons.email, size: 16, color: Colors.grey.shade600),
+                SizedBox(width: 8),
+                Text(
+                  user['email'] ?? 'Sin email',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 4),
+            
+            // Rol y fecha
+            Row(
+              children: [
+                Icon(Icons.person, size: 16, color: Colors.grey.shade600),
+                SizedBox(width: 8),
+                Text(
+                  'Rol: ${user['rol']?.toUpperCase() ?? 'CNB'}',
+                  style: TextStyle(color: Colors.grey.shade600),
+                ),
+                Spacer(),
+                Text(
+                  fechaRegistro,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade500,
+                  ),
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 16),
+            
+            // Botones de acción
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _approveUser(user),
+                    icon: Icon(Icons.check, size: 16),
+                    label: Text('Aprobar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.green,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _rejectUser(user),
+                    icon: Icon(Icons.close, size: 16),
+                    label: Text('Rechazar'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserCard(Map<String, dynamic> user) {
+    final estado = user['estado'] ?? 'pendiente';
+    Color statusColor;
+    
+    switch (estado.toLowerCase()) {
+      case 'activo':
+        statusColor = Colors.green;
+        break;
+      case 'pendiente':
+        statusColor = Colors.orange;
+        break;
+      case 'inactivo':
+        statusColor = Colors.grey;
+        break;
+      case 'suspendido':
+        statusColor = Colors.red;
+        break;
+      default:
+        statusColor = Colors.grey;
+    }
+
+    return Card(
+      margin: EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header con nombre y estado
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    user['nombre'] ?? 'Sin nombre',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    estado.toUpperCase(),
+                    style: TextStyle(
+                      color: statusColor..withOpacity(0.8),
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 8),
+            
+            // Email y rol
+            Row(
+              children: [
+                Icon(Icons.email, size: 16, color: Colors.grey.shade600),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    user['email'] ?? 'Sin email',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+              ],
+            ),
+            
+            SizedBox(height: 4),
+            
+            // Rol y código corresponsal
             Row(
               children: [
                 Container(
@@ -713,7 +763,7 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    'Rol: ${TextConstants.getRoleName(user['rol'] ?? 'cnb')}',
+                    'Rol: ${user['rol']?.toUpperCase() ?? 'cnb'}',
                     style: TextStyle(
                       color: Colors.blue.shade700,
                       fontSize: 12,
@@ -756,22 +806,6 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.green,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: 8),
-                ],
-                if (estado != 'suspendido') ...[
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () => _changeUserState(user, 'suspendido'),
-                      icon: Icon(Icons.pause_circle, size: 16),
-                      label: Text('Suspender'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.orange,
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
                   ),
@@ -781,18 +815,18 @@ class _UserManagementScreenState extends State<UserManagementScreen> with Ticker
                   Expanded(
                     child: ElevatedButton.icon(
                       onPressed: () => _changeUserState(user, 'inactivo'),
-                      icon: Icon(Icons.block, size: 16),
-                      label: Text('Inactivar'),
+                      icon: Icon(Icons.pause_circle, size: 16),
+                      label: Text('Desactivar'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.grey,
                         foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 8),
                       ),
                     ),
                   ),
                   SizedBox(width: 8),
                 ],
-                // Botón de eliminación (solo para admins)
+                
+                // Menú de opciones adicionales (solo para admins)
                 PopupMenuButton<String>(
                   icon: Icon(Icons.more_vert),
                   onSelected: (value) {
