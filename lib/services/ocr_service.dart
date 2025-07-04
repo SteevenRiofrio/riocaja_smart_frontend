@@ -122,107 +122,139 @@ class OcrService {
   }
 
   // MEJORADO: Extrae el número de transacción con múltiples patrones
-  String _extractTransactionNumber(String text) {
-    print('Buscando número de transacción en: ${text.substring(0, text.length > 200 ? 200 : text.length)}');
+String _extractTransactionNumber(String text) {
+  print('🔍 Buscando número de transacción en: ${text.substring(0, text.length > 200 ? 200 : text.length)}');
+  
+  // PATRÓN 1: Buscar por líneas que contengan "TRANSACC", "NRO", etc.
+  final lines = text.split('\n');
+  for (var line in lines) {
+    String upperLine = line.toUpperCase();
     
-    // PATRÓN 1: Buscar por líneas que contengan "TRANSACC" o similar
-    final lines = text.split('\n');
-    for (var line in lines) {
-      String upperLine = line.toUpperCase();
+    if ((upperLine.contains('TRANSACC') || upperLine.contains('NRO') || 
+         upperLine.contains('NUMERO') || upperLine.contains('REFERENCIA')) && 
+         line.contains(':')) {
       
-      if ((upperLine.contains('TRANSACC') || upperLine.contains('NRO') || 
-           upperLine.contains('NUMERO')) && line.contains(':')) {
-        
-        final parts = line.split(':');
-        if (parts.length > 1) {
-          // Extraer solo números del texto después de ":"
-          final digitsOnly = RegExp(r'\d+').allMatches(parts[1]).map((m) => m.group(0)).join();
-          if (digitsOnly.isNotEmpty && digitsOnly.length >= 4) {
-            print('Número de transacción encontrado (método 1): $digitsOnly');
-            return digitsOnly;
-          }
+      final parts = line.split(':');
+      if (parts.length > 1) {
+        // Extraer solo números del texto después de ":"
+        final digitsOnly = RegExp(r'\d+').allMatches(parts[1]).map((m) => m.group(0)).join();
+        if (digitsOnly.isNotEmpty && digitsOnly.length >= 4) {
+          print('✅ Número de transacción encontrado (método 1): $digitsOnly');
+          return digitsOnly;
         }
       }
     }
-    
-    // PATRÓN 2: Buscar secuencias largas de números (8+ dígitos)
-    final longNumbers = RegExp(r'\b\d{8,}\b').allMatches(text);
-    for (var match in longNumbers) {
-      String number = match.group(0)!;
-      // Evitar números que parezcan fechas o horas
-      if (!_isLikelyDateOrTime(number)) {
-        print('Número de transacción encontrado (método 2): $number');
-        return number;
-      }
-    }
-    
-    // PATRÓN 3: Buscar cualquier secuencia de 6+ dígitos
-    final mediumNumbers = RegExp(r'\b\d{6,}\b').allMatches(text);
-    for (var match in mediumNumbers) {
-      String number = match.group(0)!;
-      if (!_isLikelyDateOrTime(number)) {
-        print('Número de transacción encontrado (método 3): $number');
-        return number;
-      }
-    }
-    
-    // PATRÓN 4: Buscar números después de palabras clave específicas
-    final patterns = [
-      RegExp(r'(?:TRANSACCI[OÓ]N|NRO|NUMERO|REFERENCIA)[\s:]*(\d+)', caseSensitive: false),
-      RegExp(r'(\d+).*(?:TRANSACCI|NRO)', caseSensitive: false),
-    ];
-    
-    for (var pattern in patterns) {
-      var match = pattern.firstMatch(text);
-      if (match != null && match.group(1) != null) {
-        String number = match.group(1)!;
-        if (number.length >= 4) {
-          print('Número de transacción encontrado (método 4): $number');
-          return number;
-        }
-      }
-    }
-    
-    // ÚLTIMO RECURSO: Generar número basado en fecha/hora si está disponible
-    String fecha = _extractDate(text);
-    String hora = _extractTime(text);
-    
-    if (fecha.isNotEmpty && hora.isNotEmpty) {
-      // Crear número único basado en fecha y hora
-      String cleanFecha = fecha.replaceAll('/', '').replaceAll('-', '');
-      String cleanHora = hora.replaceAll(':', '');
-      String generated = '$cleanFecha$cleanHora';
-      
-      if (generated.length >= 6) {
-        print('Número de transacción generado desde fecha/hora: $generated');
-        return generated;
-      }
-    }
-    
-    // SI NADA FUNCIONA: Generar número único con timestamp
-    String fallback = DateTime.now().millisecondsSinceEpoch.toString();
-    print('Número de transacción fallback generado: $fallback');
-    return fallback;
   }
+  
+  // PATRÓN 2: Buscar secuencias largas de números (8+ dígitos) - MÁS ESPECÍFICO
+  final longNumbers = RegExp(r'\b\d{8,12}\b').allMatches(text);
+  for (var match in longNumbers) {
+    String number = match.group(0)!;
+    // Evitar números que parezcan fechas, horas, o timestamps
+    if (!_isLikelyDateOrTime(number) && !_isLikelyTimestamp(number)) {
+      print('✅ Número de transacción encontrado (método 2): $number');
+      return number;
+    }
+  }
+  
+  // PATRÓN 3: Buscar cualquier secuencia de 6-10 dígitos (MÁS RESTRICTIVO)
+  final mediumNumbers = RegExp(r'\b\d{6,10}\b').allMatches(text);
+  for (var match in mediumNumbers) {
+    String number = match.group(0)!;
+    if (!_isLikelyDateOrTime(number) && !_isLikelyTimestamp(number)) {
+      print('✅ Número de transacción encontrado (método 3): $number');
+      return number;
+    }
+  }
+  
+  // PATRÓN 4: Buscar números después de palabras clave específicas
+  final patterns = [
+    RegExp(r'(?:TRANSACCI[OÓ]N|NRO|NUMERO|REFERENCIA)[\s:]*(\d{4,12})', caseSensitive: false),
+    RegExp(r'(\d{4,12}).*(?:TRANSACCI|NRO)', caseSensitive: false),
+  ];
+  
+  for (var pattern in patterns) {
+    var match = pattern.firstMatch(text);
+    if (match != null && match.group(1) != null) {
+      String number = match.group(1)!;
+      if (number.length >= 4 && number.length <= 12) {
+        print('✅ Número de transacción encontrado (método 4): $number');
+        return number;
+      }
+    }
+  }
+  
+  // PATRÓN 5: NUEVO - Buscar números cerca de palabras como "BANCO", "GUAYAQUIL"
+  final bankPatterns = [
+    RegExp(r'BANCO.*?(\d{6,10})', caseSensitive: false),
+    RegExp(r'GUAYAQUIL.*?(\d{6,10})', caseSensitive: false),
+    RegExp(r'(\d{6,10}).*?BANCO', caseSensitive: false),
+  ];
+  
+  for (var pattern in bankPatterns) {
+    var match = pattern.firstMatch(text);
+    if (match != null && match.group(1) != null) {
+      String number = match.group(1)!;
+      if (!_isLikelyDateOrTime(number) && !_isLikelyTimestamp(number)) {
+        print('✅ Número de transacción encontrado (método 5 - banco): $number');
+        return number;
+      }
+    }
+  }
+  
+  // PATRÓN 6: ÚLTIMO RECURSO - Buscar el primer número de 6+ dígitos que no sea fecha/hora
+  final anyNumbers = RegExp(r'\b\d{6,}\b').allMatches(text);
+  for (var match in anyNumbers) {
+    String number = match.group(0)!;
+    if (!_isLikelyDateOrTime(number) && !_isLikelyTimestamp(number) && number.length <= 12) {
+      print('⚠️ Número de transacción encontrado (último recurso): $number');
+      return number;
+    }
+  }
+  
+  // ❌ SI REALMENTE NO SE ENCUENTRA NADA - DEVOLVER VACÍO
+  print('❌ NO se pudo encontrar número de transacción válido');
+  return ''; // ← CAMBIO CRÍTICO: Devolver vacío en lugar de generar automático
+}
 
-  // NUEVO: Método auxiliar para detectar si un número parece fecha/hora
-  bool _isLikelyDateOrTime(String number) {
-    // Detectar patrones de fecha (20250702, 20230101, etc.)
-    if (number.length == 8 && number.startsWith('20')) {
+// NUEVO: Método para detectar timestamps (números muy largos)
+bool _isLikelyTimestamp(String number) {
+  // Los timestamps suelen ser números de 13 dígitos o más
+  if (number.length >= 13) {
+    return true;
+  }
+  
+  // Detectar números que empiecen con 17, 16, 15 (típicos de timestamps)
+  if (number.length >= 10 && (number.startsWith('17') || number.startsWith('16') || number.startsWith('15'))) {
+    return true;
+  }
+  
+  return false;
+}
+
+// MEJORADO: Método auxiliar para detectar si un número parece fecha/hora
+bool _isLikelyDateOrTime(String number) {
+  // Detectar patrones de fecha (20250702, 20230101, etc.)
+  if (number.length == 8 && number.startsWith('20')) {
+    return true;
+  }
+  
+  // Detectar patrones de hora (205240, 123045, etc.)
+  if (number.length == 6) {
+    int? hour = int.tryParse(number.substring(0, 2));
+    int? minute = int.tryParse(number.substring(2, 4));
+    if (hour != null && minute != null && hour <= 23 && minute <= 59) {
       return true;
     }
-    
-    // Detectar patrones de hora (205240, 123045, etc.)
-    if (number.length == 6) {
-      int? hour = int.tryParse(number.substring(0, 2));
-      int? minute = int.tryParse(number.substring(2, 4));
-      if (hour != null && minute != null && hour <= 23 && minute <= 59) {
-        return true;
-      }
-    }
-    
-    return false;
   }
+  
+  // Detectar años (2020, 2021, 2022, etc.)
+  if (number.length == 4 && number.startsWith('20')) {
+    return true;
+  }
+  
+  return false;
+}
 
   // Extrae la fecha en formato dd/mm/yyyy
   String _extractDate(String text) {

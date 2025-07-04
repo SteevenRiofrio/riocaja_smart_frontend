@@ -235,85 +235,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
 
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: () async {
-                            if (_receipt == null) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text(
-                                    'Error: No se pudo procesar el comprobante o los datos son incompletos.',
-                                  ),
-                                  backgroundColor: Colors.red,
-                                ),
-                              );
-                              return;
-                            }
-
-                            // Debug log
-                            final receiptJson = _receipt!.toJson();
-                            print('Datos a enviar: ${jsonEncode(receiptJson)}');
-
-                            // Usar el provider para guardar el comprobante en el backend
-                            final provider = Provider.of<ReceiptsProvider>(
-                              context,
-                              listen: false,
-                            );
-
-                            // Establecer el contexto en el provider
-                            provider.setContext(context);
-
-                            try {
-                              final success = await provider.addReceipt(_receipt!);
-
-                              if (success) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Comprobante guardado exitosamente',
-                                    ),
-                                  ),
-                                );
-                                Navigator.of(context).pop();
-                                Navigator.of(context).pop(); // Volver a la pantalla de inicio
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Error al guardar el comprobante',
-                                    ),
-                                  ),
-                                );
-                              }
-                            } catch (e) {
-                              // Verificar si es un error de autenticación
-                              if (e.toString().contains('Sesión expirada') ||
-                                  e.toString().contains('Token')) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(
-                                      'Sesión expirada. Inicie sesión nuevamente.',
-                                    ),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-
-                                // Navegar a la pantalla de login
-                                Future.delayed(Duration(seconds: 2), () {
-                                  Navigator.of(context).pushReplacement(
-                                    MaterialPageRoute(
-                                      builder: (context) => LoginScreen(),
-                                    ),
-                                  );
-                                });
-                              } else {
-                                // Otro tipo de error
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Error: ${e.toString()}'),
-                                  ),
-                                );
-                              }
-                            }
-                          },
+                          onPressed: _saveReceipt, // Usar el nuevo método
                           child: Text('Guardar'),
                           style: ElevatedButton.styleFrom(
                             padding: EdgeInsets.symmetric(vertical: 12),
@@ -478,5 +400,206 @@ class _PreviewScreenState extends State<PreviewScreen> {
       default: // PAGO DE SERVICIO y otros
         return Colors.blue.shade100;
     }
+  }
+
+  // Reemplaza el botón de guardar actual con este método separado
+  Future<void> _saveReceipt() async {
+    if (_receipt == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: No hay datos del comprobante para guardar'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // ✅ NUEVA VALIDACIÓN CRÍTICA
+    if (_receipt!.nroTransaccion.isEmpty) {
+      // Mostrar diálogo para que el usuario ingrese manualmente
+      String? manualNumber = await _showManualTransactionDialog();
+      
+      if (manualNumber == null || manualNumber.trim().isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: Se requiere un número de transacción válido'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
+      
+      // Crear nuevo receipt con el número manual
+      _receipt = Receipt(
+        fecha: _receipt!.fecha,
+        hora: _receipt!.hora,
+        tipo: _receipt!.tipo,
+        nroTransaccion: manualNumber.trim(),
+        valorTotal: _receipt!.valorTotal,
+        fullText: _receipt!.fullText,
+      );
+    }
+
+    // ✅ VALIDACIÓN ADICIONAL: Evitar números sospechosos
+    if (_receipt!.nroTransaccion.length > 12 || 
+        _receipt!.nroTransaccion.startsWith('17') || 
+        _receipt!.nroTransaccion.startsWith('16')) {
+      
+      bool? confirmSave = await _showConfirmSuspiciousNumberDialog(_receipt!.nroTransaccion);
+      
+      if (confirmSave != true) {
+        return; // Usuario canceló
+      }
+    }
+
+    // Debug log
+    final receiptJson = _receipt!.toJson();
+    print('💾 Datos a enviar: ${jsonEncode(receiptJson)}');
+
+    // Usar el provider para guardar el comprobante en el backend
+    final provider = Provider.of<ReceiptsProvider>(context, listen: false);
+    provider.setContext(context);
+
+    try {
+      final success = await provider.addReceipt(_receipt!);
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Comprobante guardado exitosamente')),
+        );
+        Navigator.of(context).pop();
+        Navigator.of(context).pop(); // Volver a la pantalla de inicio
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al guardar el comprobante')),
+        );
+      }
+    } catch (e) {
+      // Verificar si es un error de autenticación
+      if (e.toString().contains('Sesión expirada') ||
+          e.toString().contains('Token')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Sesión expirada. Inicie sesión nuevamente.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+
+        // Navegar a la pantalla de login
+        Future.delayed(Duration(seconds: 2), () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => LoginScreen()),
+          );
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: ${e.toString()}')),
+        );
+      }
+    }
+  }
+
+  // NUEVO: Diálogo para ingreso manual de número de transacción
+  Future<String?> _showManualTransactionDialog() async {
+    TextEditingController controller = TextEditingController();
+    
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('⚠️ Número de Transacción Requerido'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'No se pudo detectar automáticamente el número de transacción. '
+                'Por favor, ingrésalo manualmente desde el comprobante físico.',
+                style: TextStyle(fontSize: 14),
+              ),
+              SizedBox(height: 16),
+              TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: 'Número de Transacción',
+                  hintText: 'Ej: 203901776',
+                  border: OutlineInputBorder(),
+                ),
+                maxLength: 12,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                String number = controller.text.trim();
+                if (number.isNotEmpty && number.length >= 4) {
+                  Navigator.of(context).pop(number);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Ingrese un número válido (mínimo 4 dígitos)'),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+              child: Text('Guardar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // NUEVO: Diálogo de confirmación para números sospechosos
+  Future<bool?> _showConfirmSuspiciousNumberDialog(String number) async {
+    return showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('🤔 Número Sospechoso Detectado'),
+          content: Text(
+            'El número detectado "$number" parece ser generado automáticamente. '
+            '¿Estás seguro de que este es el número correcto del comprobante?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                Navigator.of(context).pop(false);
+                // Abrir diálogo para ingresar manualmente
+                String? manualNumber = await _showManualTransactionDialog();
+                if (manualNumber != null) {
+                  // Actualizar el receipt con el número manual
+                  _receipt = Receipt(
+                    fecha: _receipt!.fecha,
+                    hora: _receipt!.hora,
+                    tipo: _receipt!.tipo,
+                    nroTransaccion: manualNumber.trim(),
+                    valorTotal: _receipt!.valorTotal,
+                    fullText: _receipt!.fullText,
+                  );
+                  setState(() {}); // Refrescar UI
+                }
+              },
+              child: Text('Corregir'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text('Usar Este Número'),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
