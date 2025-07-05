@@ -3,6 +3,7 @@ import 'package:riocaja_smart/models/receipt.dart';
 import 'package:riocaja_smart/services/api_service.dart';
 import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
+import 'package:riocaja_smart/providers/auth_provider.dart';
 
 class EditReceiptScreen extends StatefulWidget {
   final Receipt receipt;
@@ -60,7 +61,18 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // ✅ CORRECCIÓN CRÍTICA: Configurar ApiService con contexto y token
       final apiService = ApiService();
+      apiService.setContext(context);  // ← AGREGAR ESTA LÍNEA
+      
+      // ✅ TAMBIÉN: Configurar token desde AuthProvider
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      if (authProvider.isAuthenticated && authProvider.user?.token != null) {
+        apiService.setAuthToken(authProvider.user!.token);  // ← AGREGAR ESTA LÍNEA
+        print('🔧 Token configurado para edición: ${authProvider.user!.token.substring(0, 20)}...');
+      } else {
+        throw Exception('Usuario no autenticado');
+      }
       
       final editData = {
         'fecha': _fechaController.text.trim(),
@@ -70,11 +82,14 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
         'valor_total': double.parse(_valorController.text.trim()),
       };
 
+      print('🔧 Enviando datos de edición: $editData');
+
       final success = await apiService.editReceipt(widget.receipt.nroTransaccion, editData);
 
       if (success) {
         // Recargar la lista de comprobantes
         final receiptsProvider = Provider.of<ReceiptsProvider>(context, listen: false);
+        receiptsProvider.setContext(context);  // ← ASEGURAR CONTEXTO
         await receiptsProvider.loadReceipts();
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -94,6 +109,7 @@ class _EditReceiptScreenState extends State<EditReceiptScreen> {
         );
       }
     } catch (e) {
+      print('❌ Error en _saveChanges: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('❌ Error: $e'),

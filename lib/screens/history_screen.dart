@@ -972,14 +972,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  TextButton.icon(
-                    icon: Icon(Icons.delete_outline, size: 18),
-                    label: Text('Eliminar'),
-                    onPressed: () => _confirmDelete(receipt),
-                    style: TextButton.styleFrom(
-                      padding: EdgeInsets.symmetric(horizontal: 8),
-                      foregroundColor: Colors.red,
-                    ),
+                  // ✅ SOLO MOSTRAR BOTÓN ELIMINAR PARA ADMIN Y ASESOR
+                  Consumer<AuthProvider>(
+                    builder: (context, authProvider, child) {
+                      final userRole = authProvider.user?.rol ?? '';
+                      
+                      // 🗑️ SOLO Admin y Asesor ven el botón Eliminar en las tarjetas
+                      if (userRole == 'admin' || userRole == 'asesor') {
+                        return TextButton.icon(
+                          icon: Icon(Icons.delete_outline, size: 18),
+                          label: Text('Eliminar'),
+                          onPressed: () => _confirmDelete(receipt),
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.symmetric(horizontal: 8),
+                            foregroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                      
+                      // 📝 CNB no ve ningún botón en las tarjetas
+                      else {
+                        return SizedBox.shrink();
+                      }
+                    },
                   ),
                 ],
               ),
