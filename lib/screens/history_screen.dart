@@ -7,6 +7,7 @@ import 'package:riocaja_smart/providers/receipts_provider.dart';
 import 'package:riocaja_smart/services/api_service.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
+import 'package:riocaja_smart/screens/edit_receipt_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   @override
@@ -1245,23 +1246,85 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ),
 
                     SizedBox(height: 24),
-                    Center(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _confirmDelete(receipt);
-                        },
-                        icon: Icon(Icons.delete_outline),
-                        label: Text('Eliminar Comprobante'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.red,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 20,
-                            vertical: 12,
-                          ),
-                        ),
-                      ),
+
+                    // 🔧 BOTONES CON PERMISOS ESPECÍFICOS
+                    Consumer<AuthProvider>(
+                      builder: (context, authProvider, child) {
+                        final userRole = authProvider.user?.rol ?? '';
+                        
+                        return Column(
+                          children: [
+                            // 🔧 BOTÓN DE EDITAR (Admin y CNB)
+                            if (userRole == 'admin' || userRole == 'cnb') ...[
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    Navigator.pop(context); // Cerrar detalles
+                                    
+                                    final result = await Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => EditReceiptScreen(receipt: receipt),
+                                      ),
+                                    );
+                                    
+                                    // Si se editó exitosamente, recargar lista
+                                    if (result == true) {
+                                      final provider = Provider.of<ReceiptsProvider>(context, listen: false);
+                                      provider.setContext(context);
+                                      await provider.loadReceipts();
+                                    }
+                                  },
+                                  icon: Icon(Icons.edit, color: Colors.white),
+                                  label: Text('✏️ Editar Comprobante', style: TextStyle(color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 12),
+                            ],
+                            
+                            // 🗑️ BOTÓN DE ELIMINAR (Admin y Asesor)
+                            if (userRole == 'admin' || userRole == 'asesor') ...[
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton.icon(
+                                  onPressed: () {
+                                    Navigator.pop(context); // Cerrar detalles
+                                    _confirmDelete(receipt);
+                                  },
+                                  icon: Icon(Icons.delete_outline, color: Colors.white),
+                                  label: Text('🗑️ Eliminar Comprobante', style: TextStyle(color: Colors.white)),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red,
+                                    padding: EdgeInsets.symmetric(vertical: 12),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            
+                            // 📋 Si no tiene permisos, mostrar mensaje informativo
+                            if (userRole != 'admin' && userRole != 'asesor' && userRole != 'cnb') ...[
+                              Container(
+                                width: double.infinity,
+                                padding: EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'ℹ️ Sin permisos para editar o eliminar',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(color: Colors.grey.shade600),
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),

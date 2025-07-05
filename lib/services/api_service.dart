@@ -891,5 +891,34 @@ Future<bool> refreshToken() async {
     }
   }
 
+  // Editar comprobante
+Future<bool> editReceipt(String transactionNumber, Map<String, dynamic> editData) async {
+  try {
+    final url = '$baseUrl/receipts/$transactionNumber';
+    print('🔧 Editando comprobante: $url');
+    print('🔧 Datos de edición: $editData');
+
+    final response = await _makeRequestWithRetry(
+      'PUT',
+      url,
+      body: editData,
+    );
+
+    print('🔧 Código de respuesta editar: ${response.statusCode}');
+    print('🔧 Respuesta del servidor: ${response.body}');
+
+    if (response.statusCode == 200) {
+      print('✅ Comprobante editado exitosamente');
+      return true;
+    } else {
+      print('❌ Error al editar comprobante: ${response.statusCode}');
+      return false;
+    }
+  } catch (e) {
+    print('❌ Error en editReceipt: $e');
+    throw Exception('Error de conexión: $e');
+  }
+}
+
 
 }
