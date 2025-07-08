@@ -342,9 +342,11 @@ class ReportService {
         incomes.forEach((key, value) {
           String tipo = key.toString().toUpperCase();
           int cantidad = incomeCount[key] ?? 0;
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \${(value as num).toStringAsFixed(2).padLeft(8)}\n';
+          String valorFormatted = (value as num).toStringAsFixed(2).padLeft(8);
+          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${valorFormatted}\n';
         });
-        reportText += 'TOTAL INGRESOS      ${totalIncomeCount.toString().padLeft(4)} \${totalIncomes.toStringAsFixed(2).padLeft(8)}\n\n';
+        String totalIncomesFormatted = totalIncomes.toStringAsFixed(2).padLeft(8);
+        reportText += 'TOTAL INGRESOS      ${totalIncomeCount.toString().padLeft(4)} \$${totalIncomesFormatted}\n\n';
       }
 
       // EGRESOS
@@ -354,12 +356,14 @@ class ReportService {
         expenses.forEach((key, value) {
           String tipo = key.toString().toUpperCase();
           int cantidad = expenseCount[key] ?? 0;
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \${(value as num).toStringAsFixed(2).padLeft(8)}\n';
+          String valorFormatted = (value as num).toStringAsFixed(2).padLeft(8);
+          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${valorFormatted}\n';
         });
-        reportText += 'TOTAL EGRESOS       ${totalExpenseCount.toString().padLeft(4)} \${totalExpenses.toStringAsFixed(2).padLeft(8)}\n\n';
+        String totalExpensesFormatted = totalExpenses.toStringAsFixed(2).padLeft(8);
+        reportText += 'TOTAL EGRESOS       ${totalExpenseCount.toString().padLeft(4)} \$${totalExpensesFormatted}\n\n';
       }
 
-      reportText += 'SALDO EN CAJA                \${saldoEnCaja.toStringAsFixed(2)}\n';
+      reportText += 'SALDO EN CAJA                \$${saldoEnCaja.toStringAsFixed(2)}\n';
     } else {
       reportText += 'NO HAY TRANSACCIONES PARA ESTA FECHA.\n';
     }
