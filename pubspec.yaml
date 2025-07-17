@@ -10,12 +10,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_localizations:        # NUEVO - Para soporte de idiomas
+  flutter_localizations:        # Para soporte de idiomas
     sdk: flutter
   camera: ^0.10.5+8           # Para acceso a la cámara
   firebase_core: ^2.24.2      # Base de Firebase
-  google_mlkit_text_recognition: ^0.11.0  # Para reconocimiento de texto
-  google_mlkit_commons: ^0.6.0  # Dependencia de MLKit
+  google_mlkit_text_recognition:  # Para reconocimiento de texto
+  google_mlkit_commons: # Dependencia de MLKit
   http: ^1.1.0                # Para llamadas API
   provider: ^6.1.1            # Para gestión de estado
   shared_preferences: ^2.2.2  # Para almacenamiento local
@@ -29,16 +29,12 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.14.4
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
-  generate: true                # NUEVO - Para generar localizaciones
-  assets:
-    - assets/images/          # Carpeta de imágenes
-    - assets/app_icon.png     # Ícono de la aplicación
+  generate: true                # Para generar localizaciones
 
-# Configuración del ícono de la aplicación
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true

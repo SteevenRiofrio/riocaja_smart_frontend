@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
 
+
 class CompleteProfileScreen extends StatefulWidget {
   final String? codigoCorresponsal;
 
