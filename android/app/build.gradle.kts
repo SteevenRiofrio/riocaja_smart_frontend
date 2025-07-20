@@ -1,14 +1,32 @@
+import java.util.Properties
+import java.io.FileInputStream
+
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(FileInputStream(localPropertiesFile))
+    }
+}
+
+val flutterRoot = localProperties.getProperty("flutter.sdk")
+    ?: throw GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
+
+val flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "1"
+val flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0"
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
     id("com.google.gms.google-services")
-    id("dev.flutter.flutter-gradle-plugin")
 }
 
+apply(from = "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle")
+
 android {
-    namespace = "com.example.riocaja_smart"
+    namespace = "com.riocaja.smart"
     compileSdk = 36
-    ndkVersion = "27.0.12077973"
+    buildToolsVersion = "36.0.0"
+    ndkVersion = "25.1.8937393"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -19,37 +37,33 @@ android {
         jvmTarget = "17"
     }
 
+    sourceSets {
+        getByName("main") {
+            java.srcDirs("src/main/kotlin")
+        }
+    }
+
     defaultConfig {
-        applicationId = "com.example.riocaja_smart"
+        applicationId = "com.riocaja.smart"
         minSdk = 21
-        targetSdk = 35
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        targetSdk = 36
+        versionCode = flutterVersionCode.toInt()
+        versionName = flutterVersionName
+        multiDexEnabled = true
     }
 
     buildTypes {
-        release {
-            signingConfig = signingConfigs.getByName("debug")
-
-        }
-        
-        debug {
-            // ✅ SINTAXIS CORRECTA PARA KOTLIN DSL
+        getByName("release") {
             isMinifyEnabled = false
-            isShrinkResources = false
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation(platform("com.google.firebase:firebase-bom:32.8.1"))
-    implementation("com.google.firebase:firebase-analytics")
-    
-    // Google ML Kit con versión específica
-   // implementation("com.google.mlkit:text-recognition:16.0.0")
-}
-
-flutter {
-    source = "../.."
+    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10")
+    implementation("androidx.multidex:multidex:2.0.1")
 }
