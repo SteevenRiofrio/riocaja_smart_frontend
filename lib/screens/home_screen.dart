@@ -224,8 +224,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildGreetingCard() {
     final authProvider = Provider.of<AuthProvider>(context);
-    String greeting = _getGreeting();
-    String userName = authProvider.user?.nombre ?? 'Usuario';
+
+    // ✅ CAMBIO: De "Buenas tardes" a "Hola"
+    String greeting = "Hola";  // ← CAMBIADO
+
+    // ✅ CAMBIO: Solo usar nombre completo, nunca email
+    String userName = authProvider.user?.nombre ?? 'Usuario';  // ← CAMBIADO
 
     return Container(
       width: double.infinity,
@@ -265,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '$greeting, $userName',
+                  '$greeting, $userName',  // Aquí se muestra "Hola, [Nombre Completo]"
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,

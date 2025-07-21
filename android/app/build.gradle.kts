@@ -1,69 +1,38 @@
-import java.util.Properties
-import java.io.FileInputStream
-
-val localProperties = Properties().apply {
-    val localPropertiesFile = rootProject.file("local.properties")
-    if (localPropertiesFile.exists()) {
-        load(FileInputStream(localPropertiesFile))
-    }
-}
-
-val flutterRoot = localProperties.getProperty("flutter.sdk")
-    ?: throw GradleException("Flutter SDK not found. Define location with flutter.sdk in the local.properties file.")
-
-val flutterVersionCode = localProperties.getProperty("flutter.versionCode") ?: "1"
-val flutterVersionName = localProperties.getProperty("flutter.versionName") ?: "1.0"
-
 plugins {
     id("com.android.application")
     id("kotlin-android")
-    id("com.google.gms.google-services")
+    id("dev.flutter.flutter-gradle-plugin")
 }
 
-apply(from = "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle")
-
 android {
-    namespace = "com.riocaja.smart"
+    namespace = "com.example.riocaja_smart"
     compileSdk = 36
-    buildToolsVersion = "36.0.0"
-    ndkVersion = "25.1.8937393"
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
     }
 
     kotlinOptions {
-        jvmTarget = "17"
-    }
-
-    sourceSets {
-        getByName("main") {
-            java.srcDirs("src/main/kotlin")
-        }
+        jvmTarget = JavaVersion.VERSION_11.toString()
     }
 
     defaultConfig {
-        applicationId = "com.riocaja.smart"
-        minSdk = 21
+        applicationId = "com.example.riocaja_smart"
+        minSdk = flutter.minSdkVersion
         targetSdk = 36
-        versionCode = flutterVersionCode.toInt()
-        versionName = flutterVersionName
-        multiDexEnabled = true
+        versionCode = flutter.versionCode
+        versionName = flutter.versionName
     }
 
     buildTypes {
-        getByName("release") {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+        release {
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
-dependencies {
-    implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.10")
-    implementation("androidx.multidex:multidex:2.0.1")
+flutter {
+    source = "../.."
 }
