@@ -1,4 +1,4 @@
-// lib/services/auth_service.dart - COMPLETO CON REFRESH TOKENS Y CORRECCIÓN DE ROL
+// lib/services/auth_service.dart - COMPLETO CON REFRESH TOKENS Y CORRECCIÓN DE NOMBRE
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -182,7 +182,7 @@ class AuthService {
         print('Login exitoso con datos: $responseData');
         
         _token = responseData['access_token'];
-        _refreshToken = responseData['refresh_token']; // ← NUEVO: Obtener refresh token
+        _refreshToken = responseData['refresh_token'];
         
         if (_token == null || _token!.isEmpty) {
           print('ERROR: Token recibido es nulo o vacío');
@@ -195,11 +195,9 @@ class AuthService {
         print('Token recibido: ${_token!.substring(0, min(10, _token!.length))}...');
         print('Refresh token recibido: ${_refreshToken != null ? "SÍ" : "NO"}');
         
-        // Verificar si el perfil está completo
         final perfilCompleto = responseData['perfil_completo'] ?? false;
         final codigoCorresponsal = responseData['codigo_corresponsal'];
         
-        // Intentar obtener datos completos del usuario
         try {
           final userData = await getUserData();
           if (userData['success']) {
@@ -209,50 +207,50 @@ class AuthService {
               email: userData['data']['data']['email'],
               rol: userData['data']['data']['rol'],
               token: _token!,
-              refreshToken: _refreshToken, // ← NUEVO: Incluir refresh token
+              refreshToken: _refreshToken,
               estado: userData['data']['data']['estado'] ?? 'activo',
               perfilCompleto: userData['data']['data']['perfil_completo'] ?? false,
               codigoCorresponsal: userData['data']['data']['codigo_corresponsal'],
               nombreLocal: userData['data']['data']['nombre_local'],
             );
-            
             await _saveUserData();
             print('Datos completos del usuario guardados');
           } else {
-            // ✅ CORREGIDO: CREAR USUARIO CON DATOS DEL BACKEND (sin valores por defecto)
-            final String rolFromResponse = responseData['rol'];  // ← SIN ?? 'cnb'
+            // ✅ CORRECCIÓN: usar responseData['nombre'] directamente
+            print('⚠️ No se pudieron obtener datos completos, usando datos del login');
+            final String rolFromResponse = responseData['rol'];
             final bool perfilCompletoFromResponse = responseData['perfil_completo'] ?? false;
             
             _currentUser = User(
               id: 'temp_id',
-              nombre: email.split('@')[0],
+              nombre: responseData['nombre'] ?? email.split('@')[0], // ✅ CORREGIDO
               email: email,
-              rol: rolFromResponse,  // ← USAR DIRECTAMENTE EL ROL DEL BACKEND
+              rol: rolFromResponse,
               token: _token!,
               refreshToken: _refreshToken,
               perfilCompleto: perfilCompletoFromResponse,
             );
-            
             await _saveUserData();
-            print('Usando datos del backend directamente - Rol: $rolFromResponse');
+            print('Usando datos del login - Nombre: ${_currentUser!.nombre}, Rol: $rolFromResponse');
           }
         } catch (e) {
-          // ✅ CORREGIDO: CREAR USUARIO CON DATOS DEL BACKEND (sin valores por defecto)
-          final String rolFromResponse = responseData['rol'];  // ← SIN ?? 'cnb'
+          // ✅ CORRECCIÓN: usar responseData['nombre'] directamente
+          print('❌ Error al obtener datos adicionales: $e');
+          final String rolFromResponse = responseData['rol'];
           final bool perfilCompletoFromResponse = responseData['perfil_completo'] ?? false;
           
           _currentUser = User(
             id: 'temp_id',
             nombre: email.split('@')[0],
+            nombre: responseData['nombre'] ?? email.split('@')[0], // ✅ CORREGIDO
             email: email,
-            rol: rolFromResponse,  // ← USAR DIRECTAMENTE EL ROL DEL BACKEND
+            rol: rolFromResponse,
             token: _token!,
             refreshToken: _refreshToken,
             perfilCompleto: perfilCompletoFromResponse,
           );
-          
           await _saveUserData();
-          print('Error al obtener datos adicionales: $e. Usando rol del backend: $rolFromResponse');
+          print('Error al obtener datos adicionales: $e. Usando nombre: ${_currentUser!.nombre}, rol: $rolFromResponse');
         }
         
         return {
@@ -286,7 +284,7 @@ class AuthService {
     }
   }
 
-  // ← NUEVO: Método para renovar access token usando refresh token
+  // Renovar access token usando refresh token
   Future<bool> refreshAccessToken() async {
     try {
       if (_refreshToken == null || _refreshToken!.isEmpty) {
@@ -478,7 +476,7 @@ class AuthService {
     }
   }
   
-  // ← NUEVO: Guardar datos de usuario incluyendo refresh token
+  // Guardar datos de usuario incluyendo refresh token
   Future<void> _saveUserData() async {
     try {
       if (_currentUser != null) {
@@ -508,12 +506,12 @@ class AuthService {
   Future<bool> logout() async {
     try {
       _token = null;
-      _refreshToken = null; // ← NUEVO: Limpiar refresh token
+      _refreshToken = null;
       _currentUser = null;
       
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove(USER_DATA_KEY);
-      await prefs.remove(REFRESH_TOKEN_KEY); // ← NUEVO: Remover refresh token
+      await prefs.remove(REFRESH_TOKEN_KEY);
       await prefs.remove(TOKEN_EXPIRY_KEY);
       await prefs.remove(REMEMBER_ME_KEY);
       
@@ -543,7 +541,6 @@ class AuthService {
     return _token != null && _currentUser != null;
   }
   
-
   // Función auxiliar para mínimo
   int min(int a, int b) {
     return a < b ? a : b;
