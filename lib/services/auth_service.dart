@@ -284,53 +284,43 @@ class AuthService {
   }
 
   // Renovar access token usando refresh token
-  Future<bool> refreshAccessToken() async {
-    try {
-      if (_refreshToken == null || _refreshToken!.isEmpty) {
-        print('No hay refresh token disponible');
-        return false;
-      }
-      
-      final url = '$baseUrl/auth/refresh';
-      print('Renovando token en: $url');
-      
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'refresh_token': _refreshToken,
-        }),
-      ).timeout(Duration(seconds: 30));
-      
-      print('Respuesta refresh token: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        _token = responseData['access_token'];
-        
-        // Actualizar usuario con nuevo token
-        if (_currentUser != null) {
-          _currentUser = _currentUser!.copyWith(
-            token: _token!,
-            refreshToken: _refreshToken, // Mantener el mismo refresh token
-          );
-          
-          await _saveUserData();
-        }
-        
-        print('Token renovado exitosamente');
-        return true;
-      } else {
-        print('Error renovando token: ${response.statusCode}');
-        final errorData = jsonDecode(response.body);
-        print('Detalles del error: $errorData');
-        return false;
-      }
-    } catch (e) {
-      print('Error en refreshAccessToken: $e');
+Future<bool> refreshAccessToken() async {
+  try {
+    if (_refreshToken == null || _refreshToken!.isEmpty) {
+      print('No hay refresh token disponible');
       return false;
     }
+    
+    final url = '$baseUrl/auth/refresh';
+    print('Renovando token en: $url');
+    
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'refresh_token': _refreshToken,
+      }),
+    ).timeout(Duration(seconds: 30));
+    
+    if (response.statusCode == 200) {
+      final responseData = jsonDecode(response.body);
+      _token = responseData['access_token'];
+      
+      // AGREGAR ESTAS LÍNEAS SI NO ESTÁN:
+      if (_currentUser != null) {
+        _currentUser = _currentUser!.copyWith(token: _token!);
+        await _saveUserData();
+      }
+      
+      print('Token renovado exitosamente');
+      return true;
+    }
+    return false;
+  } catch (e) {
+    print('Error en refreshAccessToken: $e');
+    return false;
   }
+}
 
   // Completar perfil de usuario
   Future<bool> completeProfile({

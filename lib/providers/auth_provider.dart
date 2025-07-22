@@ -66,8 +66,13 @@ class AuthProvider with ChangeNotifier {
 
         // Sincronizar tokens con ApiService
         _syncTokensWithApiService();
-
         print('AuthProvider: Usuario autenticado: ${_user!.nombre}');
+
+        // AGREGAR: Configurar expiración del token
+        final prefs = await SharedPreferences.getInstance();
+        final expiryTime = DateTime.now().add(Duration(hours: 1));
+        await prefs.setInt(AuthService.TOKEN_EXPIRY_KEY, expiryTime.millisecondsSinceEpoch);
+
       } else {
         _authStatus = AuthStatus.unauthenticated;
         print('AuthProvider: No hay usuario autenticado');
@@ -138,16 +143,16 @@ class AuthProvider with ChangeNotifier {
   }
 
   // Login de usuario con refresh tokens
-  Future<bool> login(String email, String password) async {
-    try {
-      _isLoading = true;
-      _errorMessage = '';
-      notifyListeners();
+Future<bool> login(String email, String password) async {
+  try {
+    _isLoading = true;
+    _errorMessage = '';
+    notifyListeners();
 
-      // Cerrar sesión anterior si existe
-      await logout();
+    // Solo limpiar tokens sin hacer logout completo
+    _apiService.setAuthToken(null);
 
-      final result = await _authService.login(email, password);
+    final result = await _authService.login(email, password);
 
       _isLoading = false;
 
