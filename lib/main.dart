@@ -8,6 +8,7 @@ import 'package:riocaja_smart/providers/message_provider.dart';
 import 'package:riocaja_smart/providers/admin_provider.dart';
 import 'package:riocaja_smart/screens/splash_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart'; // Asegúrate de que este archivo esté configurado correctamente
 
 // Clase para interceptar errores de autenticación globalmente
 class AuthErrorHandler extends NavigatorObserver {
@@ -29,8 +30,9 @@ class AuthErrorHandler extends NavigatorObserver {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Inicializar Firebase
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   
   runApp(MyApp());
 }

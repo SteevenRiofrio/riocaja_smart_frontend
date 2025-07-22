@@ -44,37 +44,37 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'demo-key',
-    appId: '1:123456789:web:demo',
-    messagingSenderId: '123456789',
-    projectId: 'riocaja-smart-demo',
-    authDomain: 'riocaja-smart-demo.firebaseapp.com',
-    storageBucket: 'riocaja-smart-demo.appspot.com',
+    apiKey: 'AIzaSyBvhkHheWlOCUUsSP7_G8cdQ5cEzxWAK5A',
+    appId: '1:592507291957:web:your_web_app_id',
+    messagingSenderId: '592507291957',
+    projectId: 'riocaja-smart',
+    authDomain: 'riocaja-smart.firebaseapp.com',
+    storageBucket: 'riocaja-smart.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'demo-key-android',
-    appId: '1:123456789:android:demo',
-    messagingSenderId: '123456789',
-    projectId: 'riocaja-smart-demo',
-    storageBucket: 'riocaja-smart-demo.appspot.com',
+    apiKey: 'AIzaSyBvhkHheWlOCUUsSP7_G8cdQ5cEzxWAK5A',
+    appId: '1:592507291957:android:eab0929814e67512fb247c',
+    messagingSenderId: '592507291957',
+    projectId: 'riocaja-smart',
+    storageBucket: 'riocaja-smart.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'demo-key-ios',
-    appId: '1:123456789:ios:demo',
-    messagingSenderId: '123456789',
-    projectId: 'riocaja-smart-demo',
-    storageBucket: 'riocaja-smart-demo.appspot.com',
-    iosBundleId: 'com.riocaja.smart',
+    apiKey: 'AIzaSyBVbBnst8Y0soCCMZF3hWHIVvB6wCHV3io',
+    appId: '1:592507291957:ios:103bd6e453d4e71efb247c',
+    messagingSenderId: '592507291957',
+    projectId: 'riocaja-smart',
+    storageBucket: 'riocaja-smart.firebasestorage.app',
+    iosBundleId: 'com.example.riocajaSmart',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'demo-key-macos',
-    appId: '1:123456789:macos:demo',
-    messagingSenderId: '123456789',
-    projectId: 'riocaja-smart-demo',
-    storageBucket: 'riocaja-smart-demo.appspot.com',
-    iosBundleId: 'com.riocaja.smart',
+    apiKey: 'AIzaSyBVbBnst8Y0soCCMZF3hWHIVvB6wCHV3io',
+    appId: '1:592507291957:ios:103bd6e453d4e71efb247c',
+    messagingSenderId: '592507291957',
+    projectId: 'riocaja-smart',
+    storageBucket: 'riocaja-smart.firebasestorage.app',
+    iosBundleId: 'com.example.riocajaSmart',
   );
 }
