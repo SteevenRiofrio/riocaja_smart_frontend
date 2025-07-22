@@ -14,7 +14,7 @@ dependencies:
     sdk: flutter
   camera: ^0.10.5+8           # Para acceso a la cámara
   firebase_core: ^2.24.2      # Base de Firebase
-  google_mlkit_text_recognition:  # Para reconocimiento de texto
+  google_mlkit_text_recognition: ^0.11.0   # Actualizada según tu instrucción
   google_mlkit_commons: # Dependencia de MLKit
   http: ^1.1.0                # Para llamadas API
   provider: ^6.1.1            # Para gestión de estado
@@ -24,6 +24,7 @@ dependencies:
   intl: 0.19.0               # Para formateo de fechas y números
   excel: ^4.0.1              # Para crear archivos Excel
   share_plus: ^7.2.1         # Para compartir archivos
+  image: ^4.1.7   # Añadida para preprocesamiento de imágenes
 
 dev_dependencies:
   flutter_test:
