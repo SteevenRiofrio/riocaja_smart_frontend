@@ -241,7 +241,6 @@ class AuthService {
           
           _currentUser = User(
             id: 'temp_id',
-            nombre: email.split('@')[0],
             nombre: responseData['nombre'] ?? email.split('@')[0], // ✅ CORREGIDO
             email: email,
             rol: rolFromResponse,
