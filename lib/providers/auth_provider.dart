@@ -3,6 +3,9 @@ import 'package:riocaja_smart/models/user.dart';
 import 'package:riocaja_smart/services/auth_service.dart';
 import 'package:riocaja_smart/services/api_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 enum AuthStatus {
   uninitialized,
@@ -23,6 +26,9 @@ class AuthProvider with ChangeNotifier {
   bool _perfilCompleto = false;
   String? _codigoCorresponsal;
 
+  // ✅ NUEVAS VARIABLES PARA TÉRMINOS Y CONDICIONES
+  bool _needsTermsAcceptance = false;
+
   // Getters
   AuthStatus get authStatus => _authStatus;
   User? get user => _user;
@@ -34,6 +40,9 @@ class AuthProvider with ChangeNotifier {
   String? get codigoCorresponsal => _codigoCorresponsal;
   bool get needsProfileCompletion =>
       _authStatus == AuthStatus.needsProfileCompletion;
+
+  // ✅ NUEVO GETTER PARA TÉRMINOS
+  bool get needsTermsAcceptance => _needsTermsAcceptance;
 
   // Getter para ApiService
   ApiService get apiService => _apiService;
@@ -105,6 +114,79 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  // ✅ NUEVO: Verificar si el usuario necesita aceptar términos
+  Future<bool> checkTermsAcceptance(String userId) async {
+    try {
+      final baseUrl = _apiService.baseUrl; // Usar la URL del ApiService
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/users/$userId/terms/status'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_user?.token ?? ''}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        _needsTermsAcceptance = data['necesita_aceptar'] ?? false;
+        
+        print('✅ Verificación de términos:');
+        print('   Usuario ID: $userId');
+        print('   Acepto términos: ${data['acepto_terminos']}');
+        print('   Necesita aceptar: $_needsTermsAcceptance');
+        
+        notifyListeners();
+        return _needsTermsAcceptance;
+      } else {
+        print('❌ Error verificando términos: ${response.statusCode}');
+        print('   Response: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error en checkTermsAcceptance: $e');
+      return false;
+    }
+  }
+
+  // ✅ NUEVO: Aceptar o rechazar términos y condiciones
+  Future<bool> acceptTerms(String userId, bool acepta) async {
+    try {
+      final baseUrl = _apiService.baseUrl;
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/users/terms/accept'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_user?.token ?? ''}',
+        },
+        body: json.encode({
+          'user_id': userId,
+          'acepta': acepta,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['success'] == true) {
+          _needsTermsAcceptance = data['necesita_aceptar'] ?? false;
+          
+          print('✅ ${acepta ? 'Aceptados' : 'Rechazados'} términos para usuario: $userId');
+          print('   Necesita aceptar después: $_needsTermsAcceptance');
+          
+          notifyListeners();
+          return true;
+        }
+      }
+
+      print('❌ Error aceptando términos: ${response.statusCode}');
+      print('   Response: ${response.body}');
+      return false;
+    } catch (e) {
+      print('❌ Error en acceptTerms: $e');
+      return false;
+    }
+  }
+
   // Registro de usuario
   Future<bool> register(
     String nombre,
@@ -127,6 +209,8 @@ class AuthProvider with ChangeNotifier {
       _isLoading = false;
 
       if (result['success']) {
+        // ✅ NUEVO: Los usuarios nuevos aceptan términos automáticamente durante el registro
+        print('✅ Usuario registrado - términos aceptados automáticamente');
         notifyListeners();
         return true;
       } else {
@@ -142,17 +226,17 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Login de usuario con refresh tokens
-Future<bool> login(String email, String password) async {
-  try {
-    _isLoading = true;
-    _errorMessage = '';
-    notifyListeners();
+  // ✅ MODIFICADO: Login con verificación de términos
+  Future<bool> login(String email, String password) async {
+    try {
+      _isLoading = true;
+      _errorMessage = '';
+      notifyListeners();
 
-    // Solo limpiar tokens sin hacer logout completo
-    _apiService.setAuthToken(null);
+      // Solo limpiar tokens sin hacer logout completo
+      _apiService.setAuthToken(null);
 
-    final result = await _authService.login(email, password);
+      final result = await _authService.login(email, password);
 
       _isLoading = false;
 
@@ -165,7 +249,7 @@ Future<bool> login(String email, String password) async {
         if (_user!.rol == 'admin' || _user!.rol == 'asesor') {
           // Admin y asesores van directo al dashboard
           _authStatus = AuthStatus.authenticated;
-          print('AuthProvider: Admin/Operador autenticado - acceso completo');
+          print('AuthProvider: Admin/Asesor autenticado - acceso completo');
         } else {
           // Usuarios normales: verificar perfil completo
           if (_perfilCompleto) {
@@ -179,6 +263,9 @@ Future<bool> login(String email, String password) async {
 
         // Sincronizar tokens con ApiService
         _syncTokensWithApiService();
+
+        // ✅ NUEVO: Verificar términos inmediatamente después del login
+        await checkTermsAcceptance(_user!.id);
 
         await _authService.setRememberMe(_rememberMe);
 
@@ -326,6 +413,32 @@ Future<bool> login(String email, String password) async {
     }
   }
 
+  // ✅ NUEVO: Ejecutar migración para usuarios existentes (solo admin)
+  Future<bool> migrateExistingUsersTerms() async {
+    try {
+      final baseUrl = _apiService.baseUrl;
+      final response = await http.post(
+        Uri.parse('$baseUrl/api/users/terms/migrate'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${_user?.token ?? ''}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('✅ Migración completada: ${data['message']}');
+        return data['success'] == true;
+      }
+
+      print('❌ Error en migración: ${response.statusCode}');
+      return false;
+    } catch (e) {
+      print('❌ Error en migración: $e');
+      return false;
+    }
+  }
+
   // Método para forzar refresh de token manualmente
   Future<bool> refreshToken() async {
     try {
@@ -367,6 +480,7 @@ Future<bool> login(String email, String password) async {
     _perfilCompleto = false;
     _codigoCorresponsal = null;
     _errorMessage = '';
+    _needsTermsAcceptance = false; // ✅ LIMPIAR ESTADO DE TÉRMINOS
     _isLoading = false;
 
     print('AuthProvider: Logout completo - todos los tokens eliminados');
@@ -554,6 +668,11 @@ Future<bool> login(String email, String password) async {
           codigoCorresponsal: _codigoCorresponsal,
           nombreLocal: userInfo['nombre_local'],
         );
+
+        // ✅ NUEVO: También verificar términos durante refresh
+        if (_user != null) {
+          await checkTermsAcceptance(_user!.id);
+        }
 
         return true;
       }
