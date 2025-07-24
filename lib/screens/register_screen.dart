@@ -25,6 +25,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isPasswordValid = false;
   bool _isConfirmPasswordValid = false;
 
+  // ✅ VARIABLES NUEVAS PARA TÉRMINOS
+  bool _acceptTerms = false;
+  bool _showTermsError = false;
+
   @override
   void dispose() {
     _nombreController.dispose();
@@ -254,7 +258,451 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  // ✅ NUEVA FUNCIÓN: Widget de términos y condiciones
+  Widget _buildTermsSection() {
+    return Container(
+      margin: EdgeInsets.symmetric(vertical: 16),
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: _acceptTerms ? Colors.green.shade300 : Colors.grey.shade300,
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          
+          // Instrucciones de lectura
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'Lectura Requerida:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Text(
+                  '1. Lee cuidadosamente los términos de servicio\n'
+                  '2. Revisa la política de privacidad\n'
+                  '3. Comprende tus derechos y responsabilidades',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.blue.shade800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          SizedBox(height: 16),
+          
+          // Enlaces a términos
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showTermsDialog('terms'),
+                  icon: Icon(Icons.description, size: 16),
+                  label: Text('Leer Términos y Condiciones'),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.blue.shade400),
+                    foregroundColor: Colors.blue.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => _showTermsDialog('privacy'),
+                  icon: Icon(Icons.privacy_tip, size: 16),
+                  label: Text('Leer Política de Privacidad'),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.blue.shade400),
+                    foregroundColor: Colors.blue.shade700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 16),
+          
+          // Checkbox de aceptación
+          Container(
+            padding: EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _acceptTerms ? Colors.green.shade50 : Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _acceptTerms ? Colors.green.shade300 : Colors.orange.shade300,
+              ),
+            ),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _acceptTerms,
+                  onChanged: (value) {
+                    setState(() {
+                      _acceptTerms = value ?? false;
+                      _showTermsError = false;
+                    });
+                  },
+                  activeColor: Colors.green.shade700,
+                ),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _acceptTerms = !_acceptTerms;
+                        _showTermsError = false;
+                      });
+                    },
+                    child: Text.rich(
+                      TextSpan(
+                        children: [
+                          TextSpan(
+                            text: '✅ ',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          TextSpan(
+                            text: 'Acepto los términos y condiciones',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: _acceptTerms ? Colors.green.shade700 : Colors.orange.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Mensaje de error si no acepta términos
+          if (_showTermsError)
+            Padding(
+              padding: EdgeInsets.only(top: 8),
+              child: Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: Colors.red.shade300),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Debe aceptar los términos y condiciones para continuar',
+                        style: TextStyle(
+                          color: Colors.red.shade700,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NUEVA FUNCIÓN: Botón de crear cuenta modificado
+  Widget _buildCreateAccountButton() {
+    return SizedBox(
+      height: 50,
+      child: ElevatedButton(
+        onPressed: (_isLoading || !_acceptTerms || !_isNombreValid || !_isEmailValid || !_isPasswordValid || !_isConfirmPasswordValid) 
+            ? null 
+            : _register,
+        child: _isLoading
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      strokeWidth: 2.0,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text('Registrando...'),
+                ],
+              )
+            : Text(
+                'Crear Cuenta',
+                style: TextStyle(fontSize: 16),
+              ),
+        style: ElevatedButton.styleFrom(
+          foregroundColor: Colors.white,
+          backgroundColor: (_acceptTerms && _isNombreValid && _isEmailValid && _isPasswordValid && _isConfirmPasswordValid) 
+              ? Colors.green.shade700 
+              : Colors.grey.shade400,
+          disabledBackgroundColor: Colors.grey.shade400,
+        ),
+      ),
+    );
+  }
+
+  // ✅ NUEVA FUNCIÓN: Modal para mostrar términos
+  void _showTermsDialog(String type) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Container(
+          height: MediaQuery.of(context).size.height * 0.8,
+          padding: EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    type == 'terms' ? 'Términos y Condiciones' : 'Política de Privacidad',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green.shade700,
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: Icon(Icons.close),
+                  ),
+                ],
+              ),
+              Divider(),
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: type == 'terms' ? _buildTermsContent() : _buildPrivacyContent(),
+                  ),
+                ),
+              ),
+              Divider(),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        setState(() {
+                          _acceptTerms = true;
+                        });
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        'Acepto',
+                        style: TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                      },
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: Colors.grey),
+                      ),
+                      child: Text('Cerrar'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ✅ NUEVA FUNCIÓN: Contenido de términos
+  List<Widget> _buildTermsContent() {
+    return [
+      _buildModalSection(
+        'Aceptación de los Términos',
+        'Al registrarse en RíoCaja Smart, usted acepta cumplir con estos términos y condiciones. Si no está de acuerdo con alguna parte de estos términos, no debe usar nuestra aplicación.',
+      ),
+      _buildModalSection(
+        'Registro de Usuario',
+        'Para usar la aplicación, debe registrarse proporcionando información precisa y actualizada. Es responsable de mantener la confidencialidad de su cuenta y todas las actividades que ocurran bajo su cuenta.',
+      ),
+      _buildModalSection(
+        'Uso Apropiado',
+        'RioCaja Smart es una herramienta administrativa para la gestión de cierres de caja mediante reconocimiento óptico de caracteres (OCR). Se compromete a:\n'
+        '• Usar la aplicación únicamente para digitalizar y gestionar comprobantes\n'
+        '• No procesar documentos que no sean de su propiedad o autorización\n'
+        '• Mantener la integridad y veracidad de los datos registrados\n'
+        '• No intentar comprometer la seguridad del sistema',
+      ),
+      _buildModalSection(
+        'Responsabilidades del Usuario',
+        'Como usuario de RioCaja Smart, usted es responsable de:\n'
+        '• Mantener seguras sus credenciales de acceso\n'
+        '• Verificar la precisión de los datos extraídos por OCR antes de confirmar\n'
+        '• Reportar cualquier error o inconsistencia en el procesamiento\n'
+        '• Usar la aplicación solo para fines contables y administrativos legítimos\n'
+        '• Mantener la confidencialidad de la información procesada\n'
+        '• Cumplir con las regulaciones contables aplicables en su jurisdicción',
+      ),
+      _buildModalSection(
+        'Limitaciones de Servicio',
+        'RioCaja Smart es una herramienta de apoyo administrativo. Las limitaciones incluyen:\n'
+        '• La precisión del OCR puede variar según la calidad del documento\n'
+        '• La aplicación requiere conexión a internet para funcionar correctamente\n'
+        '• Los datos procesados deben ser validados por el usuario final\n'
+        '• Nos reservamos el derecho de suspender cuentas por uso indebido\n'
+        '• El servicio está sujeto a mantenimiento y actualizaciones periódicas',
+      ),
+      _buildModalSection(
+        'Modificaciones',
+        'Nos reservamos el derecho de modificar estos términos en cualquier momento para mejorar el servicio o cumplir con regulaciones. Los cambios serán notificados a través de la aplicación con al menos 15 días de anticipación.',
+      ),
+    ];
+  }
+
+  // ✅ NUEVA FUNCIÓN: Contenido de privacidad
+  List<Widget> _buildPrivacyContent() {
+    return [
+      _buildModalSection(
+        'Recolección de Datos',
+        'RioCaja Smart recolecta únicamente la información necesaria para brindar el servicio de gestión de cierres de caja:\n'
+        '• Datos de registro (nombre, email, nombre sus establecimiento,contraseña)\n'
+        '• Información extraída de comprobantes mediante OCR\n'
+        '• Registros de actividad en la aplicación\n'
+        '• Datos técnicos para mejorar el servicio',
+      ),
+      _buildModalSection(
+        'Uso de la Información',
+        'Los datos recolectados se utilizan exclusivamente para:\n'
+        '• Proporcionar el servicio de digitalización de comprobantes\n'
+        '• Generar reportes y estadísticas de cierres de caja\n'
+        '• Mejorar la precisión del reconocimiento óptico\n'
+        '• Cumplir con obligaciones legales y contables',
+      ),
+      _buildModalSection(
+        'Protección de Datos',
+        'Implementamos medidas de seguridad robustas para proteger su información:\n'
+        '• Encriptación de contraseña\n'
+        '• Acceso restringido solo a personal autorizado\n'
+        '• Respaldos seguros de la información\n'
+      ),
+      _buildModalSection(
+        'Compartir Información',
+        'RioCaja Smart NO comparte información personal con terceros. Los únicos casos donde podríamos compartir datos son:\n'
+        '• Cuando sea requerido por autoridades legales competentes\n'
+        '• Para cumplir con obligaciones regulatorias específicas\n'
+        '• Con su consentimiento explícito y por escrito',
+      ),
+      _buildModalSection(
+        'Derechos del Usuario',
+        'Como usuario de RioCaja Smart, usted tiene derecho a:\n'
+        '• Acceder a todos sus datos personales almacenados\n'
+        '• Solicitar corrección de información inexacta\n'
+        '• Solicitar eliminación de sus datos (derecho al olvido)\n'
+        '• Exportar sus datos en formato legible\n'
+      ),
+      _buildModalSection(
+        'Retención de Datos',
+        'Conservamos sus datos durante el tiempo necesario para:\n'
+        '• Proporcionar el servicio mientras mantenga su cuenta activa\n'
+        '• Cumplir con obligaciones legales y contables (generalmente 5-7 años)\n'
+        '• Resolver disputas o reclamos que puedan surgir\n'
+        'Transcurrido este período, los datos serán eliminados de forma segura.',
+      ),
+    ];
+  }
+
+  // ✅ NUEVA FUNCIÓN: Sección del modal
+  Widget _buildModalSection(String title, String content) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            content,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.5,
+              color: Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ FUNCIÓN MODIFICADA: Validación de términos agregada
   void _register() async {
+    // Validar términos PRIMERO
+    if (!_acceptTerms) {
+      setState(() {
+        _showTermsError = true;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('⚠️ Debe aceptar los términos y condiciones para continuar'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // Validación del formulario
     if (_formKey.currentState!.validate()) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       
@@ -509,42 +957,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             return null;
                           },
                         ),
-                        SizedBox(height: 32),
+                        SizedBox(height: 24),
                         
-                        // Botón de registro
-                        SizedBox(
-                          height: 50,
-                          child: ElevatedButton(
-                            onPressed: (_isLoading || !_isNombreValid || !_isEmailValid || !_isPasswordValid || !_isConfirmPasswordValid) 
-                                ? null 
-                                : _register,
-                            child: _isLoading
-                                ? Row(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                          strokeWidth: 2.0,
-                                        ),
-                                      ),
-                                      SizedBox(width: 12),
-                                      Text('Registrando...'),
-                                    ],
-                                  )
-                                : Text(
-                                    'Registrarse',
-                                    style: TextStyle(fontSize: 16),
-                                  ),
-                            style: ElevatedButton.styleFrom(
-                              foregroundColor: Colors.white,
-                              backgroundColor: Colors.green.shade700,
-                              disabledBackgroundColor: Colors.grey.shade400,
-                            ),
-                          ),
-                        ),
+                        // ✅ AGREGAR: Sección de términos y condiciones
+                        _buildTermsSection(),
+                        SizedBox(height: 24),
+                        
+                        // ✅ REEMPLAZAR: Botón de registro con el nuevo
+                        _buildCreateAccountButton(),
                         SizedBox(height: 16),
                         
                         // Opción para volver a login
@@ -590,10 +1010,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                               SizedBox(height: 8),
                               Text(
-                                '• Tu cuenta será revisada por un administrador\n'
-                                '• Recibirás notificación cuando sea aprobada\n'
-                                '• Mantén tus datos actualizados\n'
-                                '• Contacta al administrador si tienes dudas',
+                                '📧 Recibirás confirmación por email\n'
+                                '⏳ Tu cuenta será revisada por un administrador\n'
+                                '🔔 Te notificaremos cuando sea aprobada\n'
+                                '📞 Contacta al administrador si tienes dudas',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.blue.shade800,
