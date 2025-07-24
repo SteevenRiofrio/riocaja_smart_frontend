@@ -96,11 +96,21 @@ class _PrivacyCheckerState extends State<PrivacyChecker> {
 
   Future<void> _checkPrivacyStatus() async {
     try {
+      setState(() {
+        _isLoading = true;
+      });
+
+      // 🔥 AGREGAR ESTA LÍNEA PARA RESETEAR (solo para desarrollo)
+      await PrivacySimpleService.resetAcceptance(); // ⚠️ Quitar después de probar
+      print('🔄 Términos de privacidad reseteados para testing');
+      
       final hasAccepted = await PrivacySimpleService.hasAcceptedTerms();
+      
       setState(() {
         _hasAcceptedTerms = hasAccepted;
         _isLoading = false;
       });
+
       print(hasAccepted
           ? '✅ Usuario ya aceptó términos'
           : '⚠️ Usuario debe aceptar términos');

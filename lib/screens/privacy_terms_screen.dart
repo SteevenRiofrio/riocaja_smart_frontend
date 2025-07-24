@@ -130,42 +130,37 @@ class _PrivacyTermsScreenState extends State<PrivacyTermsScreen> {
       children: [
         _buildSection(
           '🏢 RESPONSABLE DEL TRATAMIENTO',
-          'CNB Banco Guayaquil S.A.\nRUC: [Número de RUC]\nDirección: [Dirección completa]\nEmail: privacidad@cnbguayaquil.com.ec'
+          'RíoCaja Smart\nAplicación móvil independiente\nEmail: riocaja.smart09@gmail.com'
         ),
         
         _buildSection(
-          '📋 DATOS QUE RECOPILAMOS',
-          '• Nombre completo\n• Correo electrónico\n• Nombre del local\n• Código de corresponsal\n• Ubicación del establecimiento\n• Logs de uso de la aplicación'
+          '📋 ¿QUÉ DATOS RECOPILAMOS?',
+          'La aplicación RíoCaja Smart únicamente recopila estos datos:\n\n• Correo electrónico - Para que puedas ingresar a la app\n• Nombre completo - Para saber quién eres\n• Contraseña - Para que solo tú puedas entrar (guardada de forma segura)\n• Código de corresponsal - Para identificar tu punto de trabajo\n\n¡Y ESO ES TODO! No recopilamos nada más.'
         ),
         
         _buildSection(
-          '🎯 FINALIDAD DEL TRATAMIENTO',
-          '• Gestión de comprobantes bancarios\n• Autenticación de usuarios autorizados\n• Cumplimiento de normativa financiera\n• Prevención de fraude y lavado de activos\n• Mejora de servicios (solo con su consentimiento)'
+          '🎯 ¿QUÉ HACEMOS CON TUS DATOS?',
+          'Usamos tu información únicamente para:\n\n• Que puedas entrar a la aplicación (usando tu correo y contraseña)\n• Identificarte dentro de la app (usando tu nombre)\n• Saber en qué punto trabajas (usando tu código de corresponsal)\n• Contactarte si hay algún problema técnico con la app\n• Nada más - No vendemos, no compartimos, no hacemos publicidad'
         ),
         
         _buildSection(
-          '📅 TIEMPO DE CONSERVACIÓN',
-          '• Datos operacionales: Durante la relación contractual\n• Datos de auditoría: 7 años (normativa bancaria)\n• Datos de marketing: Hasta revocación del consentimiento'
+          '🔒 TUS DATOS ESTÁN SEGUROS',
+          'Te garantizamos que:\n\n• Tu contraseña está encriptada - Nadie puede verla, ni nosotros\n• Usamos conexiones seguras - Toda la información viaja protegida\n• Solo personal autorizado puede acceder a los datos del sistema\n• NO vendemos tu información a nadie\n• NO compartimos tus datos con otras empresas\n• NO enviamos publicidad no deseada\n• NO accedemos a otros datos de tu teléfono'
         ),
         
         _buildSection(
-          '⚖️ SUS DERECHOS FUNDAMENTALES',
-          '• ACCESO: Conocer qué datos tenemos\n• RECTIFICACIÓN: Corregir datos incorrectos\n• ELIMINACIÓN: Solicitar borrado cuando proceda\n• OPOSICIÓN: Negarse a ciertos tratamientos\n• PORTABILIDAD: Recibir datos en formato estructurado\n• REVOCACIÓN: Retirar consentimiento en cualquier momento'
+          '⏰ ¿CUÁNTO TIEMPO GUARDAMOS TUS DATOS?',
+          '• Mientras uses la aplicación - Mantenemos tu información activa\n• Si no usas la app por 2 años - Eliminamos automáticamente tus datos\n• Si nos pides eliminar tu cuenta - Borramos todo inmediatamente'
         ),
         
         _buildSection(
-          '🔒 MEDIDAS DE SEGURIDAD',
-          '• Cifrado de datos con estándares bancarios\n• Autenticación multifactor\n• Controles de acceso estrictos\n• Auditorías de seguridad regulares\n• Respaldos seguros y encriptados'
+          '📞 CONTACTO',
+          'Si tienes preguntas o quieres que eliminemos tu información:\n• Email: riocaja.smart09@gmail.com\n• Te respondemos en máximo 15 días'
         ),
         
         _buildSection(
-          '📞 CONTACTO Y RECLAMOS',
-          'Para ejercer sus derechos:\n• Email: privacidad@cnbguayaquil.com.ec\n• Plazo de respuesta: 15 días calendario\n\nPara reclamos:\n• SPDP: www.spdp.gob.ec\n• Email SPDP: denuncias@spdp.gob.ec'
-        ),
-        
-        _buildSection(
-          '📜 BASE LEGAL',
-          'Este tratamiento se basa en:\n• Ley Orgánica de Protección de Datos Personales del Ecuador\n• Normativa de la Superintendencia de Bancos\n• Relación contractual para servicios bancarios\n• Consentimiento para funcionalidades opcionales'
+          '⚖️ ¿ES ESTO LEGAL?',
+          '¡SÍ! Esta aplicación cumple con:\n\n• Ley Orgánica de Protección de Datos Personales del Ecuador (2021)\n• Tu consentimiento que das al aceptar estos términos\n• Normativas técnicas de seguridad de información\n• Buenas prácticas de protección de datos'
         ),
         
         Container(
@@ -179,7 +174,7 @@ class _PrivacyTermsScreenState extends State<PrivacyTermsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '⚠️ IMPORTANTE',
+                '⚠️ AL ACEPTAR CONFIRMAS QUE:',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.blue.shade800,
@@ -188,15 +183,16 @@ class _PrivacyTermsScreenState extends State<PrivacyTermsScreen> {
               ),
               SizedBox(height: 8),
               Text(
-                'Al aceptar estos términos, usted confirma que:\n\n'
-                '✓ Ha leído y comprendido este aviso de privacidad\n'
-                '✓ Consiente el tratamiento de sus datos para las finalidades descritas\n'
-                '✓ Entiende sus derechos y cómo ejercerlos\n'
-                '✓ Puede revocar su consentimiento en cualquier momento\n\n'
-                'Este consentimiento es necesario para usar RíoCaja Smart.',
+                '✓ Entiendes que solo recopilamos los 4 datos mencionados\n'
+                '✓ Aceptas que usemos esos datos para que funcione la app\n'
+                '✓ Confías en que mantendremos tu información segura\n'
+                '✓ Sabes que puedes contactarnos para eliminar tus datos\n'
+                '✓ Comprendes que esto es necesario para usar RíoCaja Smart\n\n'
+                'Es simple: Solo pedimos lo necesario, solo lo usamos para la app, y está seguro.',
                 style: TextStyle(
-                  color: Colors.blue.shade800,
+                  color: Colors.blue.shade700,
                   fontSize: 14,
+                  height: 1.4,
                 ),
               ),
             ],
@@ -207,36 +203,32 @@ class _PrivacyTermsScreenState extends State<PrivacyTermsScreen> {
   }
 
   Widget _buildSection(String title, String content) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.green.shade700,
+    return Card(
+      margin: EdgeInsets.only(bottom: 16),
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.green.shade700,
+              ),
             ),
-          ),
-          SizedBox(height: 8),
-          Container(
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.grey.shade200),
-            ),
-            child: Text(
+            SizedBox(height: 8),
+            Text(
               content,
               style: TextStyle(
                 fontSize: 14,
-                height: 1.5,
+                color: Colors.grey.shade700,
+                height: 1.4,
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -245,97 +237,63 @@ class _PrivacyTermsScreenState extends State<PrivacyTermsScreen> {
     return Container(
       padding: EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Colors.grey.shade50,
         border: Border(
           top: BorderSide(color: Colors.grey.shade300),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(0, -2),
-          ),
-        ],
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          if (!_hasReadCompletely)
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.orange.shade100,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade300),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.vertical_align_bottom, color: Colors.orange.shade700),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Debe leer completamente los términos antes de aceptar',
-                      style: TextStyle(
-                        color: Colors.orange.shade800,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
+          CheckboxListTile(
+            value: _termsAccepted,
+            onChanged: _hasReadCompletely ? (value) {
+              setState(() {
+                _termsAccepted = value ?? false;
+              });
+            } : null,
+            title: Text(
+              'He leído y acepto los términos de protección de datos personales',
+              style: TextStyle(
+                fontWeight: FontWeight.w500,
+                color: _hasReadCompletely ? Colors.green.shade700 : Colors.grey,
               ),
             ),
+            subtitle: Text(
+              _hasReadCompletely 
+                ? 'Necesario para usar RíoCaja Smart'
+                : 'Debe leer completamente el documento primero',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+              ),
+            ),
+            activeColor: Colors.green.shade700,
+            controlAffinity: ListTileControlAffinity.leading,
+          ),
           
-          if (_hasReadCompletely) ...[
-            SizedBox(height: 12),
-            CheckboxListTile(
-              value: _termsAccepted,
-              onChanged: (value) {
-                setState(() {
-                  _termsAccepted = value ?? false;
-                });
-              },
-              title: Text(
-                'He leído y acepto los términos de protección de datos personales',
-                style: TextStyle(
-                  fontWeight: FontWeight.w500,
-                  color: Colors.green.shade700,
+          SizedBox(height: 16),
+          
+          SizedBox(
+            width: double.infinity,
+            height: 50,
+            child: ElevatedButton(
+              onPressed: (_hasReadCompletely && _termsAccepted) ? _acceptTermsAndContinue : null,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green.shade700,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
               ),
-              subtitle: Text(
-                'Necesario para usar RíoCaja Smart',
+              child: Text(
+                'Aceptar y Continuar a RíoCaja Smart',
                 style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey.shade600,
-                ),
-              ),
-              activeColor: Colors.green.shade700,
-              controlAffinity: ListTileControlAffinity.leading,
-            ),
-            
-            SizedBox(height: 16),
-            
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: _termsAccepted ? _acceptTermsAndContinue : null,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green.shade700,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: Text(
-                  'Aceptar y Continuar a RíoCaja Smart',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
                 ),
               ),
             ),
-          ],
+          ),
         ],
       ),
     );
