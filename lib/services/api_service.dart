@@ -12,8 +12,7 @@ import 'package:riocaja_smart/services/auth_service.dart';
 
 class ApiService {
   // URL base de la API
-  String baseUrl =
-      'https://riocajasmartbackend-production.up.railway.app/api/v1';
+  String baseUrl = 'https://riocajasmartbackend-production.up.railway.app/api/v1';
 
   // Token de autenticación
   String? _authToken;
@@ -24,6 +23,13 @@ class ApiService {
   // Referencia al AuthService para refresh automático
   AuthService? _authService;
 
+  // Función auxiliar para mínimo
+  int min(int a, int b) => a < b ? a : b;
+
+  // ================================
+  // MÉTODOS DE CONFIGURACIÓN
+  // ================================
+
   // Método para establecer el contexto
   void setContext(BuildContext context) {
     _context = context;
@@ -32,9 +38,7 @@ class ApiService {
       final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
       if (authProvider.isAuthenticated) {
         _authToken = authProvider.user?.token;
-        print(
-          'ApiService: Token configurado desde setContext: ${_authToken != null ? _authToken!.substring(0, min(10, _authToken!.length)) : "null"}...',
-        );
+        print('ApiService: Token configurado desde setContext: ${_authToken != null ? _authToken!.substring(0, min(10, _authToken!.length)) : "null"}...');
       } else {
         print('ApiService: AuthProvider no está autenticado');
       }
@@ -56,9 +60,47 @@ class ApiService {
   // Método para establecer el token de autenticación directamente
   void setAuthToken(String? token) {
     _authToken = token;
-    print(
-      'ApiService: Token establecido manualmente: ${token != null ? token.substring(0, min(10, token.length)) : "null"}...',
-    );
+    print('ApiService: Token establecido manualmente: ${token != null ? token.substring(0, min(10, token.length)) : "null"}...');
+  }
+
+  // ================================
+  // MÉTODOS AUXILIARES PRIVADOS
+  // ================================
+
+  // Verificar que el token está disponible antes de hacer peticiones
+  bool _hasValidToken() {
+    if (_authToken == null || _authToken!.isEmpty) {
+      print('❌ ApiService: No hay token disponible para hacer peticiones');
+      return false;
+    }
+    return true;
+  }
+
+  // Método para esperar hasta que el token esté disponible
+  Future<bool> _waitForToken({int maxWaitMs = 3000}) async {
+    final startTime = DateTime.now().millisecondsSinceEpoch;
+    
+    while (!_hasValidToken()) {
+      final elapsed = DateTime.now().millisecondsSinceEpoch - startTime;
+      if (elapsed > maxWaitMs) {
+        print('❌ ApiService: Timeout esperando token después de ${maxWaitMs}ms');
+        return false;
+      }
+      
+      // Intentar obtener token del contexto si está disponible
+      if (_context != null) {
+        final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+        if (authProvider.isAuthenticated && authProvider.user?.token != null) {
+          _authToken = authProvider.user!.token;
+          print('✅ ApiService: Token obtenido del AuthProvider durante espera');
+          return true;
+        }
+      }
+      
+      await Future.delayed(Duration(milliseconds: 100));
+    }
+    
+    return true;
   }
 
   // Crear los headers HTTP con o sin token de autenticación
@@ -78,7 +120,7 @@ class ApiService {
     return headers;
   }
 
-  // NUEVO: Método para redirigir a login
+  // Método para redirigir a login
   void _redirectToLogin(String message) {
     if (_context != null) {
       Future.microtask(() {
@@ -97,6 +139,52 @@ class ApiService {
       });
     }
   }
+
+  // Método para refrescar token cuando sea necesario
+  Future<bool> _refreshTokenIfNeeded() async {
+    try {
+      print('🔄 Intentando refrescar token...');
+      
+      // Si tienes un contexto disponible, intenta refrescar desde AuthProvider
+      if (_context != null) {
+        final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+        if (authProvider.isAuthenticated) {
+          // Aquí podrías implementar lógica de refresh token
+          // Por ahora, simplemente usar el token actual del AuthProvider
+          _authToken = authProvider.user?.token;
+          print('✅ Token actualizado desde AuthProvider');
+          return _authToken != null;
+        }
+      }
+      
+      print('❌ No se pudo refrescar el token');
+      return false;
+    } catch (e) {
+      print('❌ Error al refrescar token: $e');
+      return false;
+    }
+  }
+
+  // Método auxiliar para manejar logout
+  Future<void> _handleLogout() async {
+    try {
+      if (_authService != null) {
+        await _authService!.logout();
+      }
+
+      if (_context != null) {
+        final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+        await authProvider.logout();
+        _redirectToLogin('Sesión cerrada');
+      }
+    } catch (e) {
+      print('Error durante logout: $e');
+    }
+  }
+
+  // ================================
+  // MÉTODO PRINCIPAL DE PETICIONES HTTP
+  // ================================
 
   // Método mejorado para hacer peticiones HTTP con validación de estado
   Future<http.Response> _makeRequestWithRetry(
@@ -149,14 +237,13 @@ class ApiService {
 
         print('ApiService: Respuesta ${response.statusCode} de $url');
 
-        // NUEVO: Verificar errores específicos de estado de cuenta
+        // Verificar errores específicos de estado de cuenta
         if (response.statusCode == 401 || response.statusCode == 403) {
           print('Error ${response.statusCode}: ${response.body}');
 
           try {
             final errorData = jsonDecode(response.body);
-            final errorMessage =
-                errorData['detail'] ?? 'Error de autenticación';
+            final errorMessage = errorData['detail'] ?? 'Error de autenticación';
 
             // Verificar si es un error de sesión en otro dispositivo
             if (errorMessage.contains('sesión fue cerrada') ||
@@ -165,18 +252,12 @@ class ApiService {
 
               // Forzar logout en el AuthProvider
               if (_context != null) {
-                final authProvider = Provider.of<AuthProvider>(
-                  _context!,
-                  listen: false,
-                );
+                final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
                 await authProvider.logout();
 
                 // Mostrar mensaje específico de sesión cerrada
-                _redirectToLogin(
-                  'Tu sesión fue cerrada porque iniciaste sesión en otro dispositivo.',
-                );
+                _redirectToLogin('Tu sesión fue cerrada porque iniciaste sesión en otro dispositivo.');
               }
-
               return response;
             }
 
@@ -189,16 +270,12 @@ class ApiService {
 
               // Forzar logout en el AuthProvider
               if (_context != null) {
-                final authProvider = Provider.of<AuthProvider>(
-                  _context!,
-                  listen: false,
-                );
+                final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
                 await authProvider.logout();
 
                 // Redirigir a login con mensaje
                 _redirectToLogin(errorMessage);
               }
-
               return response;
             }
           } catch (e) {
@@ -215,9 +292,7 @@ class ApiService {
           if (_authService != null) {
             final refreshSuccess = await _authService!.refreshAccessToken();
             if (refreshSuccess) {
-              print(
-                'ApiService: Token renovado automáticamente, reintentando petición',
-              );
+              print('ApiService: Token renovado automáticamente, reintentando petición');
               _authToken = _authService!.currentUser?.token;
               continue; // Reintentar la petición con el nuevo token
             }
@@ -225,14 +300,9 @@ class ApiService {
 
           print('ApiService: No se pudo renovar token, cerrando sesión');
           if (_context != null) {
-            final authProvider = Provider.of<AuthProvider>(
-              _context!,
-              listen: false,
-            );
+            final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
             await authProvider.logout();
-            _redirectToLogin(
-              'Sesión expirada. Por favor inicie sesión nuevamente.',
-            );
+            _redirectToLogin('Sesión expirada. Por favor inicie sesión nuevamente.');
           }
         }
 
@@ -246,143 +316,65 @@ class ApiService {
           rethrow;
         }
 
-        print(
-          'ApiService: Reintentando en ${retryDelay.inSeconds} segundos...',
-        );
+        print('ApiService: Reintentando en ${retryDelay.inSeconds} segundos...');
         await Future.delayed(retryDelay);
         retryDelay *= 2; // Backoff exponencial
       }
     }
   }
 
-  // Método auxiliar para hacer peticiones HTTP básicas (sin interceptor)
-  Future<http.Response> _makeRawRequest(
-    String method,
-    String url, {
-    Map<String, dynamic>? body,
-    Map<String, String>? customHeaders,
-  }) async {
-    final headers = customHeaders ?? getHeaders();
-    final uri = Uri.parse(url);
+  // ================================
+  // MÉTODOS DE COMPROBANTES
+  // ================================
 
-    print('Haciendo petición $method a: $url');
-
+  // Obtener todos los comprobantes
+  Future<List<Map<String, dynamic>>> getAllReceipts() async {
     try {
-      switch (method.toUpperCase()) {
-        case 'GET':
-          return await http
-              .get(uri, headers: headers)
-              .timeout(Duration(seconds: 60));
-        case 'POST':
-          return await http
-              .post(
-                uri,
-                headers: headers,
-                body: body != null ? jsonEncode(body) : null,
-              )
-              .timeout(Duration(seconds: 60));
-        case 'PUT':
-          return await http
-              .put(
-                uri,
-                headers: headers,
-                body: body != null ? jsonEncode(body) : null,
-              )
-              .timeout(Duration(seconds: 60));
-        case 'DELETE':
-          return await http
-              .delete(uri, headers: headers)
-              .timeout(Duration(seconds: 60));
-        default:
-          throw Exception('Método HTTP no soportado: $method');
-      }
-    } catch (e) {
-      print('Error en petición HTTP: $e');
-      throw e;
-    }
-  }
-
-  // Método auxiliar para manejar logout
-  Future<void> _handleLogout() async {
-    try {
-      if (_authService != null) {
-        await _authService!.logout();
-      }
-
-      if (_context != null) {
-        final authProvider = Provider.of<AuthProvider>(
-          _context!,
-          listen: false,
-        );
-        await authProvider.logout();
-
-        _redirectToLogin('Sesión cerrada');
-      }
-    } catch (e) {
-      print('Error durante logout: $e');
-    }
-  }
-
-  // Obtener todos los comprobantes (con interceptor)
-  Future<List<Receipt>> getAllReceipts() async {
-    try {
+      // Esperar hasta que el token esté disponible
+      await _waitForToken();
+      
+      // ✅ CORRECCIÓN: Cambiar URL de '/receipts/all' a '/receipts/'
       final url = '$baseUrl/receipts/';
-      print('Obteniendo comprobantes de: $url');
-
+      print('Obteniendo todos los comprobantes desde: $url');
+      
       final response = await _makeRequestWithRetry('GET', url);
-
-      print('Código de respuesta: ${response.statusCode}');
-
-      if (response.body.isNotEmpty) {
-        if (response.statusCode == 200) {
-          final Map<String, dynamic> responseData = jsonDecode(response.body);
-          if (responseData.containsKey('data')) {
-            final List<dynamic> receiptsJson = responseData['data'];
-            print('Comprobantes obtenidos: ${receiptsJson.length}');
-            return receiptsJson.map((json) => Receipt.fromJson(json)).toList();
-          } else {
-            print('La respuesta no contiene la clave "data"');
-            return [];
-          }
+      
+      if (response.statusCode == 200) {
+        final responseData = json.decode(response.body);
+        
+        // ✅ El backend retorna la estructura: {"data": [...], "count": 10, "user_role": "cnb"}
+        if (responseData is Map<String, dynamic> && responseData.containsKey('data')) {
+          final List<dynamic> data = responseData['data'];
+          print('✅ Comprobantes obtenidos: ${data.length}');
+          return data.cast<Map<String, dynamic>>();
         } else {
-          print('Error HTTP: ${response.statusCode}');
-          throw Exception(
-            'Error al obtener comprobantes: ${response.statusCode}',
-          );
+          print('⚠️ Respuesta no tiene estructura esperada');
+          return [];
         }
+      } else if (response.statusCode == 403) {
+        print('Error 403: ${response.body}');
+        throw Exception('No autorizado para obtener comprobantes');
       } else {
-        print('El cuerpo de la respuesta está vacío');
-        return [];
+        print('Error ${response.statusCode}: ${response.body}');
+        throw Exception('Error de conexión: ${response.statusCode}');
       }
     } catch (e) {
       print('Error en getAllReceipts: $e');
-
-      if (e is SocketException) {
-        print('Error de socket: No se pudo conectar al servidor');
-      } else if (e.toString().contains('TimeoutException')) {
-        print('La conexión al servidor agotó el tiempo de espera');
-      }
-
       throw Exception('Error de conexión: $e');
     }
   }
 
-  // Guardar comprobante (con interceptor) - CORREGIDO
+  // Guardar comprobante
   Future<bool> saveReceipt(Receipt receipt) async {
     try {
       final url = '$baseUrl/receipts/';
       print('Guardando comprobante en: $url');
 
-      // CORREGIDO: Usar toJson() del modelo Receipt
+      // Usar toJson() del modelo Receipt
       final Map<String, dynamic> receiptData = receipt.toJson();
-
       print('Datos del comprobante a enviar: ${receiptData.keys.toList()}');
 
-      final response = await _makeRequestWithRetry(
-        'POST',
-        url,
-        body: receiptData,
-      );
+      final response = await _makeRequestWithRetry('POST', url, body: receiptData);
 
       print('Código de respuesta guardar: ${response.statusCode}');
       print('Respuesta del servidor: ${response.body}');
@@ -400,7 +392,7 @@ class ApiService {
     }
   }
 
-  // Eliminar comprobante (con interceptor)
+  // Eliminar comprobante
   Future<bool> deleteReceipt(String transactionNumber) async {
     if (transactionNumber.isEmpty) {
       throw Exception('El número de transacción no puede estar vacío.');
@@ -427,10 +419,33 @@ class ApiService {
     }
   }
 
-  // Obtener comprobantes filtrados por corresponsal (con interceptor)
-  Future<List<Receipt>> getReceiptsByCorresponsal(
-    String codigoCorresponsal,
-  ) async {
+  // Editar comprobante
+  Future<bool> editReceipt(String transactionNumber, Map<String, dynamic> editData) async {
+    try {
+      final url = '$baseUrl/receipts/$transactionNumber';
+      print('🔧 Editando comprobante: $url');
+      print('🔧 Datos de edición: $editData');
+
+      final response = await _makeRequestWithRetry('PUT', url, body: editData);
+
+      print('🔧 Código de respuesta editar: ${response.statusCode}');
+      print('🔧 Respuesta del servidor: ${response.body}');
+
+      if (response.statusCode == 200) {
+        print('✅ Comprobante editado exitosamente');
+        return true;
+      } else {
+        print('❌ Error al editar comprobante: ${response.statusCode}');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error en editReceipt: $e');
+      throw Exception('Error de conexión: $e');
+    }
+  }
+
+  // Obtener comprobantes filtrados por corresponsal
+  Future<List<Receipt>> getReceiptsByCorresponsal(String codigoCorresponsal) async {
     try {
       final url = '$baseUrl/receipts/corresponsal/$codigoCorresponsal';
       print('Obteniendo comprobantes por corresponsal: $url');
@@ -443,9 +458,7 @@ class ApiService {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
         if (responseData.containsKey('data')) {
           final List<dynamic> receiptsJson = responseData['data'];
-          print(
-            'Comprobantes del corresponsal $codigoCorresponsal: ${receiptsJson.length}',
-          );
+          print('Comprobantes del corresponsal $codigoCorresponsal: ${receiptsJson.length}');
           return receiptsJson.map((json) => Receipt.fromJson(json)).toList();
         }
       }
@@ -457,7 +470,7 @@ class ApiService {
     }
   }
 
-  // Obtener lista de corresponsales disponibles (con interceptor)
+  // Obtener lista de corresponsales disponibles
   Future<List<String>> getAvailableCorresponsales() async {
     try {
       final url = '$baseUrl/receipts/corresponsales';
@@ -470,8 +483,7 @@ class ApiService {
       if (response.statusCode == 200 && response.body.isNotEmpty) {
         final Map<String, dynamic> responseData = jsonDecode(response.body);
         if (responseData.containsKey('corresponsales')) {
-          final List<dynamic> corresponsalesJson =
-              responseData['corresponsales'];
+          final List<dynamic> corresponsalesJson = responseData['corresponsales'];
           return corresponsalesJson.map((item) => item.toString()).toList();
         }
       }
@@ -483,11 +495,14 @@ class ApiService {
     }
   }
 
-  // NUEVO: Obtener reporte de cierre por fecha (con interceptor)
+  // ================================
+  // MÉTODOS DE REPORTES
+  // ================================
+
+  // Obtener reporte de cierre por fecha
   Future<Map<String, dynamic>> getClosingReport(DateTime date) async {
     try {
-      final dateStr =
-          "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+      final dateStr = "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
       final url = '$baseUrl/receipts/closing-report/$dateStr';
       print('Obteniendo reporte de cierre: $url');
 
@@ -516,32 +531,28 @@ class ApiService {
       final allReceipts = await getAllReceipts();
 
       // Filtrar por fecha
-      final dateStr =
-          "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
-      final receiptsForDate =
-          allReceipts.where((receipt) => receipt.fecha == dateStr).toList();
+      final dateStr = "${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}";
+      final receiptsForDate = allReceipts.where((receipt) => receipt['fecha'] == dateStr).toList();
 
       // Calcular totales
-      double total = receiptsForDate.fold(
-        0.0,
-        (sum, receipt) => sum + receipt.valorTotal,
-      );
+      double total = receiptsForDate.fold(0.0, (sum, receipt) => sum + (receipt['valor_total'] ?? 0.0));
 
       // Agrupar por tipo
       Map<String, dynamic> summary = {};
       for (var receipt in receiptsForDate) {
-        if (summary[receipt.tipo] == null) {
-          summary[receipt.tipo] = {'count': 0, 'total': 0.0};
+        final tipo = receipt['tipo'] ?? 'Sin tipo';
+        if (summary[tipo] == null) {
+          summary[tipo] = {'count': 0, 'total': 0.0};
         }
-        summary[receipt.tipo]['count']++;
-        summary[receipt.tipo]['total'] += receipt.valorTotal;
+        summary[tipo]['count']++;
+        summary[tipo]['total'] += (receipt['valor_total'] ?? 0.0);
       }
 
       return {
         'summary': summary,
         'total': total,
         'count': receiptsForDate.length,
-        'receipts': receiptsForDate.map((r) => r.toJson()).toList(),
+        'receipts': receiptsForDate,
         'date': dateStr,
       };
     } catch (e) {
@@ -556,7 +567,11 @@ class ApiService {
     }
   }
 
-  // Obtener mensajes del usuario (con interceptor)
+  // ================================
+  // MÉTODOS DE MENSAJES
+  // ================================
+
+  // Obtener mensajes del usuario
   Future<List<Map<String, dynamic>>> getMessages() async {
     try {
       final url = '$baseUrl/messages/';
@@ -581,17 +596,13 @@ class ApiService {
     }
   }
 
-  // Marcar mensaje como leído (con interceptor)
+  // Marcar mensaje como leído
   Future<bool> markMessageAsRead(String messageId) async {
     try {
       final url = '$baseUrl/messages/mark-read';
       print('Marcando mensaje como leído: $url');
 
-      final response = await _makeRequestWithRetry(
-        'POST',
-        url,
-        body: {'message_id': messageId},
-      );
+      final response = await _makeRequestWithRetry('POST', url, body: {'message_id': messageId});
 
       print('Código de respuesta marcar leído: ${response.statusCode}');
 
@@ -602,7 +613,11 @@ class ApiService {
     }
   }
 
-  // Obtener datos de usuario (con interceptor)
+  // ================================
+  // MÉTODOS DE USUARIO
+  // ================================
+
+  // Obtener datos de usuario
   Future<Map<String, dynamic>> getUserData() async {
     try {
       final url = '$baseUrl/auth/me';
@@ -615,9 +630,7 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
-        throw Exception(
-          'Error al obtener datos de usuario: ${response.statusCode}',
-        );
+        throw Exception('Error al obtener datos de usuario: ${response.statusCode}');
       }
     } catch (e) {
       print('Error en getUserData: $e');
@@ -625,105 +638,48 @@ class ApiService {
     }
   }
 
-  // Verificar conectividad básica
-  Future<bool> checkConnectivity() async {
+  // Método público para refrescar token
+  Future<bool> refreshToken() async {
     try {
-      final url = '$baseUrl/auth/me';
-      final response = await http
-          .get(Uri.parse(url), headers: getHeaders())
-          .timeout(Duration(seconds: 10));
-
-      return response.statusCode !=
-          500; // Cualquier cosa menos error de servidor
+      print('ApiService: Intentando renovar token...');
+      
+      if (_authService != null) {
+        // Usar el AuthService configurado para renovar el token
+        final success = await _authService!.refreshAccessToken();
+        
+        if (success) {
+          // Obtener el nuevo token del AuthService
+          _authToken = _authService!.token;
+          print('ApiService: Token renovado exitosamente');
+          return true;
+        } else {
+          print('ApiService: Error renovando token con AuthService');
+          return false;
+        }
+      } else if (_context != null) {
+        // Usar AuthProvider como fallback
+        final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
+        final success = await authProvider.refreshToken();
+        
+        if (success) {
+          _authToken = authProvider.user?.token;
+          print('ApiService: Token renovado exitosamente usando AuthProvider');
+          return true;
+        } else {
+          print('ApiService: Error renovando token con AuthProvider');
+          return false;
+        }
+      } else {
+        print('ApiService: No hay AuthService ni contexto configurado para renovar token');
+        return false;
+      }
     } catch (e) {
-      print('Error de conectividad: $e');
+      print('ApiService: Error en refreshToken: $e');
       return false;
     }
   }
 
-  // Función auxiliar para mínimo
-  int min(int a, int b) {
-    return a < b ? a : b;
-  }
-
-  // Método para decodificar respuestas UTF-8 correctamente
-  Map<String, dynamic> _decodeUtf8Response(String responseBody) {
-    try {
-      // Intentar decodificar directamente
-      return jsonDecode(responseBody);
-    } catch (e) {
-      try {
-        // Si falla, intentar con codificación UTF-8 explícita
-        final utf8Bytes = utf8.encode(responseBody);
-        final decodedString = utf8.decode(utf8Bytes);
-        return jsonDecode(decodedString);
-      } catch (e2) {
-        print('Error decodificando UTF-8: $e2');
-        return {};
-      }
-    }
-  }
-
-  // Método para limpiar texto con caracteres malformados
-  String _cleanText(String text) {
-    return text
-        .replaceAll('Ã³', 'ó')
-        .replaceAll('Ã¡', 'á')
-        .replaceAll('Ã©', 'é')
-        .replaceAll('Ã­', 'í')
-        .replaceAll('Ãº', 'ú')
-        .replaceAll('Ã±', 'ñ')
-        .replaceAll('Ã"', 'Ó')
-        .replaceAll('Ã', 'Á')
-        .replaceAll('Ã‰', 'É')
-        .replaceAll('Ã', 'Í')
-        .replaceAll('Ãš', 'Ú')
-        .replaceAll('Ã', 'Ñ');
-  }
-
-Future<bool> refreshToken() async {
-  try {
-    print('ApiService: Intentando renovar token...');
-    
-    if (_authService != null) {
-      // Usar el AuthService configurado para renovar el token
-      final success = await _authService!.refreshAccessToken();
-      
-      if (success) {
-        // Obtener el nuevo token del AuthService
-        _authToken = _authService!.token;
-        print('ApiService: Token renovado exitosamente');
-        return true;
-      } else {
-        print('ApiService: Error renovando token con AuthService');
-        return false;
-      }
-    } else if (_context != null) {
-      // Usar AuthProvider como fallback
-      final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-      final success = await authProvider.refreshToken();
-      
-      if (success) {
-        _authToken = authProvider.user?.token;
-        print('ApiService: Token renovado exitosamente usando AuthProvider');
-        return true;
-      } else {
-        print('ApiService: Error renovando token con AuthProvider');
-        return false;
-      }
-    } else {
-      print('ApiService: No hay AuthService ni contexto configurado para renovar token');
-      return false;
-    }
-  } catch (e) {
-    print('ApiService: Error en refreshToken: $e');
-    return false;
-  }
-}
-
-
-
-// ================================
+  // ================================
   // MÉTODOS DE ADMINISTRACIÓN DE USUARIOS
   // ================================
 
@@ -781,14 +737,10 @@ Future<bool> refreshToken() async {
       final url = '$baseUrl/auth/approve-user';
       print('Aprobando usuario con código: $url');
 
-      final response = await _makeRequestWithRetry(
-        'POST',
-        url,
-        body: {
-          'user_id': userId,
-          'codigo_corresponsal': codigo,
-        },
-      );
+      final response = await _makeRequestWithRetry('POST', url, body: {
+        'user_id': userId,
+        'codigo_corresponsal': codigo,
+      });
 
       print('Código de respuesta aprobar usuario: ${response.statusCode}');
       return response.statusCode == 200;
@@ -804,14 +756,10 @@ Future<bool> refreshToken() async {
       final url = '$baseUrl/auth/reject-user';
       print('Rechazando usuario: $url');
 
-      final response = await _makeRequestWithRetry(
-        'POST',
-        url,
-        body: {
-          'user_id': userId,
-          if (reason != null) 'reason': reason,
-        },
-      );
+      final response = await _makeRequestWithRetry('POST', url, body: {
+        'user_id': userId,
+        if (reason != null) 'reason': reason,
+      });
 
       print('Código de respuesta rechazar usuario: ${response.statusCode}');
       return response.statusCode == 200;
@@ -827,15 +775,11 @@ Future<bool> refreshToken() async {
       final url = '$baseUrl/auth/change-user-state';
       print('Cambiando estado de usuario: $url');
 
-      final response = await _makeRequestWithRetry(
-        'POST',
-        url,
-        body: {
-          'user_id': userId,
-          'state': newState,
-          if (reason != null) 'reason': reason,
-        },
-      );
+      final response = await _makeRequestWithRetry('POST', url, body: {
+        'user_id': userId,
+        'state': newState,
+        if (reason != null) 'reason': reason,
+      });
 
       print('Código de respuesta cambiar estado: ${response.statusCode}');
       return response.statusCode == 200;
@@ -851,14 +795,10 @@ Future<bool> refreshToken() async {
       final url = '$baseUrl/auth/change-role';
       print('Cambiando rol de usuario: $url');
 
-      final response = await _makeRequestWithRetry(
-        'POST',
-        url,
-        body: {
-          'user_id': userId,
-          'role': newRole,
-        },
-      );
+      final response = await _makeRequestWithRetry('POST', url, body: {
+        'user_id': userId,
+        'role': newRole,
+      });
 
       print('Código de respuesta cambiar rol: ${response.statusCode}');
       return response.statusCode == 200;
@@ -874,14 +814,10 @@ Future<bool> refreshToken() async {
       final url = '$baseUrl/auth/delete-user';
       print('Eliminando usuario: $url');
 
-      final response = await _makeRequestWithRetry(
-        'POST',
-        url,
-        body: {
-          'user_id': userId,
-          if (reason != null) 'reason': reason,
-        },
-      );
+      final response = await _makeRequestWithRetry('POST', url, body: {
+        'user_id': userId,
+        if (reason != null) 'reason': reason,
+      });
 
       print('Código de respuesta eliminar usuario: ${response.statusCode}');
       return response.statusCode == 200;
@@ -891,34 +827,61 @@ Future<bool> refreshToken() async {
     }
   }
 
-  // Editar comprobante
-Future<bool> editReceipt(String transactionNumber, Map<String, dynamic> editData) async {
-  try {
-    final url = '$baseUrl/receipts/$transactionNumber';
-    print('🔧 Editando comprobante: $url');
-    print('🔧 Datos de edición: $editData');
+  // ================================
+  // MÉTODOS DE CONECTIVIDAD
+  // ================================
 
-    final response = await _makeRequestWithRetry(
-      'PUT',
-      url,
-      body: editData,
-    );
+  // Verificar conectividad básica
+  Future<bool> checkConnectivity() async {
+    try {
+      final url = '$baseUrl/auth/me';
+      final response = await http
+          .get(Uri.parse(url), headers: getHeaders())
+          .timeout(Duration(seconds: 10));
 
-    print('🔧 Código de respuesta editar: ${response.statusCode}');
-    print('🔧 Respuesta del servidor: ${response.body}');
-
-    if (response.statusCode == 200) {
-      print('✅ Comprobante editado exitosamente');
-      return true;
-    } else {
-      print('❌ Error al editar comprobante: ${response.statusCode}');
+      return response.statusCode != 500; // Cualquier cosa menos error de servidor
+    } catch (e) {
+      print('Error de conectividad: $e');
       return false;
     }
-  } catch (e) {
-    print('❌ Error en editReceipt: $e');
-    throw Exception('Error de conexión: $e');
   }
-}
 
+  // ================================
+  // MÉTODOS DE UTILIDAD
+  // ================================
 
+  // Método para decodificar respuestas UTF-8 correctamente
+  Map<String, dynamic> _decodeUtf8Response(String responseBody) {
+    try {
+      // Intentar decodificar directamente
+      return jsonDecode(responseBody);
+    } catch (e) {
+      try {
+        // Si falla, intentar con codificación UTF-8 explícita
+        final utf8Bytes = utf8.encode(responseBody);
+        final decodedString = utf8.decode(utf8Bytes);
+        return jsonDecode(decodedString);
+      } catch (e2) {
+        print('Error decodificando UTF-8: $e2');
+        return {};
+      }
+    }
+  }
+
+  // Método para limpiar texto con caracteres malformados
+  String _cleanText(String text) {
+    return text
+        .replaceAll('Ã³', 'ó')
+        .replaceAll('Ã¡', 'á')
+        .replaceAll('Ã©', 'é')
+        .replaceAll('Ã­', 'í')
+        .replaceAll('Ãº', 'ú')
+        .replaceAll('Ã±', 'ñ')
+        .replaceAll('Ã"', 'Ó')
+        .replaceAll('Ã', 'Á')
+        .replaceAll('Ã‰', 'É')
+        .replaceAll('Ã', 'Í')
+        .replaceAll('Ãš', 'Ú')
+        .replaceAll('Ã', 'Ñ');
+  }
 }

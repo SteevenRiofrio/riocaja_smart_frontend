@@ -73,12 +73,13 @@ class AuthProvider with ChangeNotifier {
         print('   AuthStatus: $_authStatus');
         print('   Perfil completo: $_perfilCompleto');
 
-        // Sincronizar tokens con ApiService
+        // ✅ CAMBIO CRÍTICO: Sincronizar tokens INMEDIATAMENTE Y ESPERAR
         _syncTokensWithApiService();
+        await Future.delayed(Duration(milliseconds: 100));
+        
         print('AuthProvider: Usuario autenticado: ${_user!.nombre}');
 
         // AGREGAR: Configurar expiración del token
-        final prefs = await SharedPreferences.getInstance();
         final expiryTime = DateTime.now().add(Duration(hours: 1));
         await prefs.setInt(AuthService.TOKEN_EXPIRY_KEY, expiryTime.millisecondsSinceEpoch);
 
@@ -98,8 +99,11 @@ class AuthProvider with ChangeNotifier {
   // Método para sincronizar tokens con ApiService
   void _syncTokensWithApiService() {
     if (_user != null && _user!.token.isNotEmpty) {
+      // Configurar ApiService inmediatamente
       _apiService.setAuthToken(_user!.token);
       _apiService.setAuthService(_authService); // Para refresh automático
+      
+      // ✅ NUEVO:
       print('AuthProvider: Tokens sincronizados con ApiService');
     }
   }
@@ -465,26 +469,58 @@ class AuthProvider with ChangeNotifier {
 
   // Logout con limpieza completa
   Future<void> logout() async {
-    _isLoading = true;
-    notifyListeners();
+    print('🚪 AuthProvider: Iniciando logout...');
+    
+    // ✅ NO mostrar loading durante logout
+    // _isLoading = true;
+    // notifyListeners();
 
-    // Limpiar AuthService
-    await _authService.logout();
+    try {
+      // Limpiar AuthService en paralelo (no esperar)
+      _authService.logout(); // Sin await para que sea más rápido
+      
+      // Limpiar ApiService inmediatamente
+      _apiService.setAuthToken(null);
+      
+      // Limpiar estado local inmediatamente
+      _user = null;
+      _authStatus = AuthStatus.unauthenticated;
+      _perfilCompleto = false;
+      _codigoCorresponsal = null;
+      _errorMessage = '';
+      _needsTermsAcceptance = false;
+      _isLoading = false; // ✅ Asegurar que no está en loading
+      
+      // Limpiar SharedPreferences en paralelo
+      _clearUserPreferences(); // Sin await para que sea más rápido
+      
+      print('✅ AuthProvider: Logout completado');
+      
+      // ✅ Notificar INMEDIATAMENTE para que la UI cambie rápido
+      notifyListeners();
+      
+    } catch (e) {
+      print('❌ Error durante logout: $e');
+      
+      // Incluso si hay error, forzar el logout local
+      _user = null;
+      _authStatus = AuthStatus.unauthenticated;
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
-    // Limpiar ApiService
-    _apiService.setAuthToken(null);
-
-    // Limpiar estado local
-    _user = null;
-    _authStatus = AuthStatus.unauthenticated;
-    _perfilCompleto = false;
-    _codigoCorresponsal = null;
-    _errorMessage = '';
-    _needsTermsAcceptance = false; // ✅ LIMPIAR ESTADO DE TÉRMINOS
-    _isLoading = false;
-
-    print('AuthProvider: Logout completo - todos los tokens eliminados');
-    notifyListeners();
+  // ✅ Método auxiliar para limpiar preferencias sin bloquear
+  Future<void> _clearUserPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_data');
+      await prefs.setBool('is_authenticated', false);
+      // Mantener 'remember_session' para facilitar próximo login
+      print('🧹 Preferencias de usuario limpiadas');
+    } catch (e) {
+      print('⚠️ Error limpiando preferencias: $e');
+    }
   }
 
   // Actualizar URL base
@@ -512,17 +548,138 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  // Verificar si el token está próximo a expirar
-  Future<bool> isTokenNearExpiration() async {
+  /// Verifica el estado de autenticación y restaura sesión si es posible
+  Future<void> checkAuthStatus() async {
+    print('🔍 AuthProvider: Iniciando verificación de estado...');
     try {
       final prefs = await SharedPreferences.getInstance();
-      final expiryTime = prefs.getInt(AuthService.TOKEN_EXPIRY_KEY) ?? 0;
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final fiveMinutesFromNow = now + (5 * 60 * 1000); // 5 minutos
-
-      return expiryTime > 0 && expiryTime <= fiveMinutesFromNow;
+      final rememberSession = prefs.getBool('remember_session') ?? false;
+      final userDataString = prefs.getString('user_data');
+      if (rememberSession && userDataString != null) {
+        print('📱 Datos de sesión encontrados, validando...');
+        final userData = json.decode(userDataString);
+        _user = User.fromJson(userData);
+        final tokenValid = await _verifyTokenValidity();
+        if (tokenValid) {
+          _authStatus = AuthStatus.authenticated;
+          _perfilCompleto = _user?.perfilCompleto ?? false;
+          _codigoCorresponsal = _user?.codigoCorresponsal;
+          _syncTokensWithApiService();
+          print('✅ AuthProvider: Sesión válida restaurada para ${_user!.nombre}');
+        } else {
+          print('⚠️ AuthProvider: Token expirado, intentando renovar...');
+          final refreshed = await refreshToken();
+          if (refreshed) {
+            _authStatus = AuthStatus.authenticated;
+            print('✅ AuthProvider: Token renovado exitosamente');
+          } else {
+            print('❌ AuthProvider: No se pudo renovar token');
+            await _clearInvalidSession();
+          }
+        }
+      } else {
+        print('ℹ️ AuthProvider: No hay sesión guardada o remember_session es false');
+        _authStatus = AuthStatus.unauthenticated;
+      }
+      print('📊 AuthProvider: Estado final - Autenticado: ${_authStatus == AuthStatus.authenticated}');
     } catch (e) {
-      print('Error verificando expiración de token: $e');
+      print('❌ AuthProvider: Error verificando estado: $e');
+      await _clearInvalidSession();
+    }
+  }
+
+  Future<bool> _verifyTokenValidity() async {
+    try {
+      if (_user?.token == null || _user!.token.isEmpty) {
+        print('🔍 No hay token para verificar');
+        return false;
+      }
+      print('🔍 Verificando validez del token...');
+      final tempApiService = ApiService();
+      tempApiService.setAuthToken(_user!.token);
+      final userData = await tempApiService.getUserData();
+      if (userData.isNotEmpty) {
+        print('✅ Token válido - usuario: ${userData['nombre'] ?? 'N/A'}');
+        return true;
+      } else {
+        print('❌ Token inválido - respuesta vacía');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Token no válido: $e');
+      return false;
+    }
+  }
+
+  Future<void> _clearInvalidSession() async {
+    try {
+      print('🧹 Limpiando sesión inválida...');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_data');
+      await prefs.setBool('is_authenticated', false);
+      _user = null;
+      _authStatus = AuthStatus.unauthenticated;
+      _perfilCompleto = false;
+      _codigoCorresponsal = null;
+      _needsTermsAcceptance = false;
+      _errorMessage = '';
+      print('✅ AuthProvider: Sesión inválida limpiada');
+    } catch (e) {
+      print('❌ Error limpiando sesión: $e');
+    }
+  }
+
+  Future<bool> isTokenNearExpiration() async {
+    try {
+      if (_user?.token == null) return false;
+      final parts = _user!.token.split('.');
+      if (parts.length != 3) return false;
+      final payload = parts[1];
+      final normalizedPayload = payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
+      final decoded = utf8.decode(base64Url.decode(normalizedPayload));
+      final data = json.decode(decoded);
+      if (data['exp'] != null) {
+        final expiry = DateTime.fromMillisecondsSinceEpoch(data['exp'] * 1000);
+        final now = DateTime.now();
+        final timeUntilExpiry = expiry.difference(now);
+        print('⏰ Token expira en: ${timeUntilExpiry.inMinutes} minutos');
+        return timeUntilExpiry.inMinutes < 10;
+      }
+      return false;
+    } catch (e) {
+      print('❌ Error verificando expiración: $e');
+      return false;
+    }
+  }
+
+  Future<void> _saveTokenExpiry(String token) async {
+    try {
+      final parts = token.split('.');
+      if (parts.length == 3) {
+        final payload = parts[1];
+        final normalizedPayload = payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
+        final decoded = utf8.decode(base64Url.decode(normalizedPayload));
+        final data = json.decode(decoded);
+        if (data['exp'] != null) {
+          final expiry = DateTime.fromMillisecondsSinceEpoch(data['exp'] * 1000);
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('token_expiry', expiry.millisecondsSinceEpoch);
+          print('💾 Expiración del token guardada: $expiry');
+        }
+      }
+    } catch (e) {
+      print('❌ Error guardando expiración del token: $e');
+      final defaultExpiry = DateTime.now().add(Duration(hours: 1));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('token_expiry', defaultExpiry.millisecondsSinceEpoch);
+    }
+  }
+
+  bool _isValidJWTToken(String token) {
+    try {
+      final parts = token.split('.');
+      return parts.length == 3 && parts.every((part) => part.isNotEmpty);
+    } catch (e) {
       return false;
     }
   }
@@ -698,4 +855,146 @@ class AuthProvider with ChangeNotifier {
       return true;
     }
   }
+
+// ================================
+// MÉTODOS OPTIMIZADOS para tu AuthProvider
+// ================================
+
+// ✅ CONFIGURAR usuario rápidamente SIN verificar token
+void setQuickUser(User user) {
+  _user = user;
+  _authStatus = AuthStatus.authenticated;
+  _perfilCompleto = user.perfilCompleto;
+  _codigoCorresponsal = user.codigoCorresponsal;
+  
+  // Configurar ApiService inmediatamente
+  _apiService.setAuthToken(user.token);
+  _apiService.setAuthService(_authService);
+  
+  print('⚡ Usuario configurado rápidamente: ${user.nombre}');
+  notifyListeners();
+}
+
+// ✅ VERIFICAR token SIN bloquear la UI y SIN cambiar estado hasta confirmar
+Future<bool> verifyTokenQuietly() async {
+  try {
+    if (_user?.token == null || _user!.token.isEmpty) {
+      return false;
+    }
+    
+    print('🔍 Verificando token silenciosamente...');
+    
+    // Crear instancia temporal para no afectar la principal
+    final tempApiService = ApiService();
+    tempApiService.setAuthToken(_user!.token);
+    
+    // Verificar con timeout corto
+    final userData = await tempApiService.getUserData()
+        .timeout(Duration(seconds: 5)); // Timeout de 5 segundos
+    
+    if (userData.isNotEmpty) {
+      print('✅ Token válido confirmado');
+      return true;
+    } else {
+      print('❌ Token inválido');
+      return false;
+    }
+    
+  } catch (e) {
+    print('❌ Error verificando token silenciosamente: $e');
+    return false;
+  }
+}
+
+// ✅ VERSIÓN SÚPER RÁPIDA de checkAuthStatus (solo para casos especiales)
+Future<void> quickAuthCheck() async {
+  try {
+    final prefs = await SharedPreferences.getInstance();
+    final rememberSession = prefs.getBool('remember_session') ?? false;
+    final userDataString = prefs.getString('user_data');
+    
+    if (rememberSession && userDataString != null) {
+      final userData = json.decode(userDataString);
+      final user = User.fromJson(userData);
+      
+      if (user.token.isNotEmpty) {
+        // ✅ Configurar inmediatamente, verificar después
+        setQuickUser(user);
+        
+        // ✅ Verificar en segundo plano
+        verifyTokenQuietly().then((isValid) {
+          if (!isValid) {
+            print('⚠️ Token inválido detectado, cerrando sesión');
+            logout();
+          }
+        });
+        
+        return;
+      }
+    }
+    
+    // No hay sesión válida
+    _authStatus = AuthStatus.unauthenticated;
+    notifyListeners();
+    
+  } catch (e) {
+    print('❌ Error en verificación rápida: $e');
+    _authStatus = AuthStatus.unauthenticated;
+    notifyListeners();
+  }
+}
+
+// ✅ LOGOUT SÚPER RÁPIDO - sin demoras
+Future<void> fastLogout() async {
+  print('🚪 Logout rápido iniciado...');
+  
+  // ✅ Limpiar estado INMEDIATAMENTE
+  _user = null;
+  _authStatus = AuthStatus.unauthenticated;
+  _perfilCompleto = false;
+  _codigoCorresponsal = null;
+  _errorMessage = '';
+  _needsTermsAcceptance = false;
+  _isLoading = false;
+  
+  // ✅ Limpiar ApiService inmediatamente
+  _apiService.setAuthToken(null);
+  
+  // ✅ Notificar INMEDIATAMENTE
+  notifyListeners();
+  
+  // ✅ Limpiar en segundo plano (no esperar)
+  _cleanupInBackground();
+  
+  print('⚡ Logout rápido completado');
+}
+
+// ✅ LIMPIEZA en segundo plano
+Future<void> _cleanupInBackground() async {
+  try {
+    // Limpiar AuthService
+    await _authService.logout();
+    
+    // Limpiar SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('user_data');
+    await prefs.setBool('is_authenticated', false);
+    
+    print('🧹 Limpieza en segundo plano completada');
+  } catch (e) {
+    print('⚠️ Error en limpieza: $e');
+  }
+}
+
+// ✅ MÉTODO PARA COMPROBAR si hay sesión SIN verificar token
+bool hasLocalSession() {
+  try {
+    // Esto se puede llamar síncronamente para decisiones rápidas
+    return _user != null && 
+           _user!.token.isNotEmpty && 
+           _authStatus == AuthStatus.authenticated;
+  } catch (e) {
+    return false;
+  }
+}
 }

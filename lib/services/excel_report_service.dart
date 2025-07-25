@@ -27,7 +27,8 @@ class ExcelReportService {
   // Generar reporte por día específico
   Future<bool> generateDailyReport(DateTime date) async {
     try {
-      final receipts = await _getReceiptsByDate(date);
+      final dateStr = _formatDate(date); // "dd/MM/yyyy"
+      final receipts = await _getReceiptsByDate(dateStr); // String
       if (receipts.isEmpty) {
         _showMessage('No hay comprobantes para la fecha seleccionada');
         return false;
@@ -125,103 +126,110 @@ class ExcelReportService {
   }
 
   // Obtener comprobantes por fecha específica
-  Future<List<Receipt>> _getReceiptsByDate(DateTime date) async {
-    final allReceipts = await _apiService.getAllReceipts();
-    final dateStr = DateFormat('dd/MM/yyyy').format(date);
-    
-    return allReceipts.where((receipt) => receipt.fecha == dateStr).toList();
+  // ✅ Método corregido para obtener comprobantes por fecha
+  Future<List<Receipt>> _getReceiptsByDate(String dateStr) async {
+    try {
+      print('🔍 Buscando comprobantes para la fecha: $dateStr');
+      final allReceiptsData = await _apiService.getAllReceipts();
+      final allReceipts = allReceiptsData.map((receiptMap) {
+        return Receipt.fromJson(receiptMap);
+      }).toList();
+      final filteredReceipts = allReceipts.where((receipt) {
+        return receipt.fecha == dateStr;
+      }).toList();
+      print('📋 Encontrados ${filteredReceipts.length} comprobantes para $dateStr');
+      return filteredReceipts;
+    } catch (e) {
+      print('❌ Error obteniendo comprobantes por fecha: $e');
+      return [];
+    }
   }
 
   // Obtener comprobantes por rango de fechas
+  // ✅ Método corregido para obtener comprobantes por rango de fechas
   Future<List<Receipt>> _getReceiptsByDateRange(DateTime startDate, DateTime endDate) async {
-    final allReceipts = await _apiService.getAllReceipts();
-    
-    return allReceipts.where((receipt) {
-      final receiptDate = _parseDate(receipt.fecha);
-      if (receiptDate == null) return false;
-      
-      return receiptDate.isAfter(startDate.subtract(Duration(days: 1))) &&
-             receiptDate.isBefore(endDate.add(Duration(days: 1)));
-    }).toList();
+    try {
+      print('🔍 Buscando comprobantes desde ${startDate.day}/${startDate.month}/${startDate.year} hasta ${endDate.day}/${endDate.month}/${endDate.year}');
+      final allReceiptsData = await _apiService.getAllReceipts();
+      final allReceipts = allReceiptsData.map((receiptMap) {
+        return Receipt.fromJson(receiptMap);
+      }).toList();
+      final filteredReceipts = allReceipts.where((receipt) {
+        final receiptDate = _parseDate(receipt.fecha);
+        if (receiptDate == null) return false;
+        return receiptDate.isAfter(startDate.subtract(Duration(days: 1))) &&
+               receiptDate.isBefore(endDate.add(Duration(days: 1)));
+      }).toList();
+      print('📋 Encontrados ${filteredReceipts.length} comprobantes en el rango especificado');
+      return filteredReceipts;
+    } catch (e) {
+      print('❌ Error obteniendo comprobantes por rango de fechas: $e');
+      return [];
+    }
   }
 
   // Construir hoja de reporte diario
+  // ✅ MÉTODO CORREGIDO PARA CONSTRUIR REPORTE DIARIO
   Future<void> _buildDailyReportSheet(Sheet sheet, List<Receipt> receipts, DateTime date) async {
-    // Configurar ancho de columnas
-    sheet.setColumnWidth(0, 20);
-    sheet.setColumnWidth(1, 15);
-    sheet.setColumnWidth(2, 25);
-    sheet.setColumnWidth(3, 20);
-    sheet.setColumnWidth(4, 15);
-    sheet.setColumnWidth(5, 20);
-    
-    int row = 0;
-    
-    // HEADER DEL REPORTE
-    _addHeaderCell(sheet, 0, row, 'REPORTE DIARIO - RIOCAJA SMART', isTitle: true);
-    row += 2;
-    
-    _addCell(sheet, 0, row, 'Fecha:');
-    _addCell(sheet, 1, row, DateFormat('dd/MM/yyyy').format(date));
-    row++;
-    
-    _addCell(sheet, 0, row, 'Generado:');
-    _addCell(sheet, 1, row, DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now()));
-    row++;
-    
-    final authProvider = Provider.of<AuthProvider>(_context!, listen: false);
-    _addCell(sheet, 0, row, 'Usuario:');
-    _addCell(sheet, 1, row, authProvider.user?.nombre ?? 'Sistema');
-    row += 2;
+    try {
+      print('📊 Construyendo reporte diario para ${_formatDate(date)}');
+      // Configurar ancho de columnas
+      sheet.setColumnWidth(0, 12); // Fecha
+      sheet.setColumnWidth(1, 12); // Hora
+      sheet.setColumnWidth(2, 20); // Tipo
+      sheet.setColumnWidth(3, 18); // Nro Transacción
+      sheet.setColumnWidth(4, 15); // Valor
+      sheet.setColumnWidth(5, 20); // Corresponsal
 
-    // RESUMEN EJECUTIVO
-    final summary = _generateSummary(receipts);
-    _addHeaderCell(sheet, 0, row, 'RESUMEN EJECUTIVO');
-    row++;
-    
-    _addCell(sheet, 0, row, 'Total Transacciones:');
-    _addCell(sheet, 1, row, receipts.length.toString());
-    row++;
-    
-    _addCell(sheet, 0, row, 'Total Ingresos:');
-    _addCell(sheet, 1, row, '\$${summary['totalIncomes'].toStringAsFixed(2)}');
-    row++;
-    
-    _addCell(sheet, 0, row, 'Total Egresos:');
-    _addCell(sheet, 1, row, '\$${summary['totalExpenses'].toStringAsFixed(2)}');
-    row++;
-    
-    _addCell(sheet, 0, row, 'Saldo en Caja:');
-    _addCell(sheet, 1, row, '\$${summary['balance'].toStringAsFixed(2)}');
-    row += 2;
-
-    // DETALLE DE TRANSACCIONES
-    _addHeaderCell(sheet, 0, row, 'DETALLE DE TRANSACCIONES');
-    row++;
-    
-    // Headers de tabla
-    _addHeaderCell(sheet, 0, row, 'FECHA');
-    _addHeaderCell(sheet, 1, row, 'HORA');
-    _addHeaderCell(sheet, 2, row, 'TIPO');
-    _addHeaderCell(sheet, 3, row, 'TRANSACCIÓN');
-    _addHeaderCell(sheet, 4, row, 'VALOR');
-    if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
-      _addHeaderCell(sheet, 5, row, 'CORRESPONSAL');
-    }
-    row++;
-
-    // Datos de comprobantes
-    for (final receipt in receipts) {
-      _addCell(sheet, 0, row, receipt.fecha);
-      _addCell(sheet, 1, row, receipt.hora);
-      _addCell(sheet, 2, row, receipt.tipo);
-      _addCell(sheet, 3, row, receipt.nroTransaccion);
-      _addCurrencyCell(sheet, 4, row, receipt.valorTotal);
-      
-      if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
-        _addCell(sheet, 5, row, receipt.codigoCorresponsal ?? 'N/A');
+      // Headers como List<String>
+      final List<String> headers = [
+        'Fecha',
+        'Hora',
+        'Tipo de Servicio',
+        'Nro. Transacción',
+        'Valor Total'
+      ];
+      if (receipts.any((r) => r.codigoCorresponsal != null)) {
+        headers.add('Código Corresponsal');
       }
-      row++;
+
+      // Escribir headers correctamente
+      for (int i = 0; i < headers.length; i++) {
+        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
+        cell.value = TextCellValue(headers[i]);
+      }
+
+      // Escribir datos con tipos correctos
+      for (int i = 0; i < receipts.length; i++) {
+        final receipt = receipts[i];
+        final rowIndex = i + 1;
+
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: rowIndex)).value =
+            TextCellValue(receipt.fecha);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: rowIndex)).value =
+            TextCellValue(receipt.hora);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: rowIndex)).value =
+            TextCellValue(receipt.tipo);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: rowIndex)).value =
+            TextCellValue(receipt.nroTransaccion);
+        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: rowIndex)).value =
+            DoubleCellValue(receipt.valorTotal);
+
+        if (headers.length > 5 && receipt.codigoCorresponsal != null) {
+          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: rowIndex)).value =
+              TextCellValue(receipt.codigoCorresponsal!);
+        }
+      }
+
+      // Agregar totales al final con tipos correctos
+      final totalRow = receipts.length + 2;
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: totalRow)).value = TextCellValue('TOTAL:');
+      final total = receipts.fold<double>(0.0, (sum, receipt) => sum + receipt.valorTotal);
+      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: totalRow)).value = DoubleCellValue(total);
+      print('✅ Reporte diario construido exitosamente con ${receipts.length} comprobantes');
+    } catch (e) {
+      print('❌ Error construyendo reporte diario: $e');
+      throw Exception('Error construyendo reporte: $e');
     }
   }
 
@@ -646,4 +654,13 @@ void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
     }
     print(error);
   }
+}
+
+// ================================
+// CORRECCIONES PARA EXCEL REPORT SERVICE
+// ================================
+
+// ✅ MÉTODO AUXILIAR PARA FORMATEAR FECHA
+String _formatDate(DateTime date) {
+  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }

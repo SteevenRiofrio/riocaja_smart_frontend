@@ -24,8 +24,11 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       _checkAuthentication();
+      
+      // ✅ NUEVO: Esperar un momento antes de cargar datos
+      await Future.delayed(Duration(milliseconds: 300));
       _loadInitialData();
     });
   }
@@ -39,37 +42,55 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _loadInitialData() {
+  void _loadInitialData() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    
+    // ✅ CRÍTICO: Esperar a que la autenticación esté completamente lista
+    if (!authProvider.isAuthenticated) {
+      print('🔄 HomeScreen: Esperando a que termine la autenticación...');
+      return; // No cargar nada si no está autenticado
+    }
+
+    // ✅ NUEVO: Esperar un momento adicional para asegurar sincronización
+    await Future.delayed(Duration(milliseconds: 200));
+    
+    // Verificar que el token esté disponible
+    final token = authProvider.user?.token;
+    if (token == null || token.isEmpty) {
+      print('❌ HomeScreen: No hay token disponible para cargar datos');
+      return;
+    }
+
+    print('✅ HomeScreen: Token disponible, cargando datos...');
+
+    // Configurar ReceiptsProvider
     final receiptsProvider = Provider.of<ReceiptsProvider>(context, listen: false);
     receiptsProvider.setContext(context);
+    
+    // ✅ NUEVO: Configurar el token ANTES de cargar
+    receiptsProvider.setAuthToken(token);
     receiptsProvider.loadReceipts();
 
     // Cargar datos de admin si es necesario
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
       final adminProvider = Provider.of<AdminProvider>(context, listen: false);
       
-      // ✅ CRÍTICO: Configurar AdminProvider igual que ReceiptsProvider
+      // ✅ CRÍTICO: Configurar AdminProvider con contexto Y token
       adminProvider.setContext(context);
-      adminProvider.setAuthToken(authProvider.user?.token);
+      adminProvider.setAuthToken(token);
       
-      // Verificar que hay token antes de cargar
-      final token = authProvider.user?.token;
-      if (token != null && token.isNotEmpty) {
-        print('🔄 Cargando usuarios para admin/asesor con token...');
-        adminProvider.loadAllUsers().then((_) {
-          print('✅ Usuarios cargados: ${adminProvider.allUsers.length}');
-        }).catchError((error) {
-          print('❌ Error cargando usuarios: $error');
-        });
-      } else {
-        print('❌ No hay token disponible para cargar usuarios');
-      }
+      print('🔄 Cargando usuarios para admin/asesor con token...');
+      adminProvider.loadAllUsers();
+      adminProvider.loadPendingUsers();
+      
+      // Configurar MessageProvider para admin/asesor
+      final messageProvider = Provider.of<MessageProvider>(context, listen: false);
+      messageProvider.setContext(context);
+      messageProvider.setAuthToken(token);
+      messageProvider.loadMessages();
     }
 
-    // Cargar mensajes
-    final messageProvider = Provider.of<MessageProvider>(context, listen: false);
-    messageProvider.loadMessages();
+    print('✅ HomeScreen: Todos los datos iniciales cargados correctamente');
   }
 
   @override

@@ -5,6 +5,8 @@ import 'package:riocaja_smart/services/api_service.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
+int min(int a, int b) => a < b ? a : b;
+
 class ReceiptsProvider with ChangeNotifier {
   List<Receipt> _receipts = [];
   bool _isLoading = false;
@@ -24,24 +26,43 @@ class ReceiptsProvider with ChangeNotifier {
       _apiService.setAuthToken(authProvider.user?.token);
     }
   }
-  
-  // Cargar todos los comprobantes
-  Future<void> loadReceipts() async {
-    _isLoading = true;
-    notifyListeners();
-    
-    try {
-      print("Intentando cargar comprobantes desde el backend...");
-      _receipts = await _apiService.getAllReceipts();
-    } catch (e) {
-      print('Error loading receipts: $e');
-      _receipts = []; // Lista vacía en caso de error
-    }
-    
-    _isLoading = false;
-    notifyListeners();
+
+  // ✅ NUEVO: Método para establecer el token de autenticación directamente
+  void setAuthToken(String? token) {
+    _apiService.setAuthToken(token);
+    print('ReceiptsProvider: Token establecido: ${token != null ? token.substring(0, min(10, token.length)) : "null"}...');
   }
   
+  // Cargar todos los comprobantes
+// Cargar todos los comprobantes
+Future<void> loadReceipts() async {
+  _isLoading = true;
+  notifyListeners();
+  
+  try {
+    print("Intentando cargar comprobantes desde el backend...");
+    
+    // ✅ CORRECCIÓN: Obtener los datos como Map y convertirlos a Receipt
+    final receiptsData = await _apiService.getAllReceipts();
+    
+    // Convertir cada Map a un objeto Receipt
+    _receipts = receiptsData.map((receiptMap) {
+      return Receipt.fromJson(receiptMap);
+    }).toList();
+    
+    print("Comprobantes cargados exitosamente: ${_receipts.length}");
+    
+  } catch (e) {
+    print('Error loading receipts: $e');
+    _receipts = []; // Lista vacía en caso de error
+  }
+  
+  _isLoading = false;
+  notifyListeners();
+}
+  
+
+
   // Añadir un nuevo comprobante
   Future<bool> addReceipt(Receipt receipt) async {
     _isLoading = true;

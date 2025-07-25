@@ -6,150 +6,114 @@ import 'package:riocaja_smart/screens/home_screen.dart';
 import 'package:riocaja_smart/screens/login_screen.dart';
 import 'package:riocaja_smart/screens/complete_profile_screen.dart';
 
+/// ================================
+// SplashScreen con diseño personalizado (sin íconos de Flutter)
+// ================================
 class SplashScreen extends StatefulWidget {
   @override
-  _SplashScreenState createState() => _SplashScreenState();
+  State<SplashScreen> createState() => _SplashScreenState();
 }
 
 class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _checkAuth();
-  }
-
-  Future<void> _checkAuth() async {
-    // Esperamos tiempo suficiente para que AuthProvider se inicialice
-    await Future.delayed(Duration(seconds: 3));
-    
-    if (!mounted) return;
-    
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    
-    print('🔍 SplashScreen: Verificando estado de autenticación...');
-    print('📊 Estado: ${authProvider.authStatus}');
-    print('👤 Usuario: ${authProvider.user?.nombre ?? "null"}');
-    print('🔑 Rol: ${authProvider.user?.rol ?? "null"}');
-    print('✅ Perfil completo: ${authProvider.perfilCompleto}');
-    
-    // ✅ PRIORIDAD 1: Verificar si el usuario tiene un rol privilegiado
-    if (authProvider.user != null) {
-      final rol = authProvider.user!.rol;
-      
-      // 🚨 IMPORTANTE: Admin y Asesor NUNCA van a completar perfil
-      if (rol == 'admin' || rol == 'asesor') {
-        print('🔒 SplashScreen: Usuario privilegiado detectado ($rol) - Acceso directo al dashboard');
-        _navigateToHome();
-        return;
+    Future.delayed(Duration(seconds: 2), () async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.checkAuthStatus();
+      if (authProvider.isAuthenticated) {
+        if (authProvider.perfilCompleto) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => HomeScreen()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (_) => CompleteProfileScreen()),
+          );
+        }
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => LoginScreen()),
+        );
       }
-    }
-    
-    // ✅ PRIORIDAD 2: Para usuarios normales, verificar estado de autenticación
-    switch (authProvider.authStatus) {
-      case AuthStatus.authenticated:
-        print('✅ SplashScreen: Usuario autenticado - Redirigiendo a Home');
-        _navigateToHome();
-        break;
-        
-      case AuthStatus.needsProfileCompletion:
-        print('📝 SplashScreen: Usuario necesita completar perfil');
-        _navigateToCompleteProfile();
-        break;
-        
-      case AuthStatus.unauthenticated:
-      default:
-        print('🚪 SplashScreen: Usuario no autenticado - Redirigiendo a Login');
-        _navigateToLogin();
-        break;
-    }
-  }
-
-  void _navigateToHome() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => HomeScreen())
-    );
-  }
-
-  void _navigateToCompleteProfile() {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => CompleteProfileScreen(
-          codigoCorresponsal: authProvider.codigoCorresponsal,
-        ),
-      ),
-    );
-  }
-
-  void _navigateToLogin() {
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (context) => LoginScreen()),
-    );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Color(0xFF2E7D32),
+      backgroundColor: Colors.green[700],
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo
+            // ✅ Contenedor personalizado con tu diseño
             Container(
-              width: 120,
-              height: 120,
+              width: 100,
+              height: 100,
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(15),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black26,
-                    blurRadius: 15,
+                    blurRadius: 10,
                     offset: Offset(0, 5),
                   ),
                 ],
               ),
-              child: Icon(
-                Icons.account_balance,
-                size: 60,
-                color: Color(0xFF2E7D32),
+              child: Center(
+                child: Text(
+                  'RC', // ✅ Iniciales de RíoCaja
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[700],
+                  ),
+                ),
               ),
             ),
-            SizedBox(height: 30),
+            
+            SizedBox(height: 20),
             
             // Título
             Text(
-              'RioCaja Smart',
+              'RíoCaja Smart',
               style: TextStyle(
-                fontSize: 32,
+                fontSize: 24,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
             ),
-            SizedBox(height: 10),
+            
+            SizedBox(height: 8),
             
             // Subtítulo
             Text(
-              'Sistema de Gestión Bancaria',
+              'Sistema de Gestión CNB',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 14,
                 color: Colors.white70,
               ),
             ),
-            SizedBox(height: 50),
             
-            // Loading indicator
+            SizedBox(height: 40),
+            
+            // Loading
             CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),
-            SizedBox(height: 20),
             
-            // Texto de carga
+            SizedBox(height: 15),
+            
+            // Texto
             Text(
-              'Iniciando aplicación...',
+              'Cargando...',
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 16,
                 color: Colors.white70,
               ),
             ),

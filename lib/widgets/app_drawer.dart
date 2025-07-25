@@ -248,10 +248,6 @@ class AppDrawer extends StatelessWidget {
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
-                            Text(
-                              'Local: ${authProvider.user?.nombreLocal ?? 'Administración'}',
-                              style: TextStyle(fontSize: 10),
-                            ),
                           ],
                         ),
                       ),

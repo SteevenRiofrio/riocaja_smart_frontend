@@ -35,6 +35,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true                # Para generar localizaciones
+  assets:
+    - assets/images/logo.png
 
 flutter_launcher_icons:
   android: "launcher_icon"
