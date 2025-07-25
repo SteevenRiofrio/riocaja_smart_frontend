@@ -1,11 +1,9 @@
-// lib/main.dart - ACTUALIZADO CON SOPORTE ESPAÑOL
+// lib/main.dart - LIMPIO SIN PRIVACY SCREEN
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
-import 'package:riocaja_smart/services/privacy_simple_service.dart';
-import 'package:riocaja_smart/screens/privacy_terms_screen.dart';
 import 'package:riocaja_smart/screens/home_screen.dart';
 import 'package:riocaja_smart/providers/receipts_provider.dart';
 import 'package:riocaja_smart/providers/auth_provider.dart';
@@ -71,94 +69,10 @@ class MyApp extends StatelessWidget {
             ),
           ),
         ),
-        home: PrivacyChecker(), // ← CAMBIO PRINCIPAL AQUÍ
+        home: HomeScreen(), // ← REGRESA DIRECTAMENTE A HOME
         navigatorObservers: [AuthErrorHandler()],
         debugShowCheckedModeBanner: false,
       ),
     );
-  }
-}
-
-class PrivacyChecker extends StatefulWidget {
-  @override
-  State<PrivacyChecker> createState() => _PrivacyCheckerState();
-}
-
-class _PrivacyCheckerState extends State<PrivacyChecker> {
-  bool _isLoading = true;
-  bool _hasAcceptedTerms = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkPrivacyStatus();
-  }
-
-  Future<void> _checkPrivacyStatus() async {
-    try {
-      setState(() {
-        _isLoading = true;
-      });
-
-      // 🔥 AGREGAR ESTA LÍNEA PARA RESETEAR (solo para desarrollo)
-      await PrivacySimpleService.resetAcceptance(); // ⚠️ Quitar después de probar
-      print('🔄 Términos de privacidad reseteados para testing');
-      
-      final hasAccepted = await PrivacySimpleService.hasAcceptedTerms();
-      
-      setState(() {
-        _hasAcceptedTerms = hasAccepted;
-        _isLoading = false;
-      });
-
-      print(hasAccepted
-          ? '✅ Usuario ya aceptó términos'
-          : '⚠️ Usuario debe aceptar términos');
-    } catch (e) {
-      print('❌ Error verificando términos: $e');
-      setState(() {
-        _hasAcceptedTerms = false;
-        _isLoading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade700),
-              ),
-              SizedBox(height: 16),
-              Text(
-                'Verificando configuración de privacidad...',
-                style: TextStyle(
-                  color: Colors.grey.shade600,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (!_hasAcceptedTerms) {
-      return PrivacyTermsScreen(
-        onAccepted: () {
-          setState(() {
-            _hasAcceptedTerms = true;
-          });
-        },
-      );
-    }
-
-    // Si ya aceptó, mostrar la app normal
-    return HomeScreen();
   }
 }
