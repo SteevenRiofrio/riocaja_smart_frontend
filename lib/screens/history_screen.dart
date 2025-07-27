@@ -27,6 +27,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // NUEVO: Lista de corresponsales disponibles
   Set<String> _availableCorresponsales = {};
 
+  // 1. AGREGAR VARIABLE Y CONTROLADOR
+  String _searchTransactionNumber = ''; // NUEVO: Filtro por número de transacción
+  final TextEditingController _searchController = TextEditingController(); // NUEVO: Controlador para el campo de búsqueda
+
   @override
   void initState() {
     super.initState();
@@ -169,10 +173,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
           appBar: AppBar(
             title: Text('Historial de Comprobantes'),
             actions: [
+              Container(
+                width: 200,
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: 'Buscar por N° transacción',
+                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
+                    prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey[600]),
+                    suffixIcon: _searchTransactionNumber.isNotEmpty
+                        ? IconButton(
+                            icon: Icon(Icons.clear, size: 16),
+                            onPressed: () {
+                              setState(() {
+                                _searchController.clear();
+                                _searchTransactionNumber = '';
+                              });
+                            },
+                          )
+                        : null,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide(color: Colors.grey[300]!),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: BorderSide(color: Theme.of(context).primaryColor),
+                    ),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  style: TextStyle(fontSize: 12),
+                  onChanged: (value) {
+                    setState(() {
+                      _searchTransactionNumber = value;
+                    });
+                  },
+                ),
+              ),
               IconButton(
                 icon: Icon(Icons.filter_list),
                 onPressed: _availableTypes.isNotEmpty ? _showFilterOptions : null,
-                tooltip: _availableTypes.isEmpty ? 'Sin tipos disponibles' : 'Filtrar por tipo',
+                tooltip: _availableTypes.isEmpty 
+                    ? 'No hay comprobantes para filtrar'
+                    : 'Filtros',
               ),
               
               // NUEVO: Botón para filtro de corresponsal (solo para admin)
@@ -203,11 +249,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   });
                 },
               ),
-              IconButton(
-                icon: Icon(Icons.refresh), 
-                onPressed: _loadReceipts,
-                tooltip: 'Actualizar',
-              ),
             ],
           ),
           body: _isLoading || _isProviderLoading
@@ -216,7 +257,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   children: [
                     // Mostrar los filtros activos
                     _buildActiveFilters(),
-
                     // Lista de comprobantes
                     Expanded(
                       child: _receipts.isEmpty ? _buildEmptyState() : _buildReceiptsList(_receipts),
@@ -231,6 +271,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
   // MEJORADO: Método para mostrar los filtros activos
   Widget _buildActiveFilters() {
     List<Widget> filterChips = [];
+
+    // NUEVO: Chip para búsqueda por número de transacción
+    if (_searchTransactionNumber.isNotEmpty) {
+      filterChips.add(
+        Chip(
+          label: Text('Buscar: $_searchTransactionNumber'),
+          avatar: Icon(Icons.search, size: 16),
+          onDeleted: () {
+            setState(() {
+              _searchController.clear();
+              _searchTransactionNumber = '';
+            });
+          },
+        ),
+      );
+    }
 
     // Filtros por tipo de comprobante
     if (_selectedFilters.isNotEmpty) {
@@ -486,11 +542,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   // MEJORADO: Método para filtrar comprobantes incluyendo corresponsal
   List<Receipt> _filterReceipts(List<Receipt> receipts) {
-    List<Receipt> filteredReceipts = List.from(receipts);
+    List<Receipt> filteredReceipts = receipts;
 
-    // Filtrar por tipos - ahora soportamos múltiples tipos
+    // Filtrar por tipos seleccionados
     if (_selectedFilters.isNotEmpty) {
-      filteredReceipts = filteredReceipts.where((receipt) => _selectedFilters.contains(receipt.tipo)).toList();
+      filteredReceipts = filteredReceipts
+          .where((receipt) => _selectedFilters.contains(receipt.tipo))
+          .toList();
+    }
+
+    // NUEVO: Filtrar por número de transacción
+    if (_searchTransactionNumber.isNotEmpty) {
+      filteredReceipts = filteredReceipts
+          .where((receipt) => receipt.nroTransaccion
+              .toLowerCase()
+              .contains(_searchTransactionNumber.toLowerCase()))
+          .toList();
     }
 
     // NUEVO: Filtrar por corresponsal
@@ -737,20 +804,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
           Icon(Icons.history, size: 80, color: Colors.grey.shade400),
           SizedBox(height: 16),
           Text(
-            _selectedFilters.isNotEmpty || _selectedDate != null || _selectedCorresponsal != 'todos'
+            _selectedFilters.isNotEmpty || 
+            _selectedDate != null || 
+            _selectedCorresponsal != 'todos' ||
+            _searchTransactionNumber.isNotEmpty
               ? 'No hay comprobantes que coincidan con los filtros seleccionados'
               : 'No hay comprobantes escaneados',
             style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             textAlign: TextAlign.center,
           ),
           SizedBox(height: 24),
-  if (_selectedFilters.isNotEmpty || _selectedDate != null || _selectedCorresponsal != 'todos')
+          if (_selectedFilters.isNotEmpty || 
+              _selectedDate != null || 
+              _selectedCorresponsal != 'todos' ||
+              _searchTransactionNumber.isNotEmpty)
             ElevatedButton.icon(
               onPressed: () {
                 setState(() {
                   _selectedFilters.clear();
                   _selectedDate = null;
                   _selectedCorresponsal = 'todos';
+                  _searchController.clear();
+                  _searchTransactionNumber = '';
                 });
               },
               icon: Icon(Icons.clear_all),
@@ -1518,5 +1593,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       default: // PAGO DE SERVICIO y otros
         return Colors.blue;
     }
+  }
+  
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }
