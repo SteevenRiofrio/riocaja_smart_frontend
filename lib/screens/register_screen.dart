@@ -275,7 +275,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           
-          // Instrucciones de lectura
+          // Instrucciones de lectura MODIFICADAS
           Container(
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -302,8 +302,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 SizedBox(height: 8),
                 Text(
                   '1. Lee cuidadosamente los términos de servicio\n'
-                  '2. Revisa la política de privacidad\n'
-                  '3. Comprende tus derechos y responsabilidades',
+                  '2. Comprende tus derechos y responsabilidades',
                   style: TextStyle(
                     fontSize: 13,
                     color: Colors.blue.shade800,
@@ -314,7 +313,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
           SizedBox(height: 16),
           
-          // Enlaces a términos
+          // Solo enlace a términos (SE ELIMINA el botón de política de privacidad)
           Row(
             children: [
               Expanded(
@@ -331,26 +330,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ],
           ),
-          SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showTermsDialog('privacy'),
-                  icon: Icon(Icons.privacy_tip, size: 16),
-                  label: Text('Leer Política de Privacidad'),
-                  style: OutlinedButton.styleFrom(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Colors.blue.shade400),
-                    foregroundColor: Colors.blue.shade700,
-                  ),
-                ),
-              ),
-            ],
-          ),
           SizedBox(height: 16),
           
-          // Checkbox de aceptación
+          // Checkbox de aceptación (sin cambios)
           Container(
             padding: EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -494,7 +476,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    type == 'terms' ? 'Términos y Condiciones' : 'Política de Privacidad',
+                    'Términos y Condiciones', // Solo términos, no privacidad
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -512,7 +494,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: type == 'terms' ? _buildTermsContent() : _buildPrivacyContent(),
+                    children: _buildTermsContent(), // Solo contenido de términos
                   ),
                 ),
               ),
@@ -600,58 +582,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
       _buildModalSection(
         'Modificaciones',
         'Nos reservamos el derecho de modificar estos términos en cualquier momento para mejorar el servicio o cumplir con regulaciones. Los cambios serán notificados a través de la aplicación con al menos 15 días de anticipación.',
-      ),
-    ];
-  }
-
-  // ✅ NUEVA FUNCIÓN: Contenido de privacidad
-  List<Widget> _buildPrivacyContent() {
-    return [
-      _buildModalSection(
-        'Recolección de Datos',
-        'RioCaja Smart recolecta únicamente la información necesaria para brindar el servicio de gestión de cierres de caja:\n'
-        '• Datos de registro (nombre, email, nombre sus establecimiento,contraseña)\n'
-        '• Información extraída de comprobantes mediante OCR\n'
-        '• Registros de actividad en la aplicación\n'
-        '• Datos técnicos para mejorar el servicio',
-      ),
-      _buildModalSection(
-        'Uso de la Información',
-        'Los datos recolectados se utilizan exclusivamente para:\n'
-        '• Proporcionar el servicio de digitalización de comprobantes\n'
-        '• Generar reportes y estadísticas de cierres de caja\n'
-        '• Mejorar la precisión del reconocimiento óptico\n'
-        '• Cumplir con obligaciones legales y contables',
-      ),
-      _buildModalSection(
-        'Protección de Datos',
-        'Implementamos medidas de seguridad robustas para proteger su información:\n'
-        '• Encriptación de contraseña\n'
-        '• Acceso restringido solo a personal autorizado\n'
-        '• Respaldos seguros de la información\n'
-      ),
-      _buildModalSection(
-        'Compartir Información',
-        'RioCaja Smart NO comparte información personal con terceros. Los únicos casos donde podríamos compartir datos son:\n'
-        '• Cuando sea requerido por autoridades legales competentes\n'
-        '• Para cumplir con obligaciones regulatorias específicas\n'
-        '• Con su consentimiento explícito y por escrito',
-      ),
-      _buildModalSection(
-        'Derechos del Usuario',
-        'Como usuario de RioCaja Smart, usted tiene derecho a:\n'
-        '• Acceder a todos sus datos personales almacenados\n'
-        '• Solicitar corrección de información inexacta\n'
-        '• Solicitar eliminación de sus datos (derecho al olvido)\n'
-        '• Exportar sus datos en formato legible\n'
-      ),
-      _buildModalSection(
-        'Retención de Datos',
-        'Conservamos sus datos durante el tiempo necesario para:\n'
-        '• Proporcionar el servicio mientras mantenga su cuenta activa\n'
-        '• Cumplir con obligaciones legales y contables (generalmente 5-7 años)\n'
-        '• Resolver disputas o reclamos que puedan surgir\n'
-        'Transcurrido este período, los datos serán eliminados de forma segura.',
       ),
     ];
   }
