@@ -31,6 +31,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
   String _searchTransactionNumber = ''; // NUEVO: Filtro por número de transacción
   final TextEditingController _searchController = TextEditingController(); // NUEVO: Controlador para el campo de búsqueda
 
+  // Variables adicionales para búsquedas recientes
+  List<String> _recentSearches = [];
+
   @override
   void initState() {
     super.initState();
@@ -152,6 +155,233 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return set1.containsAll(set2) && set2.containsAll(set1);
   }
 
+  void _addToRecentSearches(String search) {
+    if (search.isNotEmpty && !_recentSearches.contains(search)) {
+      setState(() {
+        _recentSearches.insert(0, search);
+        if (_recentSearches.length > 5) {
+          _recentSearches = _recentSearches.take(5).toList();
+        }
+      });
+    }
+  }
+
+  // NUEVO MÉTODO: Mostrar diálogo de búsqueda
+  void _showSearchDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        String tempSearchText = _searchTransactionNumber;
+
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.search, color: Theme.of(context).primaryColor),
+              SizedBox(width: 8),
+              Text('Buscar Comprobante'),
+            ],
+          ),
+          content: TextField(
+            controller: TextEditingController(text: tempSearchText),
+            decoration: InputDecoration(
+              hintText: 'Ingrese N° de transacción',
+              prefixIcon: Icon(Icons.receipt_long),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Theme.of(context).primaryColor, width: 2),
+              ),
+            ),
+            keyboardType: TextInputType.text,
+            textCapitalization: TextCapitalization.characters,
+            onChanged: (value) {
+              tempSearchText = value;
+            },
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _searchController.clear();
+                  _searchTransactionNumber = '';
+                });
+                Navigator.of(context).pop();
+              },
+              child: Text('Limpiar'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _searchController.text = tempSearchText;
+                  _searchTransactionNumber = tempSearchText;
+                  if (tempSearchText.isNotEmpty) {
+                    _addToRecentSearches(tempSearchText);
+                  }
+                });
+                Navigator.of(context).pop();
+              },
+              child: Text('Buscar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ALTERNATIVA: Bottom Sheet más elegante
+  void _showSearchBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (BuildContext context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            top: 20,
+            left: 20,
+            right: 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              SizedBox(height: 20),
+              Row(
+                children: [
+                  Icon(Icons.search, color: Theme.of(context).primaryColor, size: 28),
+                  SizedBox(width: 12),
+                  Text(
+                    'Buscar Comprobante',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  labelText: 'Número de Transacción',
+                  hintText: 'Ej: 1234567890',
+                  prefixIcon: Icon(Icons.receipt_long),
+                  suffixIcon: _searchTransactionNumber.isNotEmpty
+                      ? IconButton(
+                          icon: Icon(Icons.clear),
+                          onPressed: () {
+                            setState(() {
+                              _searchController.clear();
+                              _searchTransactionNumber = '';
+                            });
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                keyboardType: TextInputType.text,
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (value) {
+                  setState(() {
+                    _searchTransactionNumber = value;
+                  });
+                },
+                autofocus: true,
+              ),
+              SizedBox(height: 20),
+              if (_recentSearches.isNotEmpty) ...[
+                Text(
+                  'Búsquedas recientes:',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  children: _recentSearches.take(3).map((search) =>
+                    ActionChip(
+                      label: Text(search),
+                      onPressed: () {
+                        setState(() {
+                          _searchController.text = search;
+                          _searchTransactionNumber = search;
+                        });
+                        Navigator.pop(context);
+                      },
+                    ),
+                  ).toList(),
+                ),
+                SizedBox(height: 20),
+              ],
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _searchController.clear();
+                          _searchTransactionNumber = '';
+                        });
+                        Navigator.pop(context);
+                      },
+                      child: Text('Limpiar'),
+                    ),
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (_searchTransactionNumber.isNotEmpty) {
+                          _addToRecentSearches(_searchTransactionNumber);
+                        }
+                        Navigator.pop(context);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        padding: EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: Text('Buscar'),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 20),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Consumer<ReceiptsProvider>(
@@ -159,32 +389,31 @@ class _HistoryScreenState extends State<HistoryScreen> {
         final _allReceipts = receiptsProvider.receipts;
         final _isProviderLoading = receiptsProvider.isLoading;
 
-        // CORREGIDO: Solo actualizar si NO está cargando y hay datos
         if (!_isProviderLoading && _allReceipts.isNotEmpty) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _updateAvailableFilters(_allReceipts);
           });
         }
 
-        // Filtrar los comprobantes según los filtros seleccionados
         final _receipts = _filterReceipts(_allReceipts);
 
         return Scaffold(
           appBar: AppBar(
             title: Text('Historial de Comprobantes'),
             actions: [
+              // Barra de búsqueda pequeña y compacta, sin ícono de lupa
               Container(
-                width: 200,
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                width: 120, // Más pequeña
+                padding: EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Buscar por N° transacción',
-                    hintStyle: TextStyle(fontSize: 12, color: Colors.grey[400]),
-                    prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey[600]),
+                    hintText: 'N° transacción',
+                    hintStyle: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                    // Sin prefixIcon
                     suffixIcon: _searchTransactionNumber.isNotEmpty
                         ? IconButton(
-                            icon: Icon(Icons.clear, size: 16),
+                            icon: Icon(Icons.clear, size: 14),
                             onPressed: () {
                               setState(() {
                                 _searchController.clear();
@@ -194,18 +423,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           )
                         : null,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(color: Colors.grey[300]!),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                       borderSide: BorderSide(color: Theme.of(context).primaryColor),
                     ),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     filled: true,
                     fillColor: Colors.grey[50],
                   ),
-                  style: TextStyle(fontSize: 12),
+                  style: TextStyle(fontSize: 11),
                   onChanged: (value) {
                     setState(() {
                       _searchTransactionNumber = value;
@@ -220,8 +449,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ? 'No hay comprobantes para filtrar'
                     : 'Filtros',
               ),
-              
-              // NUEVO: Botón para filtro de corresponsal (solo para admin)
               Consumer<AuthProvider>(
                 builder: (context, authProvider, child) {
                   if (authProvider.hasRole('admin') || authProvider.hasRole('asesor')) {
@@ -234,7 +461,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   return SizedBox.shrink();
                 },
               ),
-              
               IconButton(
                 icon: Icon(Icons.calendar_today),
                 onPressed: _selectDate,
