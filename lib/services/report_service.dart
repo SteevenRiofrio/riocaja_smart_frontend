@@ -316,59 +316,217 @@ class ReportService {
     };
   }
 
-  // Generar texto del reporte para compartir
-  String generateReportText(Map<String, dynamic> reportData, DateTime selectedDate) {
-    final dateStr = DateFormat('dd/MM/yyyy').format(selectedDate);
-    final incomes = reportData['incomes'] as Map<dynamic, dynamic>? ?? {};
-    final incomeCount = reportData['incomeCount'] as Map<dynamic, dynamic>? ?? {};
-    final expenses = reportData['expenses'] as Map<dynamic, dynamic>? ?? {};
-    final expenseCount = reportData['expenseCount'] as Map<dynamic, dynamic>? ?? {};
-    final totalIncomes = reportData['totalIncomes'] as double? ?? 0.0;
-    final totalExpenses = reportData['totalExpenses'] as double? ?? 0.0;
-    final totalIncomeCount = reportData['totalIncomeCount'] as int? ?? 0;
-    final totalExpenseCount = reportData['totalExpenseCount'] as int? ?? 0;
-    final saldoEnCaja = reportData['saldoEnCaja'] as double? ?? 0.0;
-    final count = reportData['count'] as int? ?? 0;
+// ✅ FORMATO OPTIMIZADO PARA WHATSAPP MÓVIL Y WEB
+String generateReportText(Map<String, dynamic> reportData, DateTime selectedDate) {
+  final dateStr = DateFormat('dd/MM/yyyy').format(selectedDate);
+  final incomes = reportData['incomes'] as Map<dynamic, dynamic>? ?? {};
+  final incomeCount = reportData['incomeCount'] as Map<dynamic, dynamic>? ?? {};
+  final expenses = reportData['expenses'] as Map<dynamic, dynamic>? ?? {};
+  final expenseCount = reportData['expenseCount'] as Map<dynamic, dynamic>? ?? {};
+  final totalIncomes = reportData['totalIncomes'] as double? ?? 0.0;
+  final totalExpenses = reportData['totalExpenses'] as double? ?? 0.0;
+  final totalIncomeCount = reportData['totalIncomeCount'] as int? ?? 0;
+  final totalExpenseCount = reportData['totalExpenseCount'] as int? ?? 0;
+  final saldoEnCaja = reportData['saldoEnCaja'] as double? ?? 0.0;
+  final count = reportData['count'] as int? ?? 0;
 
-    String reportText = 'REPORTE DE CIERRE - RIOCAJA SMART\n\n';
-    reportText += 'FECHA: $dateStr\n';
-    reportText += 'CNB: BANCO DEL BARRIO\n\n';
+  String reportText = '';
+  
+  // ✅ ENCABEZADO SIN CARACTERES ESPECIALES
+  reportText += '==================================\n';
+  reportText += 'REPORTE DE CIERRE - RIOCAJA SMART\n';
+  reportText += '==================================\n\n';
+  reportText += 'FECHA: $dateStr\n';
+  reportText += 'CNB: BANCO DEL BARRIO\n\n';
 
-    if (count > 0) {
-      // INGRESOS
-      if (incomes.isNotEmpty) {
-        reportText += 'INGRESOS EFECTIVO\n';
-        reportText += '                    CANT    VALOR\n';
-        incomes.forEach((key, value) {
-          String tipo = key.toString().toUpperCase();
-          int cantidad = incomeCount[key] ?? 0;
-          String valorFormatted = (value as num).toStringAsFixed(2).padLeft(8);
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${valorFormatted}\n';
-        });
-        String totalIncomesFormatted = totalIncomes.toStringAsFixed(2).padLeft(8);
-        reportText += 'TOTAL INGRESOS      ${totalIncomeCount.toString().padLeft(4)} \$${totalIncomesFormatted}\n\n';
-      }
-
-      // EGRESOS
-      if (expenses.isNotEmpty) {
-        reportText += 'EGRESOS EFECTIVO\n';
-        reportText += '                    CANT    VALOR\n';
-        expenses.forEach((key, value) {
-          String tipo = key.toString().toUpperCase();
-          int cantidad = expenseCount[key] ?? 0;
-          String valorFormatted = (value as num).toStringAsFixed(2).padLeft(8);
-          reportText += '${tipo.padRight(20)} ${cantidad.toString().padLeft(4)} \$${valorFormatted}\n';
-        });
-        String totalExpensesFormatted = totalExpenses.toStringAsFixed(2).padLeft(8);
-        reportText += 'TOTAL EGRESOS       ${totalExpenseCount.toString().padLeft(4)} \$${totalExpensesFormatted}\n\n';
-      }
-
-      reportText += 'SALDO EN CAJA                \$${saldoEnCaja.toStringAsFixed(2)}\n';
-    } else {
-      reportText += 'NO HAY TRANSACCIONES PARA ESTA FECHA.\n';
+  if (count > 0) {
+    // ✅ INGRESOS EFECTIVO - Formato vertical
+    if (incomes.isNotEmpty) {
+      reportText += 'INGRESOS EFECTIVO\n';
+      reportText += '----------------------------------\n';
+      
+      incomes.forEach((key, value) {
+        String tipo = key.toString().toUpperCase();
+        int cantidad = incomeCount[key] ?? 0;
+        double valor = (value as num).toDouble();
+        
+        // ✅ FORMATO VERTICAL COMPATIBLE
+        reportText += '$tipo\n';
+        reportText += 'Cantidad: $cantidad - Valor: \$${valor.toStringAsFixed(2)}\n\n';
+      });
+      
+      reportText += 'TOTAL INGRESOS\n';
+      reportText += 'Cantidad: $totalIncomeCount - Valor: \$${totalIncomes.toStringAsFixed(2)}\n';
+      reportText += '----------------------------------\n\n';
     }
 
-    reportText += '\nGenerado el: ${DateFormat('dd/MM/yyyy HH:mm:ss').format(DateTime.now())}';
-    return reportText;
+    // ✅ EGRESOS EFECTIVO - Formato vertical
+    if (expenses.isNotEmpty) {
+      reportText += 'EGRESOS EFECTIVO\n';
+      reportText += '----------------------------------\n';
+      
+      expenses.forEach((key, value) {
+        String tipo = key.toString().toUpperCase();
+        int cantidad = expenseCount[key] ?? 0;
+        double valor = (value as num).toDouble();
+        
+        // ✅ FORMATO VERTICAL COMPATIBLE
+        reportText += '$tipo\n';
+        reportText += 'Cantidad: $cantidad - Valor: \$${valor.toStringAsFixed(2)}\n\n';
+      });
+      
+      reportText += 'TOTAL EGRESOS\n';
+      reportText += 'Cantidad: $totalExpenseCount - Valor: \$${totalExpenses.toStringAsFixed(2)}\n';
+      reportText += '----------------------------------\n\n';
+    }
+
+    // ✅ SALDO EN CAJA
+    reportText += '==================================\n';
+    reportText += 'SALDO EN CAJA: \$${saldoEnCaja.toStringAsFixed(2)}\n';
+    reportText += '==================================\n';
+  } else {
+    reportText += 'No hay transacciones para esta fecha\n\n';
   }
+
+  // ✅ TIMESTAMP
+  final now = DateTime.now();
+  final generatedAt = DateFormat('dd/MM/yyyy HH:mm:ss').format(now);
+  reportText += '\nGenerado el: $generatedAt';
+
+  return reportText;
+}
+
+// ✅ VERSIÓN ALTERNATIVA MÁS COMPACTA
+String generateCompactReportText(Map<String, dynamic> reportData, DateTime selectedDate) {
+  final dateStr = DateFormat('dd/MM/yyyy').format(selectedDate);
+  final incomes = reportData['incomes'] as Map<dynamic, dynamic>? ?? {};
+  final incomeCount = reportData['incomeCount'] as Map<dynamic, dynamic>? ?? {};
+  final expenses = reportData['expenses'] as Map<dynamic, dynamic>? ?? {};
+  final expenseCount = reportData['expenseCount'] as Map<dynamic, dynamic>? ?? {};
+  final totalIncomes = reportData['totalIncomes'] as double? ?? 0.0;
+  final totalExpenses = reportData['totalExpenses'] as double? ?? 0.0;
+  final totalIncomeCount = reportData['totalIncomeCount'] as int? ?? 0;
+  final totalExpenseCount = reportData['totalExpenseCount'] as int? ?? 0;
+  final saldoEnCaja = reportData['saldoEnCaja'] as double? ?? 0.0;
+  final count = reportData['count'] as int? ?? 0;
+
+  String reportText = '';
+  
+  // Encabezado compacto
+  reportText += '🏦 REPORTE DE CIERRE\n';
+  reportText += 'RíoCaja Smart\n\n';
+  reportText += '📅 $dateStr\n';
+  reportText += '🏢 BANCO DEL BARRIO\n\n';
+
+  if (count > 0) {
+    // INGRESOS
+    if (incomes.isNotEmpty) {
+      reportText += '📈 INGRESOS:\n';
+      incomes.forEach((key, value) {
+        String tipo = key.toString().toUpperCase();
+        int cantidad = incomeCount[key] ?? 0;
+        double valor = (value as num).toDouble();
+        reportText += '• $tipo: $cantidad x \$${valor.toStringAsFixed(2)}\n';
+      });
+      reportText += '💰 Total: $totalIncomeCount x \$${totalIncomes.toStringAsFixed(2)}\n\n';
+    }
+
+    // EGRESOS
+    if (expenses.isNotEmpty) {
+      reportText += '📉 EGRESOS:\n';
+      expenses.forEach((key, value) {
+        String tipo = key.toString().toUpperCase();
+        int cantidad = expenseCount[key] ?? 0;
+        double valor = (value as num).toDouble();
+        reportText += '• $tipo: $cantidad x \$${valor.toStringAsFixed(2)}\n';
+      });
+      reportText += '💸 Total: $totalExpenseCount x \$${totalExpenses.toStringAsFixed(2)}\n\n';
+    }
+
+    // SALDO
+    String emoji = saldoEnCaja >= 0 ? '✅' : '⚠️';
+    reportText += '$emoji SALDO EN CAJA: \$${saldoEnCaja.toStringAsFixed(2)}\n';
+  } else {
+    reportText += '❌ No hay transacciones para esta fecha\n';
+  }
+
+  return reportText;
+}
+
+// ✅ VERSIÓN CON FORMATO TABLA USANDO PUNTOS
+String generateDottedReportText(Map<String, dynamic> reportData, DateTime selectedDate) {
+  final dateStr = DateFormat('dd/MM/yyyy').format(selectedDate);
+  final incomes = reportData['incomes'] as Map<dynamic, dynamic>? ?? {};
+  final incomeCount = reportData['incomeCount'] as Map<dynamic, dynamic>? ?? {};
+  final expenses = reportData['expenses'] as Map<dynamic, dynamic>? ?? {};
+  final expenseCount = reportData['expenseCount'] as Map<dynamic, dynamic>? ?? {};
+  final totalIncomes = reportData['totalIncomes'] as double? ?? 0.0;
+  final totalExpenses = reportData['totalExpenses'] as double? ?? 0.0;
+  final totalIncomeCount = reportData['totalIncomeCount'] as int? ?? 0;
+  final totalExpenseCount = reportData['totalExpenseCount'] as int? ?? 0;
+  final saldoEnCaja = reportData['saldoEnCaja'] as double? ?? 0.0;
+  final count = reportData['count'] as int? ?? 0;
+
+  // Función para crear líneas con puntos
+  String createDottedLine(String label, String value, {int width = 30}) {
+    int dotsNeeded = width - label.length - value.length;
+    String dots = '.' * (dotsNeeded > 0 ? dotsNeeded : 1);
+    return '$label$dots$value';
+  }
+
+  String reportText = '';
+  
+  reportText += 'REPORTE DE CIERRE - RIOCAJA SMART\n';
+  reportText += 'FECHA: $dateStr\n';
+  reportText += 'CNB: BANCO DEL BARRIO\n\n';
+
+  if (count > 0) {
+    // INGRESOS
+    if (incomes.isNotEmpty) {
+      reportText += 'INGRESOS EFECTIVO\n';
+      incomes.forEach((key, value) {
+        String tipo = key.toString().toUpperCase();
+        int cantidad = incomeCount[key] ?? 0;
+        double valor = (value as num).toDouble();
+        
+        String label = '$tipo ($cantidad)';
+        String valorStr = '\$${valor.toStringAsFixed(2)}';
+        reportText += '${createDottedLine(label, valorStr)}\n';
+      });
+      
+      String totalLabel = 'TOTAL INGRESOS ($totalIncomeCount)';
+      String totalValor = '\$${totalIncomes.toStringAsFixed(2)}';
+      reportText += '${createDottedLine(totalLabel, totalValor)}\n\n';
+    }
+
+    // EGRESOS
+    if (expenses.isNotEmpty) {
+      reportText += 'EGRESOS EFECTIVO\n';
+      expenses.forEach((key, value) {
+        String tipo = key.toString().toUpperCase();
+        int cantidad = expenseCount[key] ?? 0;
+        double valor = (value as num).toDouble();
+        
+        String label = '$tipo ($cantidad)';
+        String valorStr = '\$${valor.toStringAsFixed(2)}';
+        reportText += '${createDottedLine(label, valorStr)}\n';
+      });
+      
+      String totalLabel = 'TOTAL EGRESOS ($totalExpenseCount)';
+      String totalValor = '\$${totalExpenses.toStringAsFixed(2)}';
+      reportText += '${createDottedLine(totalLabel, totalValor)}\n\n';
+    }
+
+    // SALDO
+    String saldoLabel = 'SALDO EN CAJA';
+    String saldoValor = '\$${saldoEnCaja.toStringAsFixed(2)}';
+    reportText += '${createDottedLine(saldoLabel, saldoValor)}\n';
+  }
+
+  final now = DateTime.now();
+  final generatedAt = DateFormat('dd/MM/yyyy HH:mm:ss').format(now);
+  reportText += '\nGenerado el: $generatedAt';
+
+  return reportText;
+}
 }
