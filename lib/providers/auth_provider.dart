@@ -231,60 +231,56 @@ class AuthProvider with ChangeNotifier {
   }
 
   // ✅ MODIFICADO: Login con verificación de términos
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password, {bool rememberMe = true}) async {
+    _isLoading = true;
+    _errorMessage = '';
+    _rememberMe = rememberMe;
+    notifyListeners();
+
     try {
-      _isLoading = true;
-      _errorMessage = '';
-      notifyListeners();
-
-      // Solo limpiar tokens sin hacer logout completo
-      _apiService.setAuthToken(null);
-
-      final result = await _authService.login(email, password);
-
-      _isLoading = false;
-
+      final result = await _authService.login(email, password, rememberMe: rememberMe);
+      
       if (result['success']) {
         _user = User.fromJson(result['user']);
-        _perfilCompleto = result['perfil_completo'] ?? false;
-        _codigoCorresponsal = result['codigo_corresponsal'];
-
-        // Determinar estado de autenticación basado en el rol
-        if (_user!.rol == 'admin' || _user!.rol == 'asesor') {
-          // Admin y asesores van directo al dashboard
-          _authStatus = AuthStatus.authenticated;
-          print('AuthProvider: Admin/Asesor autenticado - acceso completo');
+        
+        // Guardar email y nombre en SharedPreferences para PDF service
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_email', _user!.email);
+        await prefs.setString('user_name', _user!.nombre);
+        await prefs.setString('auth_token', _user!.token);
+        
+        print('📧 Email guardado para PDF service: ${_user!.email}');
+        print('👤 Nombre guardado para PDF service: ${_user!.nombre}');
+        print('🔑 Token guardado para PDF service: ${_user!.token.substring(0, 10)}...');
+        
+        // Configurar ApiService con el token
+        _apiService.setAuthToken(_user!.token);
+        
+        // Determinar estado según el rol y perfil
+        _perfilCompleto = _user!.perfilCompleto ?? false;
+        _codigoCorresponsal = _user!.codigoCorresponsal;
+        
+        if (_user!.rol == 'cnb' && !_perfilCompleto) {
+          _authStatus = AuthStatus.needsProfileCompletion;
         } else {
-          // Usuarios normales: verificar perfil completo
-          if (_perfilCompleto) {
-            _authStatus = AuthStatus.authenticated;
-            print('AuthProvider: Usuario normal autenticado - perfil completo');
-          } else {
-            _authStatus = AuthStatus.needsProfileCompletion;
-            print('AuthProvider: Usuario normal - necesita completar perfil');
-          }
+          _authStatus = AuthStatus.authenticated;
         }
-
-        // Sincronizar tokens con ApiService
-        _syncTokensWithApiService();
-
-        // ✅ NUEVO: Verificar términos inmediatamente después del login
-        await checkTermsAcceptance(_user!.id);
-
-        await _authService.setRememberMe(_rememberMe);
-
+        
+        print('✅ Login exitoso para: ${_user!.email}');
+        _isLoading = false;
         notifyListeners();
         return true;
       } else {
-        _errorMessage = result['message'];
+        _errorMessage = result['message'] ?? 'Error desconocido';
         _authStatus = AuthStatus.unauthenticated;
+        _isLoading = false;
         notifyListeners();
         return false;
       }
     } catch (e) {
-      _isLoading = false;
-      _errorMessage = 'Error: $e';
+      _errorMessage = 'Error de conexión: $e';
       _authStatus = AuthStatus.unauthenticated;
+      _isLoading = false;
       notifyListeners();
       return false;
     }

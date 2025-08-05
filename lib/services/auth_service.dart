@@ -465,7 +465,7 @@ Future<bool> refreshAccessToken() async {
     }
   }
   
-  // Guardar datos de usuario incluyendo refresh token
+  // Guardar datos de usuario incluyendo refresh token y email/nombre para PDF service
   Future<void> _saveUserData() async {
     try {
       if (_currentUser != null) {
@@ -474,6 +474,13 @@ Future<bool> refreshAccessToken() async {
         // Guardar datos del usuario
         await prefs.setString(USER_DATA_KEY, jsonEncode(_currentUser!.toJson()));
         await prefs.setBool(REMEMBER_ME_KEY, true);
+
+        // Guardar el email y nombre por separado para otros servicios (ej: PDF)
+        await prefs.setString('user_email', _currentUser!.email);
+        await prefs.setString('user_name', _currentUser!.nombre);
+
+        print('📧 Email guardado en SharedPreferences: ${_currentUser!.email}');
+        print('👤 Nombre guardado en SharedPreferences: ${_currentUser!.nombre}');
         
         // Guardar refresh token por separado para mayor seguridad
         if (_refreshToken != null) {

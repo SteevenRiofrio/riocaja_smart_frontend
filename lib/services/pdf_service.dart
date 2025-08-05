@@ -10,7 +10,7 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class PdfService {
-  static const String baseUrl = 'https://tu-backend-url.com/api';
+  static const String baseUrl = 'https://riocajasmartbackend-production.up.railway.app/api/v1';
 
   Future<bool> generateAndSharePdf(Map<String, dynamic> reportData, DateTime selectedDate) async {
     try {
