@@ -237,60 +237,228 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  // Generar y compartir PDF
+  // Método actualizado para generar PDF y enviar por correo
   Future<void> _generatePDF() async {
     try {
       if (_reportData.isEmpty || (_reportData['count'] as int? ?? 0) == 0) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('No hay datos para generar PDF')),
+          SnackBar(content: Text('No hay datos para generar el reporte')),
         );
         return;
       }
 
-      // Mostrar indicador de carga
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Dialog(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                  Text('Generando PDF...'),
+                  SizedBox(height: 8),
+                  Text(
+                    'Compartiendo y enviando por correo',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
               ),
-              SizedBox(width: 12),
-              Text('Generando PDF...'),
-            ],
-          ),
-          duration: Duration(seconds: 3),
-        ),
+            ),
+          );
+        },
       );
 
-      final success = await _pdfService.generateAndSharePDF(_reportData, _selectedDate);
-      
+      final success = await _pdfService.generateAndSharePdf(_reportData, _selectedDate);
+
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('PDF generado y compartido exitosamente'),
-            backgroundColor: Colors.green,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'PDF generado exitosamente',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        Text(
+                          'Compartido y enviado por correo como respaldo',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
       } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.error, color: Colors.white),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text('Error al generar o enviar el PDF'),
+                  ),
+                ],
+              ),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error al generar PDF'),
+            content: Text('Error inesperado al generar PDF'),
             backgroundColor: Colors.red,
           ),
         );
       }
-    } catch (e) {
-      print('Error al generar PDF: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error al generar PDF: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
+  }
+
+  // Diálogo de confirmación (opcional)
+  Future<bool> _showConfirmationDialog() async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.picture_as_pdf, color: Colors.red),
+              SizedBox(width: 8),
+              Text('Generar PDF'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Se realizarán las siguientes acciones:'),
+              SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.share, size: 16, color: Colors.blue),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Compartir PDF con otras aplicaciones')),
+                ],
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  Icon(Icons.email, size: 16, color: Colors.orange),
+                  SizedBox(width: 8),
+                  Expanded(child: Text('Enviar automáticamente por correo como respaldo')),
+                ],
+              ),
+              SizedBox(height: 12),
+              Text(
+                '¿Deseas continuar?',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('Cancelar'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.picture_as_pdf, size: 16),
+                  SizedBox(width: 4),
+                  Text('Generar'),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    ) ?? false;
+  }
+
+  // Método para generar PDF con confirmación (opcional)
+  Future<void> _generatePDFWithConfirmation() async {
+    final confirm = await _showConfirmationDialog();
+    if (!confirm) return;
+    await _generatePDF();
+  }
+
+  // Widget de botones de acción (actualiza tu build para usarlo)
+  Widget _buildActionButtons() {
+    return Container(
+      padding: EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _shareReport,
+              icon: Icon(Icons.share, size: 20),
+              label: Text('Compartir\nTexto'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey[600],
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+          SizedBox(width: 12),
+          Expanded(
+            flex: 2,
+            child: ElevatedButton.icon(
+              onPressed: _generatePDF, // O _generatePDFWithConfirmation si quieres confirmación
+              icon: Icon(Icons.picture_as_pdf, size: 20),
+              label: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Generar PDF'),
+                  Text(
+                    'y Enviar por Correo',
+                    style: TextStyle(fontSize: 10),
+                  ),
+                ],
+              ),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red[600],
+                foregroundColor: Colors.white,
+                padding: EdgeInsets.symmetric(vertical: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
