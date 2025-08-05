@@ -1,14 +1,19 @@
 // lib/services/pdf_service.dart
+import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:riocaja_smart_frontend/services/auth_service.dart';
 import 'package:share_plus/share_plus.dart';
 
 class PdfService {
-  
-  // Generar y compartir PDF del reporte
+  final AuthService _authService = AuthService();
+  static const String baseUrl = 'https://tu-backend-url.com/api';
+
+  // Generar y compartir PDF + enviar por correo
   Future<bool> generateAndSharePDF(Map<String, dynamic> reportData, DateTime selectedDate) async {
     try {
       final pdf = pw.Document();
@@ -68,10 +73,66 @@ class PdfService {
         ),
       );
 
-      // Guardar y compartir
-      return await _savePdf(pdf, selectedDate, dateStr);
+      // Guardar PDF temporalmente
+      final tempDir = await getTemporaryDirectory();
+      final fechaGuiones = DateFormat('dd-MM-yyyy').format(selectedDate);
+      final filePath = '${tempDir.path}/reporte_cierre_${fechaGuiones}.pdf';
+      final file = File(filePath);
+      await file.writeAsBytes(await pdf.save());
+
+      // Compartir por apps nativas
+      final shareResult = await Share.shareXFiles([XFile(filePath)], subject: 'Reporte de Cierre - $dateStr');
+
+      // Enviar por correo automático
+      final emailResult = await _sendPdfByEmail(filePath, 'reporte_cierre_${fechaGuiones}.pdf', dateStr, reportData);
+
+      return emailResult; // true si el correo fue exitoso
     } catch (e) {
       print('Error al generar PDF: $e');
+      return false;
+    }
+  }
+
+  // Enviar PDF por correo usando backend
+  Future<bool> _sendPdfByEmail(String filePath, String fileName, String dateStr, Map<String, dynamic> reportData) async {
+    try {
+      final userInfo = await _authService.getCurrentUserInfo();
+      if (userInfo == null) return false;
+      final userEmail = userInfo['email'] ?? '';
+      final userName = userInfo['nombre'] ?? 'Usuario';
+      if (userEmail.isEmpty) return false;
+
+      final file = File(filePath);
+      final pdfBytes = await file.readAsBytes();
+      final pdfBase64 = base64Encode(pdfBytes);
+
+      final reportSummary = {
+        'total_ingresos': reportData['totalIncomes'] ?? 0,
+        'total_egresos': reportData['totalExpenses'] ?? 0,
+        'saldo_en_caja': reportData['saldoEnCaja'] ?? 0,
+        'total_transacciones': reportData['count'] ?? 0,
+        'estado_caja': (reportData['saldoEnCaja'] ?? 0) >= 0 ? 'POSITIVO' : 'NEGATIVO',
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/send-pdf-report'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${await _authService.getToken()}',
+        },
+        body: jsonEncode({
+          'recipient_email': userEmail,
+          'recipient_name': userName,
+          'report_date': dateStr,
+          'pdf_filename': fileName,
+          'pdf_base64': pdfBase64,
+          'report_summary': reportSummary,
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error en _sendPdfByEmail: $e');
       return false;
     }
   }
@@ -243,24 +304,5 @@ class PdfService {
       '© RIOCAJA SMART ${DateTime.now().year}',
       style: pw.TextStyle(fontSize: 10),
     );
-  }
-
-  // Guardar y compartir PDF
-  Future<bool> _savePdf(pw.Document pdf, DateTime selectedDate, String dateStr) async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final fechaGuiones = DateFormat('dd-MM-yyyy').format(selectedDate);
-      final filePath = '${tempDir.path}/reporte_cierre_${fechaGuiones}.pdf';
-      final file = File(filePath);
-      
-      await file.writeAsBytes(await pdf.save());
-      
-      await Share.shareXFiles([XFile(filePath)], subject: 'Reporte de Cierre - $dateStr');
-      
-      return true;
-    } catch (e) {
-      print('Error al guardar PDF: $e');
-      return false;
-    }
   }
 }
