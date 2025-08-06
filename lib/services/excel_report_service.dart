@@ -1,4 +1,4 @@
-// lib/services/excel_report_service.dart - CÓDIGO COMPLETO Y LIMPIO
+// lib/services/excel_report_service.dart - CÓDIGO ADAPTADO CON FORMATO CORRECTO
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -37,7 +37,8 @@ class ExcelReportService {
       final excel = Excel.createExcel();
       final sheet = excel['Reporte Diario'];
       
-      await _buildDailyReportSheet(sheet, receipts, date);
+      // ✅ USAR EL NUEVO FORMATO CORRECTO
+      await _buildDailyReportSheetCorrectFormat(sheet, receipts, date);
       
       final fileName = 'Reporte_Diario_${DateFormat('dd-MM-yyyy').format(date)}.xlsx';
       
@@ -53,6 +54,127 @@ class ExcelReportService {
       if (autoShare) _showError('Error generando reporte diario: $e');
       print('Error generando reporte diario: $e');
       return false;
+    }
+  }
+
+  // ✅ NUEVO MÉTODO CON FORMATO CORRECTO BASADO EN EL ARCHIVO BUENO
+  Future<void> _buildDailyReportSheetCorrectFormat(Sheet sheet, List<Receipt> receipts, DateTime date) async {
+    try {
+      print('📊 Construyendo reporte diario con FORMATO CORRECTO para ${_formatDate(date)}');
+      
+      int currentRow = 0;
+
+      // ===== FILA 1: TÍTULO PRINCIPAL =====
+      _addCell(sheet, 0, currentRow, 'REPORTE DIARIO - RIOCAJA SMART');
+      currentRow++;
+
+      // ===== FILA 2: SECCIÓN RESUMEN =====
+      _addCell(sheet, 0, currentRow, 'RESUMEN');
+      currentRow++;
+
+      // ===== FILA 3: HEADERS DEL RESUMEN =====
+      _addCell(sheet, 0, currentRow, 'FECHA');
+      _addCell(sheet, 1, currentRow, 'TRANSACCIONES');
+      _addCell(sheet, 2, currentRow, 'INGRESOS');
+      _addCell(sheet, 3, currentRow, 'EGRESOS');
+      _addCell(sheet, 4, currentRow, 'SALDO');
+      currentRow++;
+
+      // ===== FILA 4: DATOS DEL RESUMEN =====
+      // Calcular totales usando la misma lógica que el archivo bueno
+      double totalIngresos = 0;
+double totalEgresos = 0;
+
+for (final receipt in receipts) {
+  String tipoUpper = receipt.tipo.toUpperCase();
+  
+  // ✅ CLASIFICACIÓN CORREGIDA BASADA EN EL PDF
+  bool esIngreso = tipoUpper.contains('PAGO DE SERVICIO') || 
+                   tipoUpper.contains('RECARGA CLARO') ||
+                   tipoUpper.contains('RECARGA') ||
+                   tipoUpper.contains('DEPÓSITO') || 
+                   tipoUpper.contains('DEPOSITO') ||
+                   tipoUpper.contains('ENVIO GIRO');
+                   
+  bool esEgreso = tipoUpper.contains('RETIRO') ||
+                  tipoUpper.contains('EFECTIVO MOVIL') ||
+                  tipoUpper.contains('EFECTIVO MÓVIL');
+  
+  if (esIngreso) {
+    totalIngresos += receipt.valorTotal;
+    print('📈 INGRESO: ${receipt.tipo} - \$${receipt.valorTotal}');
+  } else if (esEgreso) {
+    totalEgresos += receipt.valorTotal;
+    print('📉 EGRESO: ${receipt.tipo} - \$${receipt.valorTotal}');
+  } else {
+    // Para tipos no clasificados, mostrar advertencia
+    print('⚠️ TIPO NO CLASIFICADO: ${receipt.tipo} - \$${receipt.valorTotal}');
+    // Por defecto, considerarlo como egreso para no perder el registro
+    totalEgresos += receipt.valorTotal;
+  }
+}
+
+double saldo = totalIngresos - totalEgresos;
+
+print('🧮 TOTALES CALCULADOS:');
+print('   - Ingresos: \$${totalIngresos.toStringAsFixed(2)}');
+print('   - Egresos: \$${totalEgresos.toStringAsFixed(2)}');
+print('   - Saldo: \$${saldo.toStringAsFixed(2)}');
+print('   - Total transacciones: ${receipts.length}');
+
+// Escribir datos del resumen
+_addCell(sheet, 0, currentRow, DateFormat('dd/MM/yyyy').format(date));
+_addCell(sheet, 1, currentRow, receipts.length.toString());
+_addCell(sheet, 2, currentRow, '\$${totalIngresos.toStringAsFixed(2)}');
+_addCell(sheet, 3, currentRow, '\$${totalEgresos.toStringAsFixed(2)}');
+_addCell(sheet, 4, currentRow, '\$${saldo.toStringAsFixed(2)}');
+currentRow++;
+
+      // ===== FILA 5: FILA VACÍA =====
+      currentRow++;
+
+      // ===== FILA 6: TÍTULO DE DETALLE =====
+      _addCell(sheet, 0, currentRow, 'DETALLE COMPLETO DE TRANSACCIONES');
+      currentRow++;
+
+      // ===== FILA 7: HEADERS DE LA TABLA =====
+      _addCell(sheet, 0, currentRow, 'FECHA');
+      _addCell(sheet, 1, currentRow, 'HORA');
+      _addCell(sheet, 2, currentRow, 'TIPO');
+      _addCell(sheet, 3, currentRow, 'TRANSACCIÓN');
+      _addCell(sheet, 4, currentRow, 'VALOR');
+      _addCell(sheet, 5, currentRow, 'CLASIFICACIÓN');
+      currentRow++;
+
+      // ===== FILAS 8+: DATOS DE LAS TRANSACCIONES =====
+      // Ordenar por hora (como en el archivo bueno)
+      receipts.sort((a, b) => a.hora.compareTo(b.hora));
+      
+      for (final receipt in receipts) {
+        // Determinar clasificación usando la misma lógica
+        String clasificacion = 'EGRESO';
+        String tipoUpper = receipt.tipo.toUpperCase();
+        if (tipoUpper.contains('DEPÓSITO') || 
+            tipoUpper.contains('DEPOSITO') ||
+            tipoUpper.contains('RECARGA') ||
+            tipoUpper.contains('PAGO DE SERVICIO') ||
+            tipoUpper.contains('ENVIO GIRO')) {
+          clasificacion = 'INGRESO';
+        }
+
+        _addCell(sheet, 0, currentRow, receipt.fecha);
+        _addCell(sheet, 1, currentRow, receipt.hora);
+        _addCell(sheet, 2, currentRow, receipt.tipo);
+        _addCell(sheet, 3, currentRow, receipt.nroTransaccion);
+        _addCell(sheet, 4, currentRow, '\$${receipt.valorTotal.toStringAsFixed(2)}');
+        _addCell(sheet, 5, currentRow, clasificacion);
+        currentRow++;
+      }
+
+      print('✅ Reporte diario con formato correcto construido exitosamente con ${receipts.length} comprobantes');
+    } catch (e) {
+      print('❌ Error construyendo reporte diario con formato correcto: $e');
+      throw Exception('Error construyendo reporte: $e');
     }
   }
 
@@ -74,7 +196,7 @@ class ExcelReportService {
     }
   }
 
-  // Generar reporte por rango de fechas
+  // Generar reporte por rango de fechas (ADAPTADO AL NUEVO FORMATO)
   Future<bool> generateRangeReport(DateTime startDate, DateTime endDate) async {
     try {
       final receipts = await _getReceiptsByDateRange(startDate, endDate);
@@ -86,7 +208,8 @@ class ExcelReportService {
       final excel = Excel.createExcel();
       final sheet = excel['Reporte Rango'];
       
-      await _buildRangeReportSheet(sheet, receipts, startDate, endDate);
+      // ✅ USAR FORMATO CORRECTO PARA RANGO
+      await _buildRangeReportSheetCorrectFormat(sheet, receipts, startDate, endDate);
       
       final startStr = DateFormat('dd-MM-yyyy').format(startDate);
       final endStr = DateFormat('dd-MM-yyyy').format(endDate);
@@ -96,6 +219,109 @@ class ExcelReportService {
     } catch (e) {
       _showError('Error generando reporte por rango: $e');
       return false;
+    }
+  }
+
+  // ✅ CONSTRUIR REPORTE POR RANGO CON FORMATO CORRECTO
+  Future<void> _buildRangeReportSheetCorrectFormat(Sheet sheet, List<Receipt> receipts, DateTime startDate, DateTime endDate) async {
+    try {
+      print('📊 Construyendo reporte por rango con formato correcto');
+      
+      int currentRow = 0;
+
+      // ===== FILA 1: TÍTULO PRINCIPAL =====
+      _addCell(sheet, 0, currentRow, 'REPORTE POR RANGO - RIOCAJA SMART');
+      currentRow++;
+
+      // ===== FILA 2: SECCIÓN RESUMEN =====
+      _addCell(sheet, 0, currentRow, 'RESUMEN');
+      currentRow++;
+
+      // ===== FILA 3: HEADERS DEL RESUMEN =====
+      _addCell(sheet, 0, currentRow, 'FECHA');
+      _addCell(sheet, 1, currentRow, 'TRANSACCIONES');
+      _addCell(sheet, 2, currentRow, 'INGRESOS');
+      _addCell(sheet, 3, currentRow, 'EGRESOS');
+      _addCell(sheet, 4, currentRow, 'SALDO');
+      currentRow++;
+
+      // ===== CALCULAR TOTALES =====
+      double totalIngresos = 0;
+      double totalEgresos = 0;
+      
+      for (final receipt in receipts) {
+        String tipoUpper = receipt.tipo.toUpperCase();
+        if (tipoUpper.contains('DEPÓSITO') || 
+            tipoUpper.contains('DEPOSITO') ||
+            tipoUpper.contains('RECARGA') ||
+            tipoUpper.contains('PAGO DE SERVICIO') ||
+            tipoUpper.contains('ENVIO GIRO')) {
+          totalIngresos += receipt.valorTotal;
+        } else if (tipoUpper.contains('RETIRO')) {
+          totalEgresos += receipt.valorTotal;
+        }
+      }
+
+      double saldo = totalIngresos - totalEgresos;
+
+      // ===== FILA 4: DATOS DEL RESUMEN =====
+      String rangoFechas = '${DateFormat('dd/MM/yyyy').format(startDate)} - ${DateFormat('dd/MM/yyyy').format(endDate)}';
+      _addCell(sheet, 0, currentRow, rangoFechas);
+      _addCell(sheet, 1, currentRow, receipts.length.toString());
+      _addCell(sheet, 2, currentRow, '\$${totalIngresos.toStringAsFixed(2)}');
+      _addCell(sheet, 3, currentRow, '\$${totalEgresos.toStringAsFixed(2)}');
+      _addCell(sheet, 4, currentRow, '\$${saldo.toStringAsFixed(2)}');
+      currentRow++;
+
+      // ===== FILA 5: FILA VACÍA =====
+      currentRow++;
+
+      // ===== FILA 6: TÍTULO DE DETALLE =====
+      _addCell(sheet, 0, currentRow, 'DETALLE COMPLETO DE TRANSACCIONES');
+      currentRow++;
+
+      // ===== FILA 7: HEADERS DE LA TABLA =====
+      _addCell(sheet, 0, currentRow, 'FECHA');
+      _addCell(sheet, 1, currentRow, 'HORA');
+      _addCell(sheet, 2, currentRow, 'TIPO');
+      _addCell(sheet, 3, currentRow, 'TRANSACCIÓN');
+      _addCell(sheet, 4, currentRow, 'VALOR');
+      _addCell(sheet, 5, currentRow, 'CLASIFICACIÓN');
+      currentRow++;
+
+      // ===== FILAS 8+: DATOS DE LAS TRANSACCIONES =====
+      // Ordenar por fecha y hora
+      receipts.sort((a, b) {
+        final dateComparison = a.fecha.compareTo(b.fecha);
+        if (dateComparison != 0) return dateComparison;
+        return a.hora.compareTo(b.hora);
+      });
+      
+      for (final receipt in receipts) {
+        // Determinar clasificación
+        String clasificacion = 'EGRESO';
+        String tipoUpper = receipt.tipo.toUpperCase();
+        if (tipoUpper.contains('DEPÓSITO') || 
+            tipoUpper.contains('DEPOSITO') ||
+            tipoUpper.contains('RECARGA') ||
+            tipoUpper.contains('PAGO DE SERVICIO') ||
+            tipoUpper.contains('ENVIO GIRO')) {
+          clasificacion = 'INGRESO';
+        }
+
+        _addCell(sheet, 0, currentRow, receipt.fecha);
+        _addCell(sheet, 1, currentRow, receipt.hora);
+        _addCell(sheet, 2, currentRow, receipt.tipo);
+        _addCell(sheet, 3, currentRow, receipt.nroTransaccion);
+        _addCell(sheet, 4, currentRow, '\$${receipt.valorTotal.toStringAsFixed(2)}');
+        _addCell(sheet, 5, currentRow, clasificacion);
+        currentRow++;
+      }
+
+      print('✅ Reporte por rango con formato correcto construido exitosamente');
+    } catch (e) {
+      print('❌ Error construyendo reporte por rango: $e');
+      throw Exception('Error construyendo reporte por rango: $e');
     }
   }
 
@@ -191,115 +417,6 @@ class ExcelReportService {
       print('❌ Error obteniendo comprobantes por rango de fechas: $e');
       return [];
     }
-  }
-
-  // ✅ CONSTRUIR REPORTE DIARIO
-  Future<void> _buildDailyReportSheet(Sheet sheet, List<Receipt> receipts, DateTime date) async {
-    try {
-      print('📊 Construyendo reporte diario para ${_formatDate(date)}');
-      // Configurar ancho de columnas
-      sheet.setColumnWidth(0, 12); // Fecha
-      sheet.setColumnWidth(1, 12); // Hora
-      sheet.setColumnWidth(2, 20); // Tipo
-      sheet.setColumnWidth(3, 18); // Nro Transacción
-      sheet.setColumnWidth(4, 15); // Valor
-      sheet.setColumnWidth(5, 20); // Corresponsal
-
-      // Headers
-      final List<String> headers = [
-        'Fecha',
-        'Hora',
-        'Tipo de Servicio',
-        'Nro. Transacción',
-        'Valor Total'
-      ];
-      if (receipts.any((r) => r.codigoCorresponsal != null)) {
-        headers.add('Código Corresponsal');
-      }
-
-      // Escribir headers
-      for (int i = 0; i < headers.length; i++) {
-        final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
-        cell.value = TextCellValue(headers[i]);
-      }
-
-      // Escribir datos
-      for (int i = 0; i < receipts.length; i++) {
-        final receipt = receipts[i];
-        final rowIndex = i + 1;
-
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 0, rowIndex: rowIndex)).value =
-            TextCellValue(receipt.fecha);
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 1, rowIndex: rowIndex)).value =
-            TextCellValue(receipt.hora);
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 2, rowIndex: rowIndex)).value =
-            TextCellValue(receipt.tipo);
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: rowIndex)).value =
-            TextCellValue(receipt.nroTransaccion);
-        sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: rowIndex)).value =
-            DoubleCellValue(receipt.valorTotal);
-
-        if (headers.length > 5 && receipt.codigoCorresponsal != null) {
-          sheet.cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: rowIndex)).value =
-              TextCellValue(receipt.codigoCorresponsal!);
-        }
-      }
-
-      // Agregar totales al final
-      final totalRow = receipts.length + 2;
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: totalRow)).value = TextCellValue('TOTAL:');
-      final total = receipts.fold<double>(0.0, (sum, receipt) => sum + receipt.valorTotal);
-      sheet.cell(CellIndex.indexByColumnRow(columnIndex: 4, rowIndex: totalRow)).value = DoubleCellValue(total);
-      print('✅ Reporte diario construido exitosamente con ${receipts.length} comprobantes');
-    } catch (e) {
-      print('❌ Error construyendo reporte diario: $e');
-      throw Exception('Error construyendo reporte: $e');
-    }
-  }
-
-  // Construir hoja de reporte por rango
-  Future<void> _buildRangeReportSheet(Sheet sheet, List<Receipt> receipts, DateTime startDate, DateTime endDate) async {
-    int row = 0;
-    
-    // HEADER
-    _addHeaderCell(sheet, 0, row, 'REPORTE POR RANGO - RIOCAJA SMART', isTitle: true);
-    row += 2;
-    
-    _addCell(sheet, 0, row, 'Desde:');
-    _addCell(sheet, 1, row, DateFormat('dd/MM/yyyy').format(startDate));
-    row++;
-    
-    _addCell(sheet, 0, row, 'Hasta:');
-    _addCell(sheet, 1, row, DateFormat('dd/MM/yyyy').format(endDate));
-    row++;
-    
-    _addCell(sheet, 0, row, 'Días incluidos:');
-    _addCell(sheet, 1, row, endDate.difference(startDate).inDays + 1);
-    row += 2;
-
-    // RESUMEN POR DÍAS
-    final dailySummary = _generateDailySummary(receipts);
-    _addHeaderCell(sheet, 0, row, 'RESUMEN POR DÍAS');
-    row++;
-    
-    _addHeaderCell(sheet, 0, row, 'FECHA');
-    _addHeaderCell(sheet, 1, row, 'TRANSACCIONES');
-    _addHeaderCell(sheet, 2, row, 'INGRESOS');
-    _addHeaderCell(sheet, 3, row, 'EGRESOS');
-    _addHeaderCell(sheet, 4, row, 'SALDO');
-    row++;
-
-    for (final day in dailySummary.entries) {
-      _addCell(sheet, 0, row, day.key);
-      _addCell(sheet, 1, row, day.value['count'].toString());
-      _addCurrencyCell(sheet, 2, row, day.value['incomes']);
-      _addCurrencyCell(sheet, 3, row, day.value['expenses']);
-      _addCurrencyCell(sheet, 4, row, day.value['balance']);
-      row++;
-    }
-    
-    row += 2;
-    await _addDetailedTransactions(sheet, receipts, row);
   }
 
   // Construir hoja de reporte semanal
@@ -582,17 +699,44 @@ class ExcelReportService {
   }
 
   String _classifyTransaction(String tipo) {
-    final incomeTypes = {'DEPOSITO', 'PAGO DE SERVICIO', 'RECARGA CLARO', 'ENVIO GIRO'};
-    return incomeTypes.contains(tipo.toUpperCase()) ? 'INGRESO' : 'EGRESO';
+  String tipoUpper = tipo.toUpperCase();
+  
+  // ✅ CLASIFICACIÓN CORREGIDA BASADA EN EL PDF
+  bool esIngreso = tipoUpper.contains('PAGO DE SERVICIO') || 
+                   tipoUpper.contains('RECARGA CLARO') ||
+                   tipoUpper.contains('RECARGA') ||
+                   tipoUpper.contains('DEPÓSITO') || 
+                   tipoUpper.contains('DEPOSITO') ||
+                   tipoUpper.contains('ENVIO GIRO');
+                   
+  bool esEgreso = tipoUpper.contains('RETIRO') ||
+                  tipoUpper.contains('EFECTIVO MOVIL') ||
+                  tipoUpper.contains('EFECTIVO MÓVIL');
+  
+  if (esIngreso) {
+    return 'INGRESO';
+  } else if (esEgreso) {
+    return 'EGRESO';
+  } else {
+    // Para tipos no clasificados, log de advertencia y clasificar como egreso por defecto
+    print('⚠️ Tipo de transacción no clasificado: $tipo');
+    return 'EGRESO';
   }
+}
 
   // MÉTODOS AUXILIARES PARA EXCEL
   void _addCell(Sheet sheet, int col, int row, dynamic value) {
     final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-    cell.value = value is String ? TextCellValue(value) : 
-                 value is int ? IntCellValue(value) :
-                 value is double ? DoubleCellValue(value) :
-                 TextCellValue(value.toString());
+    
+    if (value is String) {
+      cell.value = TextCellValue(value);
+    } else if (value is int) {
+      cell.value = IntCellValue(value);
+    } else if (value is double) {
+      cell.value = DoubleCellValue(value);
+    } else {
+      cell.value = TextCellValue(value.toString());
+    }
   }
 
   void _addHeaderCell(Sheet sheet, int col, int row, String value, {bool isTitle = false}) {
@@ -610,7 +754,7 @@ class ExcelReportService {
 
   void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
     final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-    cell.value = TextCellValue('\$${value.toStringAsFixed(2)}');
+    cell.value = TextCellValue('\${value.toStringAsFixed(2)}');
   }
 
   // ✅ GUARDAR Y COMPARTIR EXCEL

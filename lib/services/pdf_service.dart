@@ -128,7 +128,6 @@ class PdfService {
     }
   }
 
-  // ✅ ENVIAR AMBOS ARCHIVOS POR CORREO
   Future<bool> _sendBothFilesByEmail(String pdfFilePath, String pdfFileName, String? excelFilePath, String dateStr, Map<String, dynamic> reportData) async {
   try {
     print('📧 Enviando por correo: PDF + Excel...');
@@ -154,89 +153,60 @@ class PdfService {
 
     final reportSummary = _generateReportSummary(reportData);
 
-    // Preparar datos del email con estructura simplificada
+    // ✅ USAR LA ESTRUCTURA CORRECTA DEL BACKEND
     Map<String, dynamic> emailData = {
       'recipient_email': userEmail,
       'recipient_name': userName,
-      'subject': '📊 Reporte de Cierre - $dateStr - RíoCaja Smart',
-      'message_type': 'backup_report',
       'report_date': dateStr,
+      'pdf_filename': pdfFileName,
+      'pdf_base64': pdfBase64, // ✅ Cambiado de 'content' a 'pdf_base64'
       'report_summary': reportSummary,
-      'attachments': []
     };
-
-    // Agregar PDF como adjunto
-    emailData['attachments'].add({
-      'filename': pdfFileName,
-      'content': pdfBase64,
-      'content_type': 'application/pdf'
-    });
 
     // ✅ AGREGAR EXCEL SI EXISTE
     if (excelFilePath != null && File(excelFilePath).existsSync()) {
       final excelFile = File(excelFilePath);
       final excelBytes = await excelFile.readAsBytes();
       final excelBase64 = base64Encode(excelBytes);
+      final excelFileName = excelFile.path.split('/').last;
       
-      emailData['attachments'].add({
-        'filename': excelFile.path.split('/').last,
-        'content': excelBase64,
-        'content_type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
+      emailData['excel_filename'] = excelFileName;
+      emailData['excel_base64'] = excelBase64; // ✅ Cambiado de 'content' a 'excel_base64'
       
-      print('📊 Excel incluido en correo: ${excelFile.path.split('/').last}');
+      print('📊 Excel incluido en correo: $excelFileName');
     } else {
       print('📧 Enviando solo PDF por correo (Excel no disponible)');
     }
 
-    // ✅ INTENTAR MÚLTIPLES ENDPOINTS HASTA QUE UNO FUNCIONE
-    final List<String> endpoints = [
-      '$baseUrl/email/send',                    // Endpoint genérico de email
-      '$baseUrl/notifications/send-email',      // Endpoint de notificaciones
-      '$baseUrl/reports/send-email',            // Endpoint de reportes
-      '$baseUrl/send-email',                    // Endpoint simple
-    ];
+    // ✅ USAR EL ENDPOINT CORRECTO QUE EXISTE EN EL BACKEND
+    final String correctEndpoint = '$baseUrl/send-pdf-report';
 
-    bool emailSent = false;
-    String lastError = '';
+    try {
+      print('🔄 Enviando a endpoint correcto: $correctEndpoint');
+      
+      final response = await http.post(
+        Uri.parse(correctEndpoint),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+        body: jsonEncode(emailData),
+      );
 
-    for (String endpoint in endpoints) {
-      try {
-        print('🔄 Intentando endpoint: $endpoint');
-        
-        final response = await http.post(
-          Uri.parse(endpoint),
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $token',
-          },
-          body: jsonEncode(emailData),
-        );
-
-        print('📧 Respuesta de $endpoint: ${response.statusCode}');
-        
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          print('✅ Email enviado exitosamente via: $endpoint');
-          emailSent = true;
-          break;
-        } else {
-          print('❌ Error en $endpoint: ${response.statusCode} - ${response.body}');
-          lastError = 'Error ${response.statusCode}: ${response.body}';
-        }
-      } catch (e) {
-        print('❌ Error conectando a $endpoint: $e');
-        lastError = 'Error de conexión: $e';
-        continue;
+      print('📧 Respuesta del servidor: ${response.statusCode}');
+      print('📧 Cuerpo de respuesta: ${response.body}');
+      
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Email enviado exitosamente');
+        return true;
+      } else {
+        print('❌ Error del servidor: ${response.statusCode} - ${response.body}');
+        return false;
       }
+    } catch (e) {
+      print('❌ Error conectando al servidor: $e');
+      return false;
     }
-
-    if (emailSent) {
-      return true;
-    }
-
-    // Si ningún endpoint funcionó, intentar método alternativo
-    print('🔄 Todos los endpoints fallaron, intentando método alternativo...');
-    return await _sendEmailViaAlternativeMethod(userEmail, userName, dateStr, pdfFilePath, excelFilePath, reportSummary);
 
   } catch (e) {
     print('❌ Error en _sendBothFilesByEmail: $e');
