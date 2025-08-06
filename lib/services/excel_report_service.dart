@@ -1,4 +1,4 @@
-// lib/services/excel_report_service.dart
+// lib/services/excel_report_service.dart - CÓDIGO COMPLETO Y LIMPIO
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -24,13 +24,13 @@ class ExcelReportService {
     _apiService.setAuthToken(token);
   }
 
-  // Generar reporte por día específico
-  Future<bool> generateDailyReport(DateTime date) async {
+  // ✅ MÉTODO PRINCIPAL CON PARÁMETRO autoShare
+  Future<bool> generateDailyReport(DateTime date, {bool autoShare = true}) async {
     try {
-      final dateStr = _formatDate(date); // "dd/MM/yyyy"
-      final receipts = await _getReceiptsByDate(dateStr); // String
+      final dateStr = _formatDate(date);
+      final receipts = await _getReceiptsByDate(dateStr);
       if (receipts.isEmpty) {
-        _showMessage('No hay comprobantes para la fecha seleccionada');
+        if (autoShare) _showMessage('No hay comprobantes para la fecha seleccionada');
         return false;
       }
 
@@ -40,9 +40,36 @@ class ExcelReportService {
       await _buildDailyReportSheet(sheet, receipts, date);
       
       final fileName = 'Reporte_Diario_${DateFormat('dd-MM-yyyy').format(date)}.xlsx';
-      return await _saveAndShareExcel(excel, fileName);
+      
+      // ✅ COMPORTAMIENTO DIFERENTE SEGÚN autoShare
+      if (autoShare) {
+        // Compartir automáticamente (comportamiento actual)
+        return await _saveAndShareExcel(excel, fileName);
+      } else {
+        // SOLO guardar sin compartir (para uso interno del PDF)
+        return await _saveExcelOnly(excel, fileName);
+      }
     } catch (e) {
-      _showError('Error generando reporte diario: $e');
+      if (autoShare) _showError('Error generando reporte diario: $e');
+      print('Error generando reporte diario: $e');
+      return false;
+    }
+  }
+
+  // ✅ SOLO GUARDAR SIN COMPARTIR
+  Future<bool> _saveExcelOnly(Excel excel, String fileName) async {
+    try {
+      final bytes = excel.save();
+      if (bytes == null) return false;
+
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/$fileName');
+      await file.writeAsBytes(bytes);
+
+      print('📊 Excel guardado para correo: ${file.path}');
+      return true;
+    } catch (e) {
+      print('Error al guardar Excel: $e');
       return false;
     }
   }
@@ -125,8 +152,7 @@ class ExcelReportService {
     }
   }
 
-  // Obtener comprobantes por fecha específica
-  // ✅ Método corregido para obtener comprobantes por fecha
+  // ✅ OBTENER COMPROBANTES POR FECHA
   Future<List<Receipt>> _getReceiptsByDate(String dateStr) async {
     try {
       print('🔍 Buscando comprobantes para la fecha: $dateStr');
@@ -145,8 +171,7 @@ class ExcelReportService {
     }
   }
 
-  // Obtener comprobantes por rango de fechas
-  // ✅ Método corregido para obtener comprobantes por rango de fechas
+  // ✅ OBTENER COMPROBANTES POR RANGO DE FECHAS
   Future<List<Receipt>> _getReceiptsByDateRange(DateTime startDate, DateTime endDate) async {
     try {
       print('🔍 Buscando comprobantes desde ${startDate.day}/${startDate.month}/${startDate.year} hasta ${endDate.day}/${endDate.month}/${endDate.year}');
@@ -168,8 +193,7 @@ class ExcelReportService {
     }
   }
 
-  // Construir hoja de reporte diario
-  // ✅ MÉTODO CORREGIDO PARA CONSTRUIR REPORTE DIARIO
+  // ✅ CONSTRUIR REPORTE DIARIO
   Future<void> _buildDailyReportSheet(Sheet sheet, List<Receipt> receipts, DateTime date) async {
     try {
       print('📊 Construyendo reporte diario para ${_formatDate(date)}');
@@ -181,7 +205,7 @@ class ExcelReportService {
       sheet.setColumnWidth(4, 15); // Valor
       sheet.setColumnWidth(5, 20); // Corresponsal
 
-      // Headers como List<String>
+      // Headers
       final List<String> headers = [
         'Fecha',
         'Hora',
@@ -193,13 +217,13 @@ class ExcelReportService {
         headers.add('Código Corresponsal');
       }
 
-      // Escribir headers correctamente
+      // Escribir headers
       for (int i = 0; i < headers.length; i++) {
         final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0));
         cell.value = TextCellValue(headers[i]);
       }
 
-      // Escribir datos con tipos correctos
+      // Escribir datos
       for (int i = 0; i < receipts.length; i++) {
         final receipt = receipts[i];
         final rowIndex = i + 1;
@@ -221,7 +245,7 @@ class ExcelReportService {
         }
       }
 
-      // Agregar totales al final con tipos correctos
+      // Agregar totales al final
       final totalRow = receipts.length + 2;
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: 3, rowIndex: totalRow)).value = TextCellValue('TOTAL:');
       final total = receipts.fold<double>(0.0, (sum, receipt) => sum + receipt.valorTotal);
@@ -422,7 +446,7 @@ class ExcelReportService {
     }
   }
 
-  // Métodos auxiliares para análisis de datos
+  // MÉTODOS AUXILIARES PARA ANÁLISIS DE DATOS
   Map<String, dynamic> _generateSummary(List<Receipt> receipts) {
     double totalIncomes = 0.0;
     double totalExpenses = 0.0;
@@ -562,10 +586,13 @@ class ExcelReportService {
     return incomeTypes.contains(tipo.toUpperCase()) ? 'INGRESO' : 'EGRESO';
   }
 
-  // Métodos auxiliares para Excel
+  // MÉTODOS AUXILIARES PARA EXCEL
   void _addCell(Sheet sheet, int col, int row, dynamic value) {
     final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-    cell.value = value is num ? TextCellValue(value.toString()) : TextCellValue(value.toString());
+    cell.value = value is String ? TextCellValue(value) : 
+                 value is int ? IntCellValue(value) :
+                 value is double ? DoubleCellValue(value) :
+                 TextCellValue(value.toString());
   }
 
   void _addHeaderCell(Sheet sheet, int col, int row, String value, {bool isTitle = false}) {
@@ -581,13 +608,12 @@ class ExcelReportService {
     );
   }
 
-void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
-  final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
-  // Formatear como texto con símbolo de moneda
-  cell.value = TextCellValue('\$${value.toStringAsFixed(2)}');
-}
+  void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
+    final cell = sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: row));
+    cell.value = TextCellValue('\$${value.toStringAsFixed(2)}');
+  }
 
-  // Guardar y compartir Excel
+  // ✅ GUARDAR Y COMPARTIR EXCEL
   Future<bool> _saveAndShareExcel(Excel excel, String fileName) async {
     try {
       final bytes = excel.save();
@@ -611,7 +637,7 @@ void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
     }
   }
 
-  // Utilidades
+  // UTILIDADES
   DateTime? _parseDate(String dateStr) {
     try {
       if (dateStr.contains('/')) {
@@ -628,6 +654,10 @@ void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
       print('Error parsing date: $dateStr');
     }
     return null;
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
   }
 
   void _showMessage(String message) {
@@ -654,46 +684,4 @@ void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
     }
     print(error);
   }
-
-// ✅ NUEVO: Método especial para generar Excel sin mostrar UI
-Future<String?> generateDailyReportForEmail(DateTime date) async {
-  try {
-    final dateStr = _formatDate(date);
-    final receipts = await _getReceiptsByDate(dateStr);
-    
-    if (receipts.isEmpty) {
-      print('No hay comprobantes para la fecha seleccionada');
-      return null;
-    }
-
-    final excel = Excel.createExcel();
-    final sheet = excel['Reporte Diario'];
-    
-    await _buildDailyReportSheet(sheet, receipts, date);
-    
-    // Guardar en una ubicación específica para el PDF service
-    final tempDir = await getTemporaryDirectory();
-    final fileName = 'Reporte_Diario_${DateFormat('dd-MM-yyyy').format(date)}.xlsx';
-    final filePath = '${tempDir.path}/$fileName';
-    
-    final excelBytes = excel.encode();
-    if (excelBytes != null) {
-      final file = File(filePath);
-      await file.writeAsBytes(excelBytes);
-      print('Excel generado para email: $filePath');
-      return filePath;
-    }
-    
-    return null;
-  } catch (e) {
-    print('Error generando Excel para email: $e');
-    return null;
-  }
-}
-
-}
-
-// ✅ MÉTODO AUXILIAR PARA FORMATEAR FECHA
-String _formatDate(DateTime date) {
-  return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
 }
