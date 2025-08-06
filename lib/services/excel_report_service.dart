@@ -654,11 +654,44 @@ void _addCurrencyCell(Sheet sheet, int col, int row, double value) {
     }
     print(error);
   }
+
+// ✅ NUEVO: Método especial para generar Excel sin mostrar UI
+Future<String?> generateDailyReportForEmail(DateTime date) async {
+  try {
+    final dateStr = _formatDate(date);
+    final receipts = await _getReceiptsByDate(dateStr);
+    
+    if (receipts.isEmpty) {
+      print('No hay comprobantes para la fecha seleccionada');
+      return null;
+    }
+
+    final excel = Excel.createExcel();
+    final sheet = excel['Reporte Diario'];
+    
+    await _buildDailyReportSheet(sheet, receipts, date);
+    
+    // Guardar en una ubicación específica para el PDF service
+    final tempDir = await getTemporaryDirectory();
+    final fileName = 'Reporte_Diario_${DateFormat('dd-MM-yyyy').format(date)}.xlsx';
+    final filePath = '${tempDir.path}/$fileName';
+    
+    final excelBytes = excel.encode();
+    if (excelBytes != null) {
+      final file = File(filePath);
+      await file.writeAsBytes(excelBytes);
+      print('Excel generado para email: $filePath');
+      return filePath;
+    }
+    
+    return null;
+  } catch (e) {
+    print('Error generando Excel para email: $e');
+    return null;
+  }
 }
 
-// ================================
-// CORRECCIONES PARA EXCEL REPORT SERVICE
-// ================================
+}
 
 // ✅ MÉTODO AUXILIAR PARA FORMATEAR FECHA
 String _formatDate(DateTime date) {

@@ -29,6 +29,9 @@ class _ReportScreenState extends State<ReportScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+    _pdfService.setContext(context);
+    });
     // Configurar locale en español
     Intl.defaultLocale = 'es_ES';
     
@@ -272,6 +275,9 @@ class _ReportScreenState extends State<ReportScreen> {
         },
       );
 
+          // ✅ CRÍTICO: Configurar contexto antes de generar
+       _pdfService.setContext(context);
+       
       final success = await _pdfService.generateAndSharePdf(_reportData, _selectedDate);
 
       if (mounted) {

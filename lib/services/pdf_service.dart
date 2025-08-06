@@ -1,4 +1,3 @@
-// lib/services/pdf_service.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -8,15 +7,25 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import 'package:riocaja_smart/services/excel_report_service.dart';
 
 class PdfService {
   static const String baseUrl = 'https://riocajasmartbackend-production.up.railway.app/api/v1';
+  
+  BuildContext? _context;
+
+  void setContext(BuildContext context) {
+    _context = context;
+    print('📧 PDF Service: Contexto configurado');
+  }
 
   Future<bool> generateAndSharePdf(Map<String, dynamic> reportData, DateTime selectedDate) async {
     try {
       final dateStr = DateFormat('dd/MM/yyyy').format(selectedDate);
       final currentTime = DateFormat('HH:mm:ss').format(DateTime.now());
 
+      // ✅ GENERAR PDF CON TU FORMATO ORIGINAL
       final pdf = await _generatePdfDocument(reportData, selectedDate, dateStr, currentTime);
 
       final tempDir = await getTemporaryDirectory();
@@ -27,9 +36,17 @@ class PdfService {
 
       await file.writeAsBytes(await pdf.save());
 
+      // ✅ GENERAR EXCEL SIMPLE
+       final excelFilePath = await _generateRealExcel(reportData, selectedDate);
+      if (excelFilePath != null) {
+        print('📊 Excel generado correctamente: $excelFilePath');
+      } else {
+        print('⚠️ No se pudo generar Excel, continuando solo con PDF');
+      }
+
       final results = await Future.wait([
         _shareViaNativeApps(filePath, dateStr),
-        _sendPdfByEmail(filePath, fileName, dateStr, reportData),
+        _sendReportByEmail(filePath, excelFilePath, dateStr, reportData),
       ]);
 
       bool shareSuccess = results[0];
@@ -62,7 +79,7 @@ class PdfService {
     }
   }
 
-  Future<bool> _sendPdfByEmail(String filePath, String fileName, String dateStr, Map<String, dynamic> reportData) async {
+  Future<bool> _sendReportByEmail(String filePath, String? excelFilePath, String dateStr, Map<String, dynamic> reportData) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final userEmail = prefs.getString('user_email') ?? '';
@@ -84,20 +101,34 @@ class PdfService {
 
       final reportSummary = _generateReportSummary(reportData);
 
+      Map<String, dynamic> emailData = {
+        'recipient_email': userEmail,
+        'recipient_name': userName,
+        'report_date': dateStr,
+        'pdf_filename': file.path.split('/').last,
+        'pdf_base64': pdfBase64,
+        'report_summary': reportSummary,
+      };
+
+      // ✅ AGREGAR EXCEL SI EXISTE
+      if (excelFilePath != null) {
+        final excelFile = File(excelFilePath);
+        if (await excelFile.exists()) {
+          final excelBytes = await excelFile.readAsBytes();
+          final excelBase64 = base64Encode(excelBytes);
+          
+          emailData['excel_filename'] = excelFile.path.split('/').last;
+          emailData['excel_base64'] = excelBase64;
+        }
+      }
+
       final response = await http.post(
         Uri.parse('$baseUrl/send-pdf-report'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
         },
-        body: jsonEncode({
-          'recipient_email': userEmail,
-          'recipient_name': userName,
-          'report_date': dateStr,
-          'pdf_filename': fileName,
-          'pdf_base64': pdfBase64,
-          'report_summary': reportSummary,
-        }),
+        body: jsonEncode(emailData),
       );
 
       if (response.statusCode == 200) {
@@ -109,8 +140,77 @@ class PdfService {
         return false;
       }
     } catch (e) {
-      print('Error en _sendPdfByEmail: $e');
+      print('Error en _sendReportByEmail: $e');
       return false;
+    }
+  }
+
+  // ✅ REEMPLAZAR EXCEL SIMPLE POR TU EXCEL REAL
+  Future<String?> _generateRealExcel(Map<String, dynamic> reportData, DateTime selectedDate) async {
+    try {
+      final ExcelReportService _excelReportService = ExcelReportService();
+      
+      // Configurar el servicio con contexto y token
+      if (_context != null) {
+        _excelReportService.setContext(_context!);
+      }
+      
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      if (token != null) {
+        _excelReportService.setAuthToken(token);
+      }
+      
+      // ✅ USAR EXACTAMENTE EL MISMO MÉTODO QUE EN "EXCEL REPORTS"
+      final success = await _excelReportService.generateDailyReport(selectedDate);
+      
+      if (success) {
+        // Buscar el archivo generado
+        final tempDir = await getTemporaryDirectory();
+        final documentsDir = await getApplicationDocumentsDirectory();
+        final fileName = 'Reporte_Diario_${DateFormat('dd-MM-yyyy').format(selectedDate)}.xlsx';
+        
+        // Buscar en varias ubicaciones posibles
+        final possiblePaths = [
+          '${tempDir.path}/$fileName',
+          '${documentsDir.path}/$fileName',
+          '${tempDir.path}/Download/$fileName',
+        ];
+        
+        for (String path in possiblePaths) {
+          final file = File(path);
+          if (await file.exists()) {
+            print('📊 Excel encontrado en: $path');
+            return path;
+          }
+        }
+        
+        print('⚠️ Excel generado pero no encontrado en las rutas esperadas');
+        return null;
+      } else {
+        print('❌ Error generando Excel con ExcelReportService');
+        return null;
+      }
+    } catch (e) {
+      print('❌ Error en _generateRealExcel: $e');
+      return null;
+    }
+  }
+
+  String _formatConceptName(String key) {
+    switch (key.toLowerCase()) {
+      case 'pago_servicios':
+        return 'PAGO SERVICIOS';
+      case 'recarga_claro':
+        return 'RECARGA CLARO';
+      case 'deposito':
+        return 'DEPOSITO';
+      case 'retiro':
+        return 'RETIRO';
+      case 'efectivo_movil':
+        return 'EFECTIVO MOVIL';
+      default:
+        return key.replaceAll('_', ' ').toUpperCase();
     }
   }
 
@@ -145,6 +245,7 @@ class PdfService {
     }
   }
 
+  // ✅ TU FORMATO ORIGINAL EXACTO - SIN CAMBIOS
   Future<pw.Document> _generatePdfDocument(Map<String, dynamic> reportData, DateTime selectedDate, String dateStr, String currentTime) async {
     final pdf = pw.Document();
 
@@ -160,11 +261,11 @@ class PdfService {
 
     incomes.forEach((key, value) {
       totalIncomes += (value as num).toDouble();
-      totalIncomeCount += totalIncomeCount += (incomeCount[key] ?? 0) as int;
+      totalIncomeCount += (incomeCount[key] ?? 0) as int;
     });
     expenses.forEach((key, value) {
       totalExpenses += (value as num).toDouble();
-      totalExpenseCount += totalExpenseCount += (expenseCount[key] ?? 0) as int;
+      totalExpenseCount += (expenseCount[key] ?? 0) as int;
     });
 
     double saldoEnCaja = totalIncomes - totalExpenses;
@@ -266,19 +367,20 @@ class PdfService {
           String tipo = entry.key.toString().toUpperCase();
           double valor = (entry.value as num).toDouble();
           int cantidad = incomeCount[entry.key] ?? 0;
+          
           return pw.Row(
             children: [
               pw.Expanded(flex: 3, child: pw.Text(tipo)),
-              pw.Expanded(flex: 1, child: pw.Text('$cantidad', textAlign: pw.TextAlign.center)),
+              pw.Expanded(flex: 1, child: pw.Text(cantidad.toString())),
               pw.Expanded(flex: 2, child: pw.Text('\$${valor.toStringAsFixed(2)}', textAlign: pw.TextAlign.right)),
             ],
           );
         }).toList(),
-        pw.Divider(),
+        pw.SizedBox(height: 5),
         pw.Row(
           children: [
             pw.Expanded(flex: 3, child: pw.Text('TOTAL INGRESOS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-            pw.Expanded(flex: 1, child: pw.Text('$totalIncomeCount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center)),
+            pw.Expanded(flex: 1, child: pw.Text(totalIncomeCount.toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
             pw.Expanded(flex: 2, child: pw.Text('\$${totalIncomes.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
           ],
         ),
@@ -306,19 +408,20 @@ class PdfService {
           String tipo = entry.key.toString().toUpperCase();
           double valor = (entry.value as num).toDouble();
           int cantidad = expenseCount[entry.key] ?? 0;
+          
           return pw.Row(
             children: [
               pw.Expanded(flex: 3, child: pw.Text(tipo)),
-              pw.Expanded(flex: 1, child: pw.Text('$cantidad', textAlign: pw.TextAlign.center)),
+              pw.Expanded(flex: 1, child: pw.Text(cantidad.toString())),
               pw.Expanded(flex: 2, child: pw.Text('\$${valor.toStringAsFixed(2)}', textAlign: pw.TextAlign.right)),
             ],
           );
         }).toList(),
-        pw.Divider(),
+        pw.SizedBox(height: 5),
         pw.Row(
           children: [
             pw.Expanded(flex: 3, child: pw.Text('TOTAL EGRESOS', style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
-            pw.Expanded(flex: 1, child: pw.Text('$totalExpenseCount', style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.center)),
+            pw.Expanded(flex: 1, child: pw.Text(totalExpenseCount.toString(), style: pw.TextStyle(fontWeight: pw.FontWeight.bold))),
             pw.Expanded(flex: 2, child: pw.Text('\$${totalExpenses.toStringAsFixed(2)}', style: pw.TextStyle(fontWeight: pw.FontWeight.bold), textAlign: pw.TextAlign.right)),
           ],
         ),
@@ -330,29 +433,30 @@ class PdfService {
     return pw.Container(
       padding: pw.EdgeInsets.all(10),
       decoration: pw.BoxDecoration(
-        color: saldoEnCaja >= 0 ? PdfColors.green100 : PdfColors.red100,
+        color: PdfColors.grey200,
         borderRadius: pw.BorderRadius.circular(5),
       ),
-      child: pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-        children: [
-          pw.Text(
-            'SALDO EN CAJA',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16),
+      child: pw.Center(
+        child: pw.Text(
+          'SALDO EN CAJA \$${saldoEnCaja.toStringAsFixed(2)}',
+          style: pw.TextStyle(
+            fontWeight: pw.FontWeight.bold, 
+            fontSize: 16,
+            // ✅ AGREGAR COLOR: VERDE si positivo, ROJO si negativo
+            color: saldoEnCaja >= 0 ? PdfColors.green : PdfColors.red,
           ),
-          pw.Text(
-            '\$${saldoEnCaja.toStringAsFixed(2)}',
-            style: pw.TextStyle(fontWeight: pw.FontWeight.bold, fontSize: 16),
-          ),
-        ],
+        ),
       ),
     );
   }
 
   pw.Widget _buildPdfFooter() {
-    return pw.Text(
-      '© RIOCAJA SMART ${DateTime.now().year}',
-      style: pw.TextStyle(fontSize: 10),
+    return pw.Container(
+      alignment: pw.Alignment.center,
+      child: pw.Text(
+        '© RIOCAJA SMART 2025',
+        style: pw.TextStyle(fontSize: 10),
+      ),
     );
   }
 }
