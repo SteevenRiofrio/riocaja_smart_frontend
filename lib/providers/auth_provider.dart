@@ -76,13 +76,15 @@ class AuthProvider with ChangeNotifier {
         // ✅ CAMBIO CRÍTICO: Sincronizar tokens INMEDIATAMENTE Y ESPERAR
         _syncTokensWithApiService();
         await Future.delayed(Duration(milliseconds: 100));
-        
+
         print('AuthProvider: Usuario autenticado: ${_user!.nombre}');
 
         // AGREGAR: Configurar expiración del token
         final expiryTime = DateTime.now().add(Duration(hours: 1));
-        await prefs.setInt(AuthService.TOKEN_EXPIRY_KEY, expiryTime.millisecondsSinceEpoch);
-
+        await prefs.setInt(
+          AuthService.TOKEN_EXPIRY_KEY,
+          expiryTime.millisecondsSinceEpoch,
+        );
       } else {
         _authStatus = AuthStatus.unauthenticated;
         print('AuthProvider: No hay usuario autenticado');
@@ -96,13 +98,18 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
+
+  
+
+
+
   // Método para sincronizar tokens con ApiService
   void _syncTokensWithApiService() {
     if (_user != null && _user!.token.isNotEmpty) {
       // Configurar ApiService inmediatamente
       _apiService.setAuthToken(_user!.token);
       _apiService.setAuthService(_authService); // Para refresh automático
-      
+
       // ✅ NUEVO:
       print('AuthProvider: Tokens sincronizados con ApiService');
     }
@@ -133,12 +140,12 @@ class AuthProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         _needsTermsAcceptance = data['necesita_aceptar'] ?? false;
-        
+
         print('✅ Verificación de términos:');
         print('   Usuario ID: $userId');
         print('   Acepto términos: ${data['acepto_terminos']}');
         print('   Necesita aceptar: $_needsTermsAcceptance');
-        
+
         notifyListeners();
         return _needsTermsAcceptance;
       } else {
@@ -162,21 +169,20 @@ class AuthProvider with ChangeNotifier {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer ${_user?.token ?? ''}',
         },
-        body: json.encode({
-          'user_id': userId,
-          'acepta': acepta,
-        }),
+        body: json.encode({'user_id': userId, 'acepta': acepta}),
       );
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        
+
         if (data['success'] == true) {
           _needsTermsAcceptance = data['necesita_aceptar'] ?? false;
-          
-          print('✅ ${acepta ? 'Aceptados' : 'Rechazados'} términos para usuario: $userId');
+
+          print(
+            '✅ ${acepta ? 'Aceptados' : 'Rechazados'} términos para usuario: $userId',
+          );
           print('   Necesita aceptar después: $_needsTermsAcceptance');
-          
+
           notifyListeners();
           return true;
         }
@@ -231,59 +237,65 @@ class AuthProvider with ChangeNotifier {
   }
 
   // ✅ MODIFICADO: Login con verificación de términos
-Future<bool> login(String email, String password, {bool rememberMe = true}) async {
+  Future<bool> login(
+    String email,
+    String password, {
+    bool rememberMe = true,
+  }) async {
     _isLoading = true;
     _errorMessage = '';
     _rememberMe = rememberMe;
     notifyListeners();
 
     try {
-    final result = await _authService.login(email, password);
+      final result = await _authService.login(email, password);
 
-    if (result['success']) {
-      _user = User.fromJson(result['user']);
-      
-      // ✅ CRÍTICO: Guardar email y nombre en SharedPreferences para PDF service
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('user_email', _user!.email);
-      await prefs.setString('user_name', _user!.nombre);
-      await prefs.setString('auth_token', _user!.token);
-      
-      print('📧 Email guardado para PDF service: ${_user!.email}');
-      print('👤 Nombre guardado para PDF service: ${_user!.nombre}');
-      print('🔑 Token guardado para PDF service: ${_user!.token.substring(0, 10)}...');
-      
-      // Configurar ApiService con el token
-      _apiService.setAuthToken(_user!.token);
-      
-      // Determinar estado según el rol y perfil
-      _perfilCompleto = _user!.perfilCompleto ?? false;
-      _codigoCorresponsal = _user!.codigoCorresponsal;
-      
-      if (_user!.rol == 'cnb' && !_perfilCompleto) {
-        _authStatus = AuthStatus.needsProfileCompletion;
+      if (result['success']) {
+        _user = User.fromJson(result['user']);
+
+        // ✅ CRÍTICO: Guardar email y nombre en SharedPreferences para PDF service
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_email', _user!.email);
+        await prefs.setString('user_name', _user!.nombre);
+        await prefs.setString('auth_token', _user!.token);
+
+        print('📧 Email guardado para PDF service: ${_user!.email}');
+        print('👤 Nombre guardado para PDF service: ${_user!.nombre}');
+        print(
+          '🔑 Token guardado para PDF service: ${_user!.token.substring(0, 10)}...',
+        );
+
+        // Configurar ApiService con el token
+        _apiService.setAuthToken(_user!.token);
+
+        // Determinar estado según el rol y perfil
+        _perfilCompleto = _user!.perfilCompleto ?? false;
+        _codigoCorresponsal = _user!.codigoCorresponsal;
+
+        if (_user!.rol == 'cnb' && !_perfilCompleto) {
+          _authStatus = AuthStatus.needsProfileCompletion;
+        } else {
+          _authStatus = AuthStatus.authenticated;
+        }
+
+        print('✅ Login exitoso para: ${_user!.email}');
+        _isLoading = false;
+        notifyListeners();
+        return true;
       } else {
-        _authStatus = AuthStatus.authenticated;
+        _errorMessage = result['message'] ?? 'Error desconocido';
+        _authStatus = AuthStatus.unauthenticated;
+        _isLoading = false;
+        notifyListeners();
+        return false;
       }
-      
-      print('✅ Login exitoso para: ${_user!.email}');
-      _isLoading = false;
-      notifyListeners();
-      return true;
-    } else {
-      _errorMessage = result['message'] ?? 'Error desconocido';
+    } catch (e) {
+      _errorMessage = 'Error de conexión: $e';
       _authStatus = AuthStatus.unauthenticated;
       _isLoading = false;
       notifyListeners();
       return false;
     }
-  } catch (e) {
-    _errorMessage = 'Error de conexión: $e';
-    _authStatus = AuthStatus.unauthenticated;
-    _isLoading = false;
-    notifyListeners();
-    return false;
-  }
   }
 
   // Completar perfil (solo para usuarios normales)
@@ -466,7 +478,7 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
   // Logout con limpieza completa
   Future<void> logout() async {
     print('🚪 AuthProvider: Iniciando logout...');
-    
+
     // ✅ NO mostrar loading durante logout
     // _isLoading = true;
     // notifyListeners();
@@ -474,10 +486,10 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
     try {
       // Limpiar AuthService en paralelo (no esperar)
       _authService.logout(); // Sin await para que sea más rápido
-      
+
       // Limpiar ApiService inmediatamente
       _apiService.setAuthToken(null);
-      
+
       // Limpiar estado local inmediatamente
       _user = null;
       _authStatus = AuthStatus.unauthenticated;
@@ -486,18 +498,17 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
       _errorMessage = '';
       _needsTermsAcceptance = false;
       _isLoading = false; // ✅ Asegurar que no está en loading
-      
+
       // Limpiar SharedPreferences en paralelo
       _clearUserPreferences(); // Sin await para que sea más rápido
-      
+
       print('✅ AuthProvider: Logout completado');
-      
+
       // ✅ Notificar INMEDIATAMENTE para que la UI cambie rápido
       notifyListeners();
-      
     } catch (e) {
       print('❌ Error durante logout: $e');
-      
+
       // Incluso si hay error, forzar el logout local
       _user = null;
       _authStatus = AuthStatus.unauthenticated;
@@ -531,19 +542,29 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
   }
 
   // Método para manejar errores de autenticación global
-  void handleAuthError(String error) {
-    _errorMessage = error;
+void handleAuthError(String error) {
+  // 🔥 PRIMERO: Detectar sesión cerrada por otro dispositivo
+  if (error.contains('Sesión cerrada por login en otro dispositivo')) {
+    print('🔐 Sesión cerrada por otro dispositivo detectada');
+    _errorMessage = 'Tu cuenta ha sido accedida desde otro dispositivo. Por seguridad, tu sesión actual ha sido cerrada.';
     notifyListeners();
-
-    // Si es un error de token, intentar logout
-    if (error.contains('token') ||
-        error.contains('401') ||
-        error.contains('unauthorized')) {
-      print('AuthProvider: Error de autenticación detectado - cerrando sesión');
-      logout();
-    }
+    logout();
+    return; // IMPORTANTE: Salir aquí para no ejecutar el resto
   }
 
+  // DESPUÉS: El resto del código existente
+  _errorMessage = error;
+  notifyListeners();
+
+  // Si es un error de token, intentar logout
+  if (error.contains('token') ||
+      error.contains('401') ||
+      error.contains('unauthorized')) {
+    print('AuthProvider: Error de autenticación detectado - cerrando sesión');
+    logout();
+  }
+}
+ 
   /// Verifica el estado de autenticación y restaura sesión si es posible
   Future<void> checkAuthStatus() async {
     print('🔍 AuthProvider: Iniciando verificación de estado...');
@@ -561,7 +582,9 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
           _perfilCompleto = _user?.perfilCompleto ?? false;
           _codigoCorresponsal = _user?.codigoCorresponsal;
           _syncTokensWithApiService();
-          print('✅ AuthProvider: Sesión válida restaurada para ${_user!.nombre}');
+          print(
+            '✅ AuthProvider: Sesión válida restaurada para ${_user!.nombre}',
+          );
         } else {
           print('⚠️ AuthProvider: Token expirado, intentando renovar...');
           final refreshed = await refreshToken();
@@ -574,10 +597,14 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
           }
         }
       } else {
-        print('ℹ️ AuthProvider: No hay sesión guardada o remember_session es false');
+        print(
+          'ℹ️ AuthProvider: No hay sesión guardada o remember_session es false',
+        );
         _authStatus = AuthStatus.unauthenticated;
       }
-      print('📊 AuthProvider: Estado final - Autenticado: ${_authStatus == AuthStatus.authenticated}');
+      print(
+        '📊 AuthProvider: Estado final - Autenticado: ${_authStatus == AuthStatus.authenticated}',
+      );
     } catch (e) {
       print('❌ AuthProvider: Error verificando estado: $e');
       await _clearInvalidSession();
@@ -631,7 +658,10 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
       final parts = _user!.token.split('.');
       if (parts.length != 3) return false;
       final payload = parts[1];
-      final normalizedPayload = payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
+      final normalizedPayload = payload.padRight(
+        (payload.length + 3) ~/ 4 * 4,
+        '=',
+      );
       final decoded = utf8.decode(base64Url.decode(normalizedPayload));
       final data = json.decode(decoded);
       if (data['exp'] != null) {
@@ -653,11 +683,16 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
       final parts = token.split('.');
       if (parts.length == 3) {
         final payload = parts[1];
-        final normalizedPayload = payload.padRight((payload.length + 3) ~/ 4 * 4, '=');
+        final normalizedPayload = payload.padRight(
+          (payload.length + 3) ~/ 4 * 4,
+          '=',
+        );
         final decoded = utf8.decode(base64Url.decode(normalizedPayload));
         final data = json.decode(decoded);
         if (data['exp'] != null) {
-          final expiry = DateTime.fromMillisecondsSinceEpoch(data['exp'] * 1000);
+          final expiry = DateTime.fromMillisecondsSinceEpoch(
+            data['exp'] * 1000,
+          );
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt('token_expiry', expiry.millisecondsSinceEpoch);
           print('💾 Expiración del token guardada: $expiry');
@@ -852,145 +887,144 @@ Future<bool> login(String email, String password, {bool rememberMe = true}) asyn
     }
   }
 
-// ================================
-// MÉTODOS OPTIMIZADOS para tu AuthProvider
-// ================================
+  // ================================
+  // MÉTODOS OPTIMIZADOS para tu AuthProvider
+  // ================================
 
-// ✅ CONFIGURAR usuario rápidamente SIN verificar token
-void setQuickUser(User user) {
-  _user = user;
-  _authStatus = AuthStatus.authenticated;
-  _perfilCompleto = user.perfilCompleto;
-  _codigoCorresponsal = user.codigoCorresponsal;
-  
-  // Configurar ApiService inmediatamente
-  _apiService.setAuthToken(user.token);
-  _apiService.setAuthService(_authService);
-  
-  print('⚡ Usuario configurado rápidamente: ${user.nombre}');
-  notifyListeners();
-}
+  // ✅ CONFIGURAR usuario rápidamente SIN verificar token
+  void setQuickUser(User user) {
+    _user = user;
+    _authStatus = AuthStatus.authenticated;
+    _perfilCompleto = user.perfilCompleto;
+    _codigoCorresponsal = user.codigoCorresponsal;
 
-// ✅ VERIFICAR token SIN bloquear la UI y SIN cambiar estado hasta confirmar
-Future<bool> verifyTokenQuietly() async {
-  try {
-    if (_user?.token == null || _user!.token.isEmpty) {
-      return false;
-    }
-    
-    print('🔍 Verificando token silenciosamente...');
-    
-    // Crear instancia temporal para no afectar la principal
-    final tempApiService = ApiService();
-    tempApiService.setAuthToken(_user!.token);
-    
-    // Verificar con timeout corto
-    final userData = await tempApiService.getUserData()
-        .timeout(Duration(seconds: 5)); // Timeout de 5 segundos
-    
-    if (userData.isNotEmpty) {
-      print('✅ Token válido confirmado');
-      return true;
-    } else {
-      print('❌ Token inválido');
-      return false;
-    }
-    
-  } catch (e) {
-    print('❌ Error verificando token silenciosamente: $e');
-    return false;
+    // Configurar ApiService inmediatamente
+    _apiService.setAuthToken(user.token);
+    _apiService.setAuthService(_authService);
+
+    print('⚡ Usuario configurado rápidamente: ${user.nombre}');
+    notifyListeners();
   }
-}
 
-// ✅ VERSIÓN SÚPER RÁPIDA de checkAuthStatus (solo para casos especiales)
-Future<void> quickAuthCheck() async {
-  try {
-    final prefs = await SharedPreferences.getInstance();
-    final rememberSession = prefs.getBool('remember_session') ?? false;
-    final userDataString = prefs.getString('user_data');
-    
-    if (rememberSession && userDataString != null) {
-      final userData = json.decode(userDataString);
-      final user = User.fromJson(userData);
-      
-      if (user.token.isNotEmpty) {
-        // ✅ Configurar inmediatamente, verificar después
-        setQuickUser(user);
-        
-        // ✅ Verificar en segundo plano
-        verifyTokenQuietly().then((isValid) {
-          if (!isValid) {
-            print('⚠️ Token inválido detectado, cerrando sesión');
-            logout();
-          }
-        });
-        
-        return;
+  // ✅ VERIFICAR token SIN bloquear la UI y SIN cambiar estado hasta confirmar
+  Future<bool> verifyTokenQuietly() async {
+    try {
+      if (_user?.token == null || _user!.token.isEmpty) {
+        return false;
       }
+
+      print('🔍 Verificando token silenciosamente...');
+
+      // Crear instancia temporal para no afectar la principal
+      final tempApiService = ApiService();
+      tempApiService.setAuthToken(_user!.token);
+
+      // Verificar con timeout corto
+      final userData = await tempApiService.getUserData().timeout(
+        Duration(seconds: 5),
+      ); // Timeout de 5 segundos
+
+      if (userData.isNotEmpty) {
+        print('✅ Token válido confirmado');
+        return true;
+      } else {
+        print('❌ Token inválido');
+        return false;
+      }
+    } catch (e) {
+      print('❌ Error verificando token silenciosamente: $e');
+      return false;
     }
-    
-    // No hay sesión válida
+  }
+
+  // ✅ VERSIÓN SÚPER RÁPIDA de checkAuthStatus (solo para casos especiales)
+  Future<void> quickAuthCheck() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final rememberSession = prefs.getBool('remember_session') ?? false;
+      final userDataString = prefs.getString('user_data');
+
+      if (rememberSession && userDataString != null) {
+        final userData = json.decode(userDataString);
+        final user = User.fromJson(userData);
+
+        if (user.token.isNotEmpty) {
+          // ✅ Configurar inmediatamente, verificar después
+          setQuickUser(user);
+
+          // ✅ Verificar en segundo plano
+          verifyTokenQuietly().then((isValid) {
+            if (!isValid) {
+              print('⚠️ Token inválido detectado, cerrando sesión');
+              logout();
+            }
+          });
+
+          return;
+        }
+      }
+
+      // No hay sesión válida
+      _authStatus = AuthStatus.unauthenticated;
+      notifyListeners();
+    } catch (e) {
+      print('❌ Error en verificación rápida: $e');
+      _authStatus = AuthStatus.unauthenticated;
+      notifyListeners();
+    }
+  }
+
+  // ✅ LOGOUT SÚPER RÁPIDO - sin demoras
+  Future<void> fastLogout() async {
+    print('🚪 Logout rápido iniciado...');
+
+    // ✅ Limpiar estado INMEDIATAMENTE
+    _user = null;
     _authStatus = AuthStatus.unauthenticated;
+    _perfilCompleto = false;
+    _codigoCorresponsal = null;
+    _errorMessage = '';
+    _needsTermsAcceptance = false;
+    _isLoading = false;
+
+    // ✅ Limpiar ApiService inmediatamente
+    _apiService.setAuthToken(null);
+
+    // ✅ Notificar INMEDIATAMENTE
     notifyListeners();
-    
-  } catch (e) {
-    print('❌ Error en verificación rápida: $e');
-    _authStatus = AuthStatus.unauthenticated;
-    notifyListeners();
-  }
-}
 
-// ✅ LOGOUT SÚPER RÁPIDO - sin demoras
-Future<void> fastLogout() async {
-  print('🚪 Logout rápido iniciado...');
-  
-  // ✅ Limpiar estado INMEDIATAMENTE
-  _user = null;
-  _authStatus = AuthStatus.unauthenticated;
-  _perfilCompleto = false;
-  _codigoCorresponsal = null;
-  _errorMessage = '';
-  _needsTermsAcceptance = false;
-  _isLoading = false;
-  
-  // ✅ Limpiar ApiService inmediatamente
-  _apiService.setAuthToken(null);
-  
-  // ✅ Notificar INMEDIATAMENTE
-  notifyListeners();
-  
-  // ✅ Limpiar en segundo plano (no esperar)
-  _cleanupInBackground();
-  
-  print('⚡ Logout rápido completado');
-}
+    // ✅ Limpiar en segundo plano (no esperar)
+    _cleanupInBackground();
 
-// ✅ LIMPIEZA en segundo plano
-Future<void> _cleanupInBackground() async {
-  try {
-    // Limpiar AuthService
-    await _authService.logout();
-    
-    // Limpiar SharedPreferences
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_data');
-    await prefs.setBool('is_authenticated', false);
-    
-    print('🧹 Limpieza en segundo plano completada');
-  } catch (e) {
-    print('⚠️ Error en limpieza: $e');
+    print('⚡ Logout rápido completado');
   }
-}
 
-// ✅ MÉTODO PARA COMPROBAR si hay sesión SIN verificar token
-bool hasLocalSession() {
-  try {
-    // Esto se puede llamar síncronamente para decisiones rápidas
-    return _user != null && 
-           _user!.token.isNotEmpty && 
-           _authStatus == AuthStatus.authenticated;
-  } catch (e) {
-    return false;
+  // ✅ LIMPIEZA en segundo plano
+  Future<void> _cleanupInBackground() async {
+    try {
+      // Limpiar AuthService
+      await _authService.logout();
+
+      // Limpiar SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_data');
+      await prefs.setBool('is_authenticated', false);
+
+      print('🧹 Limpieza en segundo plano completada');
+    } catch (e) {
+      print('⚠️ Error en limpieza: $e');
+    }
   }
-}
+
+  // ✅ MÉTODO PARA COMPROBAR si hay sesión SIN verificar token
+  bool hasLocalSession() {
+    try {
+      // Esto se puede llamar síncronamente para decisiones rápidas
+      return _user != null &&
+          _user!.token.isNotEmpty &&
+          _authStatus == AuthStatus.authenticated;
+    } catch (e) {
+      return false;
+    }
+  }
 }

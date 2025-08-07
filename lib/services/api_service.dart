@@ -1,4 +1,3 @@
-// lib/services/api_service.dart - COMPLETO Y CORREGIDO - FINAL
 import 'dart:convert';
 import 'dart:async';
 import 'dart:io';
